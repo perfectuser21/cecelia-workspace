@@ -339,10 +339,18 @@ send_feishu_notification() {
 
 # 发送飞书卡片消息
 # 参数: $1=标题, $2=状态(success/failed/warning), $3=内容
+# 环境变量: TEST_MODE=1 时跳过实际发送
 send_feishu_card() {
   local title="$1"
   local status="$2"
   local content="$3"
+
+  # TEST_MODE: 跳过实际发送
+  if [[ "${TEST_MODE:-}" == "1" ]]; then
+    log_info "[TEST_MODE] 模拟发送飞书卡片: $title ($status)"
+    return 0
+  fi
+
   load_secrets
 
   if [[ -z "$FEISHU_BOT_WEBHOOK" ]]; then
