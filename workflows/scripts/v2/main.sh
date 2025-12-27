@@ -83,20 +83,21 @@ echo ""
 echo "[阶段 1/4] 准备"
 echo "----------------------------------------"
 
-PREPARE_RESULT=$("$SHARED_DIR/prepare.sh" "$TASK_ID" "$CODING_TYPE" "$RUN_ID" 2>&1) || {
-  echo "准备阶段失败"
-  echo "$PREPARE_RESULT"
-  exit 1
+# 日志输出到终端(stderr)，JSON结果捕获到变量(stdout)
+PREPARE_RESULT=$("$SHARED_DIR/prepare.sh" "$TASK_ID" "$CODING_TYPE" "$RUN_ID") || {
+  echo "准备阶段失败 (exit code: $?)"
+  exit 4
 }
 
-# 解析准备结果
-WORK_DIR=$(echo "$PREPARE_RESULT" | jq -r '.work_dir // empty' 2>/dev/null)
-TASK_INFO_PATH=$(echo "$PREPARE_RESULT" | jq -r '.task_info_path // empty' 2>/dev/null)
+# 解析准备结果（只取最后的 JSON 块）
+PREPARE_JSON=$(echo "$PREPARE_RESULT" | grep -A 100 '^{' | head -20)
+WORK_DIR=$(echo "$PREPARE_JSON" | jq -r '.work_dir // empty' 2>/dev/null)
+TASK_INFO_PATH=$(echo "$PREPARE_JSON" | jq -r '.task_info_path // empty' 2>/dev/null)
 
 if [[ -z "$WORK_DIR" || -z "$TASK_INFO_PATH" ]]; then
   echo "准备阶段返回数据异常"
-  echo "$PREPARE_RESULT"
-  exit 1
+  echo "Raw result: $PREPARE_RESULT"
+  exit 5
 fi
 
 echo "准备完成: $WORK_DIR"
@@ -124,9 +125,11 @@ while [[ $RETRY_COUNT -le $MAX_RETRIES ]]; do
     break
   fi
 
-  EXECUTE_RESULT=$("$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH" 2>&1) || {
-    echo "执行阶段失败"
-    echo "$EXECUTE_RESULT"
+  EXECUTE_RESULT=$("$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH")
+  EXECUTE_EXIT=$?
+
+  if [[ $EXECUTE_EXIT -ne 0 ]]; then
+    echo "执行阶段失败 (exit code: $EXECUTE_EXIT)"
 
     # 记录失败
     echo '{"success": false, "error": "execute_failed"}' > "$WORK_DIR/result.json"
@@ -140,7 +143,7 @@ while [[ $RETRY_COUNT -le $MAX_RETRIES ]]; do
       PASSED=false
       break
     fi
-  }
+  fi
 
   echo "执行完成"
 
@@ -154,7 +157,7 @@ while [[ $RETRY_COUNT -le $MAX_RETRIES ]]; do
   QUALITY_SCRIPT="$SHARED_DIR/quality-check.sh"
 
   if [[ -f "$QUALITY_SCRIPT" ]]; then
-    QUALITY_RESULT=$("$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE" 2>&1)
+    QUALITY_RESULT=$("$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE")
     QUALITY_EXIT=$?
 
     case $QUALITY_EXIT in
@@ -202,7 +205,7 @@ echo ""
 echo "[阶段 4/4] 收尾"
 echo "----------------------------------------"
 
-CLEANUP_RESULT=$("$SHARED_DIR/cleanup.sh" "$RUN_ID" "$TASK_ID" "$PASSED" "$RETRY_COUNT" 2>&1) || {
+CLEANUP_RESULT=$("$SHARED_DIR/cleanup.sh" "$RUN_ID" "$TASK_ID" "$PASSED" "$RETRY_COUNT") || {
   echo "收尾阶段失败"
   echo "$CLEANUP_RESULT"
 }
