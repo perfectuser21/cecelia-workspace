@@ -1,0 +1,158 @@
+{
+  "name": "SSH 执行模板",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ssh-exec-{{$randomUUID}}",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "触发器",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "webhookId": "{{WEBHOOK_ID}}"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 准备 SSH 命令\nconst input = $input.item.json.body || $input.item.json;\n\nconst command = input.command || 'echo \"No command specified\"';\nconst workdir = input.workdir || '/home/xx';\nconst timeout = input.timeout || 300;\n\nreturn {\n  json: {\n    command: `cd ${workdir} && ${command}`,\n    timeout: timeout,\n    original_input: input\n  }\n};"
+      },
+      "id": "prepare-command",
+      "name": "准备命令",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "={{$json.command}}",
+        "options": {}
+      },
+      "id": "ssh-execute",
+      "name": "SSH 执行",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "{{SSH_CREDENTIAL_ID}}",
+          "name": "VPS SSH"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// 解析 SSH 输出并检查错误\nconst item = $input.item;\nconst stdout = item.json.stdout || '';\nconst stderr = item.json.stderr || '';\nconst exitCode = item.json.exitCode ?? (item.error ? 1 : 0);\n\nif (exitCode !== 0 || item.error) {\n  throw new Error(`SSH 执行失败: ${item.error?.message || stderr || 'Unknown error'}`);\n}\n\nreturn {\n  json: {\n    success: true,\n    exit_code: exitCode,\n    stdout: stdout,\n    stderr: stderr,\n    executed_at: new Date().toISOString()\n  }\n};"
+      },
+      "id": "parse-result",
+      "name": "解析结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": "={{ $json.success ? 200 : 500 }}"
+        }
+      },
+      "id": "respond",
+      "name": "返回响应",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [240, 520]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.FEISHU_BOT_WEBHOOK}}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"msg_type\": \"text\", \"content\": { \"text\": \"❌ SSH 执行失败\\nWorkflow: \" + $json.workflow.name + \"\\n错误: \" + $json.execution.error.message + \"\\n时间: \" + new Date().toISOString() } } }}",
+        "options": {}
+      },
+      "id": "notify-error",
+      "name": "错误告警",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 520]
+    }
+  ],
+  "connections": {
+    "触发器": {
+      "main": [
+        [
+          {
+            "node": "准备命令",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "准备命令": {
+      "main": [
+        [
+          {
+            "node": "SSH 执行",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH 执行": {
+      "main": [
+        [
+          {
+            "node": "解析结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "解析结果": {
+      "main": [
+        [
+          {
+            "node": "返回响应",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "错误告警",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

@@ -1,0 +1,102 @@
+{
+  "name": "夜间清理",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger",
+      "name": "手动触发",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx",
+        "command": "#!/bin/bash\nset -e\n\nTOTAL_FREED=0\nITEMS_CLEANED=0\n\necho \"Starting cleanup...\"\n\n# ========== 1. /tmp 临时文件（超过 1 天）==========\necho \"Cleaning /tmp...\"\nTMP_BEFORE=$(du -sm /tmp 2>/dev/null | cut -f1 || echo 0)\nfind /tmp -type f -mtime +1 -delete 2>/dev/null || true\nfind /tmp -type d -empty -delete 2>/dev/null || true\nTMP_AFTER=$(du -sm /tmp 2>/dev/null | cut -f1 || echo 0)\nTMP_FREED=$((TMP_BEFORE - TMP_AFTER))\nTOTAL_FREED=$((TOTAL_FREED + TMP_FREED))\nif [ $TMP_FREED -gt 0 ]; then ITEMS_CLEANED=$((ITEMS_CLEANED + 1)); fi\n\n# ========== 2. 用户缓存（超过 7 天）==========\necho \"Cleaning user cache...\"\nCACHE_BEFORE=$(du -sm ~/.cache 2>/dev/null | cut -f1 || echo 0)\nfind ~/.cache -type f -mtime +7 -delete 2>/dev/null || true\nCACHE_AFTER=$(du -sm ~/.cache 2>/dev/null | cut -f1 || echo 0)\nCACHE_FREED=$((CACHE_BEFORE - CACHE_AFTER))\nTOTAL_FREED=$((TOTAL_FREED + CACHE_FREED))\nif [ $CACHE_FREED -gt 0 ]; then ITEMS_CLEANED=$((ITEMS_CLEANED + 1)); fi\n\n# ========== 3. npm 缓存 ==========\necho \"Cleaning npm cache...\"\nNPM_BEFORE=$(du -sm ~/.npm 2>/dev/null | cut -f1 || echo 0)\nrm -rf ~/.npm/_cacache/* 2>/dev/null || true\nNPM_AFTER=$(du -sm ~/.npm 2>/dev/null | cut -f1 || echo 0)\nNPM_FREED=$((NPM_BEFORE - NPM_AFTER))\nTOTAL_FREED=$((TOTAL_FREED + NPM_FREED))\nif [ $NPM_FREED -gt 0 ]; then ITEMS_CLEANED=$((ITEMS_CLEANED + 1)); fi\n\n# ========== 4. pip 缓存 ==========\necho \"Cleaning pip cache...\"\nPIP_BEFORE=$(du -sm ~/.cache/pip 2>/dev/null | cut -f1 || echo 0)\nrm -rf ~/.cache/pip/* 2>/dev/null || true\nPIP_FREED=$PIP_BEFORE\nTOTAL_FREED=$((TOTAL_FREED + PIP_FREED))\nif [ $PIP_FREED -gt 0 ]; then ITEMS_CLEANED=$((ITEMS_CLEANED + 1)); fi\n\n# ========== 5. Docker 清理 ==========\necho \"Cleaning Docker...\"\nDOCKER_BEFORE=$(docker system df --format '{{.Size}}' 2>/dev/null | head -1 || echo \"0B\")\n\n# Dangling images\ndocker image prune -f > /tmp/docker_prune.log 2>&1 || true\nDOCKER_IMAGE=$(grep \"reclaimed\" /tmp/docker_prune.log 2>/dev/null | grep -oP '[0-9.]+[KMGT]?B' || echo \"0B\")\n\n# Stopped containers\ndocker container prune -f >> /tmp/docker_prune.log 2>&1 || true\n\n# Build cache\ndocker builder prune -f >> /tmp/docker_prune.log 2>&1 || true\nDOCKER_BUILDER=$(grep \"reclaimed\" /tmp/docker_prune.log 2>/dev/null | tail -1 | grep -oP '[0-9.]+[KMGT]?B' || echo \"0B\")\n\nITEMS_CLEANED=$((ITEMS_CLEANED + 1))\n\n# ========== 6. Chrome 缓存（各平台）==========\necho \"Cleaning Chrome caches...\"\nCHROME_FREED=0\nfor platform in douyin kuaishou xiaohongshu toutiao weibo channels gongzhonghao zhihu; do\n  CACHE_DIR=~/.$platform/chrome-data/Default/Cache\n  if [ -d \"$CACHE_DIR\" ]; then\n    SIZE=$(du -sm \"$CACHE_DIR\" 2>/dev/null | cut -f1 || echo 0)\n    rm -rf \"$CACHE_DIR\"/* 2>/dev/null || true\n    CHROME_FREED=$((CHROME_FREED + SIZE))\n  fi\n  \n  # Code Cache\n  CODE_CACHE=~/.$platform/chrome-data/Default/Code\\ Cache\n  if [ -d \"$CODE_CACHE\" ]; then\n    SIZE=$(du -sm \"$CODE_CACHE\" 2>/dev/null | cut -f1 || echo 0)\n    rm -rf \"$CODE_CACHE\"/* 2>/dev/null || true\n    CHROME_FREED=$((CHROME_FREED + SIZE))\n  fi\ndone\nTOTAL_FREED=$((TOTAL_FREED + CHROME_FREED))\nif [ $CHROME_FREED -gt 0 ]; then ITEMS_CLEANED=$((ITEMS_CLEANED + 1)); fi\n\n# ========== 7. 日志文件（超过 7 天）==========\necho \"Cleaning old logs...\"\nLOG_FREED=0\nfor logdir in ~/logs /var/log; do\n  if [ -d \"$logdir\" ]; then\n    BEFORE=$(du -sm \"$logdir\" 2>/dev/null | cut -f1 || echo 0)\n    find \"$logdir\" -type f -name \"*.log\" -mtime +7 -delete 2>/dev/null || true\n    find \"$logdir\" -type f -name \"*.log.*\" -mtime +7 -delete 2>/dev/null || true\n    AFTER=$(du -sm \"$logdir\" 2>/dev/null | cut -f1 || echo 0)\n    LOG_FREED=$((LOG_FREED + BEFORE - AFTER))\n  fi\ndone\nTOTAL_FREED=$((TOTAL_FREED + LOG_FREED))\nif [ $LOG_FREED -gt 0 ]; then ITEMS_CLEANED=$((ITEMS_CLEANED + 1)); fi\n\n# ========== 结果 ==========\necho \"{\"\necho \"  \\\"success\\\": true,\"\necho \"  \\\"total_freed_mb\\\": $TOTAL_FREED,\"\necho \"  \\\"items_cleaned\\\": $ITEMS_CLEANED,\"\necho \"  \\\"details\\\": {\"\necho \"    \\\"tmp_freed_mb\\\": $TMP_FREED,\"\necho \"    \\\"cache_freed_mb\\\": $CACHE_FREED,\"\necho \"    \\\"npm_freed_mb\\\": $NPM_FREED,\"\necho \"    \\\"pip_freed_mb\\\": $PIP_FREED,\"\necho \"    \\\"chrome_freed_mb\\\": $CHROME_FREED,\"\necho \"    \\\"log_freed_mb\\\": $LOG_FREED,\"\necho \"    \\\"docker_image\\\": \\\"$DOCKER_IMAGE\\\",\"\necho \"    \\\"docker_builder\\\": \\\"$DOCKER_BUILDER\\\"\"\necho \"  },\"\necho \"  \\\"timestamp\\\": \\\"$(date -Iseconds)\\\"\"\necho \"}\"\n"
+      },
+      "id": "ssh",
+      "name": "执行清理",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json.stdout || '';\ntry {\n  const jsonMatch = output.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    return [{ json: JSON.parse(jsonMatch[0]) }];\n  }\n} catch (e) {}\nreturn [{ json: { success: false, error: 'Failed to parse output', raw: output } }];"
+      },
+      "id": "parse",
+      "name": "解析结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 1 1 *"
+            }
+          ]
+        }
+      },
+      "id": "placeholder_schedule",
+      "name": "占位触发器",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -200,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "手动触发": {
+      "main": [
+        [
+          {
+            "node": "执行清理",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "执行清理": {
+      "main": [
+        [
+          {
+            "node": "解析结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  }
+}

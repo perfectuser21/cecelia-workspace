@@ -1,0 +1,158 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2025-12-25",
+  "templates": [
+    {
+      "id": "webhook-response",
+      "name": "Webhook 响应",
+      "description": "接收 webhook 并返回响应的标准流程",
+      "tags": ["webhook", "api", "http"],
+      "category": "integration",
+      "nodes": ["Webhook", "Code", "Respond to Webhook"],
+      "complexity": 1,
+      "use_cases": ["API 端点", "外部系统回调", "数据接收"]
+    },
+    {
+      "id": "scheduled-task",
+      "name": "定时任务",
+      "description": "按计划执行的任务（支持 Cron 表达式）",
+      "tags": ["schedule", "cron", "automation"],
+      "category": "automation",
+      "nodes": ["Schedule Trigger", "Code", "HTTP Request"],
+      "complexity": 2,
+      "use_cases": ["定时备份", "定时检查", "日常维护"]
+    },
+    {
+      "id": "api-integration",
+      "name": "API 集成",
+      "description": "调用外部 API 并处理响应",
+      "tags": ["api", "http", "integration"],
+      "category": "integration",
+      "nodes": ["Trigger", "HTTP Request", "Code", "Error Handler"],
+      "complexity": 2,
+      "use_cases": ["数据同步", "第三方服务集成", "API 调用"]
+    },
+    {
+      "id": "notification",
+      "name": "通知模板",
+      "description": "发送飞书/钉钉/Slack 通知",
+      "tags": ["notification", "feishu", "alert"],
+      "category": "notification",
+      "nodes": ["Trigger", "Code", "HTTP Request (飞书)"],
+      "complexity": 1,
+      "use_cases": ["告警通知", "状态推送", "审批提醒"]
+    },
+    {
+      "id": "ssh-execution",
+      "name": "SSH 执行",
+      "description": "通过 SSH 在远程服务器执行命令",
+      "tags": ["ssh", "vps", "execution"],
+      "category": "automation",
+      "nodes": ["Trigger", "SSH", "Code", "Error Handler"],
+      "complexity": 3,
+      "use_cases": ["远程脚本执行", "服务器管理", "部署自动化"]
+    },
+    {
+      "id": "vps-health-check",
+      "name": "VPS 健康检查",
+      "description": "定时检查 VPS 磁盘/内存/CPU，超阈值告警",
+      "tags": ["健康检查", "磁盘空间", "vps监控", "服务器监控", "告警"],
+      "category": "automation",
+      "nodes": ["Schedule Trigger", "SSH", "Code", "IF", "HTTP Request", "Error Trigger"],
+      "complexity": 3,
+      "use_cases": ["磁盘空间监控", "服务器健康检查", "资源告警"]
+    },
+    {
+      "id": "data-processing",
+      "name": "数据处理流水线",
+      "description": "获取数据、转换、存储的完整流程",
+      "tags": ["data", "etl", "database"],
+      "category": "data",
+      "nodes": ["Trigger", "HTTP Request", "Code", "Postgres", "Error Handler"],
+      "complexity": 3,
+      "use_cases": ["数据同步", "ETL 流程", "数据清洗"]
+    },
+    {
+      "id": "error-handling",
+      "name": "错误处理",
+      "description": "带重试和错误通知的健壮流程",
+      "tags": ["error", "retry", "reliability"],
+      "category": "pattern",
+      "nodes": ["Trigger", "Try", "Catch", "Code", "Notification"],
+      "complexity": 2,
+      "use_cases": ["需要容错的流程", "关键业务流程", "外部依赖调用"]
+    },
+    {
+      "id": "parallel-execution",
+      "name": "并行执行",
+      "description": "使用 SplitInBatches 并行处理多个任务",
+      "tags": ["parallel", "batch", "performance"],
+      "category": "pattern",
+      "nodes": ["Trigger", "SplitInBatches", "Code", "Merge"],
+      "complexity": 3,
+      "use_cases": ["批量处理", "并发任务", "性能优化"]
+    },
+    {
+      "id": "sub-workflow",
+      "name": "子 Workflow 调用",
+      "description": "调用其他 workflow 实现模块化",
+      "tags": ["workflow", "modular", "reusable"],
+      "category": "pattern",
+      "nodes": ["Trigger", "Execute Workflow", "Code"],
+      "complexity": 2,
+      "use_cases": ["流程编排", "模块化设计", "复用逻辑"]
+    },
+    {
+      "id": "github-api",
+      "name": "GitHub API 调用",
+      "description": "调用 GitHub API 获取仓库信息",
+      "tags": ["github", "api", "star", "repo", "仓库", "stars"],
+      "category": "integration",
+      "nodes": ["HTTP Request", "Code"],
+      "complexity": 1,
+      "use_cases": ["获取仓库数据", "监控 stars", "GitHub 集成"]
+    },
+    {
+      "id": "code-node",
+      "name": "代码处理节点",
+      "description": "使用 JavaScript 处理数据的通用模板",
+      "tags": ["code", "逻辑", "处理", "计算", "脚本", "js", "javascript"],
+      "category": "pattern",
+      "nodes": ["Webhook", "Code", "Respond to Webhook"],
+      "complexity": 1,
+      "use_cases": ["数据转换", "业务逻辑", "自定义计算"]
+    },
+    {
+      "id": "data-compare",
+      "name": "数据对比",
+      "description": "对比当前和历史数据的变化",
+      "tags": ["对比", "比较", "compare", "diff", "增量", "变化"],
+      "category": "data",
+      "nodes": ["Webhook", "Code", "Respond to Webhook"],
+      "complexity": 1,
+      "use_cases": ["数据变化检测", "增量分析", "趋势对比"]
+    }
+  ],
+  "categories": {
+    "integration": {
+      "name": "集成",
+      "description": "与外部系统交互的模板"
+    },
+    "automation": {
+      "name": "自动化",
+      "description": "定时或触发式自动化任务"
+    },
+    "notification": {
+      "name": "通知",
+      "description": "消息推送和告警"
+    },
+    "data": {
+      "name": "数据处理",
+      "description": "数据获取、转换、存储"
+    },
+    "pattern": {
+      "name": "设计模式",
+      "description": "可复用的设计模式"
+    }
+  }
+}

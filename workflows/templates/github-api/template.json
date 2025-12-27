@@ -1,0 +1,99 @@
+{
+  "name": "{{WORKFLOW_NAME}}",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 1 }] }
+      },
+      "id": "schedule",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/repos/{{OWNER}}/{{REPO}}",
+        "options": {
+          "response": { "response": { "fullResponse": true } }
+        }
+      },
+      "id": "github-api",
+      "name": "GitHub API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 获取当前 star 数量\nconst currentStars = $input.first().json.body.stargazers_count;\nconst repo = $input.first().json.body.full_name;\n\n// 获取之前的记录（使用静态数据存储）\nconst staticData = $getWorkflowStaticData('global');\nconst previousStars = staticData.previousStars || 0;\n\n// 计算新增\nconst newStars = currentStars - previousStars;\n\n// 更新记录\nstaticData.previousStars = currentStars;\n\nreturn {\n  repo,\n  currentStars,\n  previousStars,\n  newStars,\n  hasNewStars: newStars > 0\n};"
+      },
+      "id": "process-data",
+      "name": "处理数据",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.hasNewStars }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-new-stars",
+      "name": "检查新增",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.FEISHU_BOT_WEBHOOK}}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"msg_type\":\"text\",\"content\":{\"text\":\"🌟 GitHub Star 通知\\n\\n仓库: \" + $json.repo + \"\\n当前 Stars: \" + $json.currentStars + \"\\n新增: +\" + $json.newStars}}"
+      },
+      "id": "notify",
+      "name": "飞书通知",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [240, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.FEISHU_BOT_WEBHOOK}}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"msg_type\":\"text\",\"content\":{\"text\":\"❌ GitHub API 错误: \" + $json.error.message}}"
+      },
+      "id": "error-notify",
+      "name": "错误通知",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 500]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": { "main": [[{ "node": "GitHub API", "type": "main", "index": 0 }]] },
+    "GitHub API": { "main": [[{ "node": "处理数据", "type": "main", "index": 0 }]] },
+    "处理数据": { "main": [[{ "node": "检查新增", "type": "main", "index": 0 }]] },
+    "检查新增": { "main": [[{ "node": "飞书通知", "type": "main", "index": 0 }], []] },
+    "Error Trigger": { "main": [[{ "node": "错误通知", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

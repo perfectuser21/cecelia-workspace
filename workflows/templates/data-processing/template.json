@@ -1,0 +1,245 @@
+{
+  "name": "数据处理流水线模板",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 */6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "定时触发",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.example.com/data",
+        "method": "GET",
+        "authentication": "genericCredentialType",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "100"
+            },
+            {
+              "name": "offset",
+              "value": "0"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "fetch-data",
+      "name": "获取数据",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 数据清洗和转换\nconst rawData = $input.item.json;\nconst items = rawData.items || [];\n\n// 过滤和转换数据\nconst processedItems = items\n  .filter(item => item.status === 'active') // 只要 active 的\n  .map(item => ({\n    id: item.id,\n    title: item.title || 'Untitled',\n    content: item.content || '',\n    published_at: item.created_at ? new Date(item.created_at).toISOString() : null,\n    metrics: {\n      views: item.views || 0,\n      likes: item.likes || 0,\n      comments: item.comments || 0\n    },\n    // 数据清洗：移除 HTML 标签\n    clean_content: (item.content || '').replace(/<[^>]*>/g, ''),\n    // 添加处理时间戳\n    processed_at: new Date().toISOString()\n  }));\n\nconsole.log(`处理了 ${processedItems.length} 条数据`);\n\n// 返回多个 items 用于批量插入\nreturn processedItems.map(item => ({ json: item }));"
+      },
+      "id": "transform-data",
+      "name": "转换数据",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "content_items",
+          "mode": "list",
+          "cachedResultName": "content_items"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{$json.id}}",
+            "title": "={{$json.title}}",
+            "content": "={{$json.clean_content}}",
+            "publish_time": "={{$json.published_at}}",
+            "latest_views": "={{$json.metrics.views}}",
+            "latest_likes": "={{$json.metrics.likes}}",
+            "latest_comments": "={{$json.metrics.comments}}",
+            "status": "active"
+          },
+          "matchingColumns": ["id"],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "mode": "upsert"
+        }
+      },
+      "id": "save-to-db",
+      "name": "保存到数据库",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [900, 300],
+      "credentials": {
+        "postgres": {
+          "id": "{{POSTGRES_CREDENTIAL_ID}}",
+          "name": "PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 生成处理报告\nconst allItems = $input.all();\nconst totalCount = allItems.length;\n\nconst report = {\n  job_name: 'Data Processing Pipeline',\n  executed_at: new Date().toISOString(),\n  stats: {\n    total_processed: totalCount,\n    total_saved: totalCount,\n    success_rate: '100%'\n  },\n  sample_data: allItems.slice(0, 3).map(item => ({\n    id: item.json.id,\n    title: item.json.title\n  }))\n};\n\nreturn { json: report };"
+      },
+      "id": "generate-report",
+      "name": "生成报告",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.FEISHU_BOT_WEBHOOK}}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"msg_type\": \"text\",\n  \"content\": {\n    \"text\": \"[数据处理完成]\\n任务: \" + $json.job_name + \"\\n处理数量: \" + $json.stats.total_processed + \"\\n时间: \" + $json.executed_at\n  }\n} }}",
+        "options": {}
+      },
+      "id": "notify",
+      "name": "发送通知",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [240, 500]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.FEISHU_BOT_WEBHOOK}}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\"msg_type\": \"text\", \"content\": {\"text\": \"[数据处理失败]\\n错误: \" + $json.error.message}} }}"
+      },
+      "id": "error-notify",
+      "name": "错误通知",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 500]
+    }
+  ],
+  "connections": {
+    "定时触发": {
+      "main": [
+        [
+          {
+            "node": "获取数据",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "获取数据": {
+      "main": [
+        [
+          {
+            "node": "转换数据",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "转换数据": {
+      "main": [
+        [
+          {
+            "node": "保存到数据库",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "保存到数据库": {
+      "main": [
+        [
+          {
+            "node": "生成报告",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "生成报告": {
+      "main": [
+        [
+          {
+            "node": "发送通知",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "错误通知",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

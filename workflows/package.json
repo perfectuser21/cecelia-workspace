@@ -1,0 +1,22 @@
+{
+  "name": "n8n-workflows",
+  "version": "1.0.0",
+  "description": "n8n Cloud workflows with Claude Code SSH integration",
+  "author": "Alex Xu",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/perfectuser21/n8n-workflows.git"
+  },
+  "keywords": [
+    "n8n",
+    "workflow",
+    "automation",
+    "claude",
+    "claude-code",
+    "ssh"
+  ],
+  "dependencies": {
+    "puppeteer-core": "^24.34.0"
+  }
+}

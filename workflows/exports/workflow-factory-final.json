@@ -1,0 +1,1547 @@
+{
+  "name": "AI工厂-Workflow生产线",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "workflow-factory",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-receive-prd",
+      "name": "接收PRD",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "workflow-factory-prd"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 初始化 Run，生成 run_id 或使用续跑/回滚的 run_id\nconst now = new Date();\nconst inputData = $input.first().json;\n\nconst resumeRunId = inputData.resume_run_id || inputData.body?.resume_run_id || null;\nconst rollbackRunId = inputData.rollback_run_id || inputData.body?.rollback_run_id || null;\nconst runId = resumeRunId || (now.toISOString().replace(/[-:T]/g, '').slice(0, 14) + '-' + Math.random().toString(36).slice(2, 8));\n\nconst prd = inputData.prd || inputData.body?.prd || '未提供PRD';\nconst targetWorkflow = inputData.target_workflow || inputData.body?.target_workflow || null;\n\nreturn [{\n  json: {\n    run_id: runId,\n    prd: prd,\n    target_workflow: targetWorkflow,\n    started_at: now.toISOString(),\n    factory_type: 'workflow',\n    state_dir: `/home/xx/data/runs/${runId}`,\n    rework_count: 0,\n    is_resume: resumeRunId ? true : false,\n    resume_run_id: resumeRunId,\n    is_rollback: rollbackRunId ? true : false,\n    rollback_run_id: rollbackRunId\n  }\n}];"
+      },
+      "id": "code-init-run",
+      "name": "初始化Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=mkdir -p {{ $json.state_dir }}/{tasks,qc,docs,rework,reports} && echo '{{ $json.prd }}' > {{ $json.state_dir }}/prd.md && echo '{\"status\": \"decomposing\", \"started_at\": \"{{ $json.started_at }}\", \"rework_count\": 0}' > {{ $json.state_dir }}/state.json",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-init-state",
+      "name": "SSH 初始化状态目录",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        560,
+        300
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=claude -p '你是 n8n 架构师。分析以下 PRD 并分解为具体的 workflow 任务列表。\n\n【重要】只输出 JSON，不要输出其他内容。如果 PRD 不够清晰，仍然尝试分解成至少一个任务。\n\n输出格式（必须严格遵守）：\n{\"tasks\": [{\"id\": \"task_1\", \"name\": \"任务名\", \"description\": \"详细描述\", \"depends_on\": [], \"files_expected\": [\"预期产出\"], \"complexity\": 3, \"estimated_minutes\": 15, \"model\": \"sonnet\"}]}\n\n字段说明：\n- id: 任务ID（task_1, task_2...）\n- name: 任务名称\n- description: 详细描述任务内容\n- depends_on: 依赖的任务ID列表\n- files_expected: 预期产出的 workflow 或节点列表\n- complexity: 复杂度评分 1-5（1=非常简单，5=非常复杂）\n- estimated_minutes: 预估执行时间（分钟）\n- model: 推荐使用的模型（complexity>=4用opus，<=2用haiku，其他用sonnet）\n\n可用模板参考：\n1. webhook-trigger: Webhook 触发 + 处理 + 响应\n2. scheduled-job: 定时任务 + 执行 + 通知\n3. data-sync: 数据获取 + 转换 + 保存\n4. multi-step-approval: 多步骤审批流程\n5. error-handling: 标准错误处理模式\n\n=== PRD 开始 ===\n{{ $json.prd }}\n=== PRD 结束 ===\n\n操作类型：{{ $json.target_workflow ? \"修改现有 Workflow (ID: \" + $json.target_workflow + \")\" : \"创建新 Workflow\" }}\n\n【再次强调】只输出 JSON 格式的 tasks 列表，不要添加说明文字。' --allowedTools \"Read,Write,Edit,Grep,Glob,Bash,mcp__n8n__search_workflows,mcp__n8n__get_workflow_details\" --model sonnet 2>&1 | tail -n 100",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-claude-decompose",
+      "name": "SSH Claude A - 分解PRD",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 拓扑排序：将任务按依赖关系分成波次，并智能分配模型\nconst items = $input.all();\nconst rawOutput = items[0].json.stdout || '';\nconst initData = $('初始化Run').first().json;\n\nlet tasks;\n\n// 解析 Claude 输出的 JSON（处理 markdown 代码块）\ntry {\n  let jsonStr = rawOutput;\n  \n  // 先尝试提取 markdown 代码块中的 JSON\n  const codeBlockMatch = rawOutput.match(/```(?:json)?\\s*([\\s\\S]*?)```/);\n  if (codeBlockMatch) {\n    jsonStr = codeBlockMatch[1].trim();\n  }\n  \n  // 匹配完整的 JSON 对象\n  const jsonMatch = jsonStr.match(/\\{[\\s\\S]*\"tasks\"\\s*:\\s*\\[[\\s\\S]*\\]\\s*\\}/);\n  if (jsonMatch) {\n    const parsed = JSON.parse(jsonMatch[0]);\n    tasks = parsed.tasks;\n  } else {\n    throw new Error('无法找到 tasks JSON');\n  }\n} catch (e) {\n  return [{ json: { error: '解析失败', details: e.message, raw: rawOutput, ...initData } }];\n}\n\nif (!tasks || tasks.length === 0) {\n  return [{ json: { error: '任务列表为空', ...initData } }];\n}\n\n// 智能分配模型\nfunction assignModel(task) {\n  if (task.model && ['opus', 'sonnet', 'haiku'].includes(task.model)) {\n    return task.model;\n  }\n  const complexity = task.complexity || 3;\n  if (complexity >= 4) return 'opus';\n  if (complexity <= 2) return 'haiku';\n  return 'sonnet';\n}\n\n// 拓扑排序\nconst waves = [];\nconst completed = new Set();\nwhile (completed.size < tasks.length) {\n  const wave = [];\n  for (const task of tasks) {\n    if (completed.has(task.id)) continue;\n    const deps = task.depends_on || [];\n    if (deps.every(dep => completed.has(dep))) wave.push(task);\n  }\n  if (wave.length === 0) {\n    return [{ json: { error: '循环依赖', ...initData } }];\n  }\n  wave.forEach(t => completed.add(t.id));\n  waves.push(wave);\n}\n\n// 返回任务列表\nconst sortedTasks = [];\nwaves.forEach((wave, waveIndex) => {\n  wave.forEach(task => {\n    sortedTasks.push({\n      ...task,\n      waveIndex,\n      totalWaves: waves.length,\n      model: assignModel(task),\n      complexity: task.complexity || 3,\n      estimated_minutes: task.estimated_minutes || 10,\n      files_expected: task.files_expected || [],\n      ...initData\n    });\n  });\n});\n\nconst waveData = {\n  waves: waves.map((w, i) => ({\n    waveIndex: i,\n    tasks: w.map(t => ({ id: t.id, name: t.name, model: assignModel(t) }))\n  })),\n  totalWaves: waves.length,\n  tasksCount: sortedTasks.length\n};\n\nconst executionPlan = {\n  run_id: initData.run_id,\n  created_at: new Date().toISOString(),\n  prd: initData.prd,\n  tasks: tasks,\n  waves: waveData.waves\n};\n\nreturn sortedTasks.map(task => ({\n  json: { ...task, _waveData: waveData, _executionPlan: executionPlan }\n}));"
+      },
+      "id": "code-topological-sort",
+      "name": "Code - 拓扑排序",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 3,
+        "options": {}
+      },
+      "id": "split-in-batches",
+      "name": "SplitInBatches - 任务分批",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1080,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=cd /home/xx/dev/n8n-workflows && # 更新 wave 信息\nif [ ! -z \"{{ $json.waveIndex }}\" ]; then\n  jq '.current_wave = {{ $json.waveIndex }} | .total_waves = {{ $json.totalWaves }}' {{ $json.state_dir }}/state.json > {{ $json.state_dir }}/state.json.tmp 2>/dev/null && mv {{ $json.state_dir }}/state.json.tmp {{ $json.state_dir }}/state.json || true\nfi\necho '{\"task_id\": \"{{ $json.id }}\", \"status\": \"executing\", \"model\": \"{{ $json.model || 'sonnet' }}\", \"complexity\": {{ $json.complexity || 3 }}, \"estimated_minutes\": {{ $json.estimated_minutes || 10 }}}' > {{ $json.state_dir }}/tasks/{{ $json.id }}.json && claude -p '执行以下 n8n workflow 任务：\n\n任务ID: {{ $json.id }}\n任务名: {{ $json.name }}\n描述: {{ $json.description }}\n预期产出: {{ JSON.stringify($json.files_expected) }}\n复杂度: {{ $json.complexity || 3 }}/5\n预估时间: {{ $json.estimated_minutes || 10 }} 分钟\n\n要求：\n1. 使用 mcp__n8n 工具创建/修改 workflow\n2. 确保所有节点连接正确\n3. 完成后返回 JSON：{\"task_id\": \"{{ $json.id }}\", \"status\": \"success\", \"workflow_id\": \"xxx\", \"nodes_created\": N, \"files_created\": [\"xxx\"]}' --allowedTools \"mcp__n8n__search_workflows,mcp__n8n__get_workflow_details,mcp__n8n__execute_workflow,Read,Write,Edit,Bash\" --model {{ $json.model || 'sonnet' }} 2>&1 | tail -n 100",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-claude-execute",
+      "name": "SSH Claude B - 执行任务",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1260,
+        300
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 合并所有任务执行结果\nconst items = $input.all();\nconst results = [];\nlet successCount = 0;\nlet failedCount = 0;\nlet initData = {};\n\nfor (const item of items) {\n  // 保存 initData\n  if (item.json.run_id) {\n    initData = {\n      run_id: item.json.run_id,\n      state_dir: item.json.state_dir,\n      target_workflow: item.json.target_workflow,\n      started_at: item.json.started_at,\n      rework_count: item.json.rework_count || 0  // 保留返工计数\n    };\n  }\n  \n  try {\n    const output = item.json.stdout || '';\n    const match = output.match(/\\{[\\s\\S]*\"task_id\"[\\s\\S]*\"status\"[\\s\\S]*\\}/i);\n    \n    let result;\n    if (match) {\n      result = JSON.parse(match[0]);\n    } else {\n      result = {\n        task_id: item.json.id || 'unknown',\n        status: 'completed',\n        output: output.slice(-500)\n      };\n    }\n    \n    results.push(result);\n    \n    if (result.status === 'success') {\n      successCount++;\n    } else if (result.status === 'failed') {\n      failedCount++;\n    }\n  } catch (e) {\n    results.push({\n      task_id: item.json.id || 'parse_error',\n      status: 'failed',\n      error: e.message\n    });\n    failedCount++;\n  }\n}\n\nreturn [{\n  json: {\n    ...initData,\n    results,\n    summary: {\n      total: results.length,\n      success: successCount,\n      failed: failedCount,\n      success_rate: results.length > 0 ? (successCount / results.length * 100).toFixed(2) + '%' : '0%'\n    },\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "code-merge-results",
+      "name": "Code - 合并结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=# 硬检查：验证 workflow 存在性和节点完整性\nsource /home/xx/dev/n8n-workflows/.secrets\nBASE_URL=\"https://zenithjoy21xx.app.n8n.cloud/api/v1\"\n\necho '{\"check\": \"workflow_existence\", \"results\": [], \"all_exist\": true}' > /tmp/hard_check_{{ $json.run_id }}.json\n\nfor workflow_id in $(echo '{{ JSON.stringify($json.results) }}' | jq -r '.[].workflow_id // empty' 2>/dev/null); do\n  if [ -n \"$workflow_id\" ]; then\n    response=$(curl -s -H \"X-N8N-API-KEY: $N8N_REST_API_KEY\" \"$BASE_URL/workflows/$workflow_id\" 2>/dev/null)\n    \n    if echo \"$response\" | jq -e '.id' > /dev/null 2>&1; then\n      node_count=$(echo \"$response\" | jq '.nodes | length')\n      jq --arg wid \"$workflow_id\" --argjson nc \"$node_count\" \\\n        '.results += [{\"workflow_id\": $wid, \"exists\": true, \"node_count\": $nc}]' \\\n        /tmp/hard_check_{{ $json.run_id }}.json > /tmp/hard_check_{{ $json.run_id }}_tmp.json && \\\n        mv /tmp/hard_check_{{ $json.run_id }}_tmp.json /tmp/hard_check_{{ $json.run_id }}.json\n    else\n      jq --arg wid \"$workflow_id\" \\\n        '.results += [{\"workflow_id\": $wid, \"exists\": false}] | .all_exist = false' \\\n        /tmp/hard_check_{{ $json.run_id }}.json > /tmp/hard_check_{{ $json.run_id }}_tmp.json && \\\n        mv /tmp/hard_check_{{ $json.run_id }}_tmp.json /tmp/hard_check_{{ $json.run_id }}.json\n    fi\n  fi\ndone\n\ncat /tmp/hard_check_{{ $json.run_id }}.json\ncp /tmp/hard_check_{{ $json.run_id }}.json {{ $json.state_dir }}/qc/hard_check.json\nrm -f /tmp/hard_check_{{ $json.run_id }}.json /tmp/hard_check_{{ $json.run_id }}_tmp.json",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-bash-hard-check",
+      "name": "SSH Bash - 硬检查",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1660,
+        120
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=cd /home/xx/dev/n8n-workflows && output=$(claude -p '对以下 workflows 进行快速质量检查：\n\n{{ JSON.stringify($json.results.filter(r => r.workflow_id), null, 2) }}\n\n检查点：\n1. 节点命名是否清晰（中文描述）\n2. 是否有错误处理\n3. 连接是否完整\n\n返回 JSON：{\"check\": \"quality\", \"pass\": true/false, \"issues\": [{\"workflow_id\": \"xxx\", \"issue\": \"问题描述\"}]}' --allowedTools \"mcp__n8n__get_workflow_details\" --model sonnet 2>&1 | tail -n 50) && echo \"$output\" && echo \"$output\" | grep -o '{\"check\":.*}' > {{ $json.state_dir }}/qc/soft_check.json || echo '{\"check\": \"quality\", \"pass\": false, \"error\": \"解析失败\"}' > {{ $json.state_dir }}/qc/soft_check.json",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-claude-quality-check",
+      "name": "SSH Claude C - 软检查",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1660,
+        240
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=# 安全扫描：检查 workflow 中的安全问题\nsource /home/xx/dev/n8n-workflows/.secrets\nBASE_URL=\"https://zenithjoy21xx.app.n8n.cloud/api/v1\"\n\n# 初始化扫描结果\necho '{\n  \"check\": \"security_scan\",\n  \"issues\": [],\n  \"pass\": true,\n  \"details\": {\n    \"credentials\": {\"checked\": true, \"found\": 0},\n    \"sql_injection\": {\"checked\": true, \"found\": 0},\n    \"xss\": {\"checked\": true, \"found\": 0},\n    \"command_injection\": {\"checked\": true, \"found\": 0}\n  }\n}' > /tmp/security_{{ $json.run_id }}.json\n\nfor workflow_id in $(echo '{{ JSON.stringify($json.results) }}' | jq -r '.[].workflow_id // empty' 2>/dev/null); do\n  if [ -n \"$workflow_id\" ]; then\n    response=$(curl -s -H \"X-N8N-API-KEY: $N8N_REST_API_KEY\" \"$BASE_URL/workflows/$workflow_id\" 2>/dev/null)\n    \n    # 1. 检查硬编码凭据（排除 credential reference）\n    if echo \"$response\" | grep -E '(password|secret|api[_-]?key)\\s*[\":=]\\s*[\"'\"'\"'][A-Za-z0-9+/=]{20,}' | grep -v 'credentials' > /dev/null 2>&1; then\n      jq --arg wid \"$workflow_id\" \\\n        '.issues += [{\"workflow_id\": $wid, \"type\": \"credentials\", \"issue\": \"可能包含硬编码凭据\"}] | .pass = false | .details.credentials.found += 1' \\\n        /tmp/security_{{ $json.run_id }}.json > /tmp/security_{{ $json.run_id }}_tmp.json && \\\n        mv /tmp/security_{{ $json.run_id }}_tmp.json /tmp/security_{{ $json.run_id }}.json\n    fi\n    \n    # 2. 检查 SQL 注入风险（拼接 SQL 字符串）\n    if echo \"$response\" | grep -E '(SELECT|INSERT|UPDATE|DELETE|DROP).*[+].*\\$(json|input|execution)' > /dev/null 2>&1 || \\\n       echo \"$response\" | grep -E 'query.*[+].*variable|sql.*[+].*\\$' > /dev/null 2>&1; then\n      jq --arg wid \"$workflow_id\" \\\n        '.issues += [{\"workflow_id\": $wid, \"type\": \"sql_injection\", \"issue\": \"可能存在 SQL 注入风险（字符串拼接）\"}] | .pass = false | .details.sql_injection.found += 1' \\\n        /tmp/security_{{ $json.run_id }}.json > /tmp/security_{{ $json.run_id }}_tmp.json && \\\n        mv /tmp/security_{{ $json.run_id }}_tmp.json /tmp/security_{{ $json.run_id }}.json\n    fi\n    \n    # 3. 检查 XSS 风险（直接输出用户输入到 HTML）\n    if echo \"$response\" | grep -E 'innerHTML.*=.*(\\$json|\\$input)|document\\.write\\(' > /dev/null 2>&1; then\n      jq --arg wid \"$workflow_id\" \\\n        '.issues += [{\"workflow_id\": $wid, \"type\": \"xss\", \"issue\": \"可能存在 XSS 风险（直接输出到 HTML）\"}] | .pass = false | .details.xss.found += 1' \\\n        /tmp/security_{{ $json.run_id }}.json > /tmp/security_{{ $json.run_id }}_tmp.json && \\\n        mv /tmp/security_{{ $json.run_id }}_tmp.json /tmp/security_{{ $json.run_id }}.json\n    fi\n    \n    # 4. 检查命令注入风险（不安全的命令拼接）\n    if echo \"$response\" | grep -E 'exec\\(.*\\$(json|input)|spawn\\(.*\\$(json|input)|child_process.*\\$' > /dev/null 2>&1 || \\\n       echo \"$response\" | grep -E 'eval\\(.*\\$(json|input)' > /dev/null 2>&1; then\n      jq --arg wid \"$workflow_id\" \\\n        '.issues += [{\"workflow_id\": $wid, \"type\": \"command_injection\", \"issue\": \"可能存在命令注入风险（不安全的命令拼接）\"}] | .pass = false | .details.command_injection.found += 1' \\\n        /tmp/security_{{ $json.run_id }}.json > /tmp/security_{{ $json.run_id }}_tmp.json && \\\n        mv /tmp/security_{{ $json.run_id }}_tmp.json /tmp/security_{{ $json.run_id }}.json\n    fi\n  fi\ndone\n\ncat /tmp/security_{{ $json.run_id }}.json\ncp /tmp/security_{{ $json.run_id }}.json {{ $json.state_dir }}/qc/security.json\nrm -f /tmp/security_{{ $json.run_id }}.json /tmp/security_{{ $json.run_id }}_tmp.json",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-bash-security-scan",
+      "name": "SSH Bash - 安全扫描",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1660,
+        360
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=# 集成检查：验证 workflow 连接和依赖完整性\nsource /home/xx/dev/n8n-workflows/.secrets\nBASE_URL=\"https://zenithjoy21xx.app.n8n.cloud/api/v1\"\n\nimports_ok=1\napi_ok=1\n\nfor workflow_id in $(echo '{{ JSON.stringify($json.results) }}' | jq -r '.[].workflow_id // empty' 2>/dev/null); do\n  if [ -n \"$workflow_id\" ]; then\n    response=$(curl -s -H \"X-N8N-API-KEY: $N8N_REST_API_KEY\" \"$BASE_URL/workflows/$workflow_id\" 2>/dev/null)\n    \n    # 检查所有节点是否有 connections\n    node_count=$(echo \"$response\" | jq '.nodes | length')\n    connection_count=$(echo \"$response\" | jq '.connections | length')\n    \n    # 至少应该有 n-1 个连接（对于 n 个节点的线性流）\n    if [ \"$connection_count\" -lt 1 ] && [ \"$node_count\" -gt 1 ]; then\n      imports_ok=0\n    fi\n    \n    # 检查是否有未连接的节点（孤立节点）\n    orphan_count=$(echo \"$response\" | jq '[.nodes[] | select(.type != \"n8n-nodes-base.webhook\" and .type != \"n8n-nodes-base.manualTrigger\")] | length - (.connections | length)' 2>/dev/null || echo 0)\n    if [ \"$orphan_count\" -gt 1 ]; then\n      api_ok=0\n    fi\n  fi\ndone\n\necho '{\"imports_ok\": '$imports_ok', \"api_ok\": '$api_ok'}' > {{ $json.state_dir }}/qc/integration.json\necho \"INTEGRATION_CHECK_RESULT|imports_ok=$imports_ok|api_ok=$api_ok\"",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-bash-integration-check",
+      "name": "SSH Bash - 集成检查",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1660,
+        480
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=# 性能检查：验证 workflow 复杂度和效率\nsource /home/xx/dev/n8n-workflows/.secrets\nBASE_URL=\"https://zenithjoy21xx.app.n8n.cloud/api/v1\"\n\nsize_ok=1\ncomplexity_ok=1\n\nfor workflow_id in $(echo '{{ JSON.stringify($json.results) }}' | jq -r '.[].workflow_id // empty' 2>/dev/null); do\n  if [ -n \"$workflow_id\" ]; then\n    response=$(curl -s -H \"X-N8N-API-KEY: $N8N_REST_API_KEY\" \"$BASE_URL/workflows/$workflow_id\" 2>/dev/null)\n    \n    # 检查节点数量（单个 workflow 不应超过 50 个节点）\n    node_count=$(echo \"$response\" | jq '.nodes | length')\n    if [ \"$node_count\" -gt 50 ]; then\n      size_ok=0\n    fi\n    \n    # 检查代码节点中的代码长度（单个 Code 节点不应超过 500 行）\n    max_code_lines=$(echo \"$response\" | jq -r '[.nodes[] | select(.type == \"n8n-nodes-base.code\") | .parameters.jsCode // \"\" | split(\"\\n\") | length] | max // 0')\n    if [ \"$max_code_lines\" -gt 500 ]; then\n      complexity_ok=0\n    fi\n    \n    # 检查嵌套深度（SplitInBatches 嵌套不应超过 3 层）\n    split_count=$(echo \"$response\" | jq '[.nodes[] | select(.type == \"n8n-nodes-base.splitInBatches\")] | length')\n    if [ \"$split_count\" -gt 3 ]; then\n      complexity_ok=0\n    fi\n  fi\ndone\n\necho '{\"size_ok\": '$size_ok', \"complexity_ok\": '$complexity_ok'}' > {{ $json.state_dir }}/qc/performance.json\necho \"PERFORMANCE_CHECK_RESULT|size_ok=$size_ok|complexity_ok=$complexity_ok\"",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-bash-performance-check",
+      "name": "SSH Bash - 性能检查",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1660,
+        600
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=# Git检查：验证分支、未提交变更、版本一致性\ncd /home/xx/dev/n8n-workflows\n\nbranch_ok=1\nuncommitted=0\nversion_ok=1\n\n# 检查当前分支是否在受保护分支（main/master）\ncurrent_branch=$(git branch --show-current 2>/dev/null || echo \"unknown\")\nif [ \"$current_branch\" = \"main\" ] || [ \"$current_branch\" = \"master\" ]; then\n  branch_ok=0\nfi\n\n# 检查是否有未提交的变更\nuncommitted=$(git status --porcelain 2>/dev/null | wc -l)\n\n# 检查版本一致性（如果有 package.json）\nif [ -f \"package.json\" ]; then\n  pkg_version=$(jq -r '.version // \"0.0.0\"' package.json 2>/dev/null)\n  # 检查是否有版本相关的 tag\n  latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo \"v0.0.0\")\n  tag_version=${latest_tag#v}\n  \n  # 简单比较版本号（去掉 v 前缀）\n  if [ \"$pkg_version\" != \"$tag_version\" ] && [ \"$latest_tag\" != \"v0.0.0\" ]; then\n    version_ok=0\n  fi\nfi\n\necho '{\"branch_ok\": '$branch_ok', \"uncommitted\": '$uncommitted', \"version_ok\": '$version_ok'}' > {{ $json.state_dir }}/qc/git.json\necho \"GIT_CHECK_RESULT|branch_ok=$branch_ok|uncommitted=$uncommitted|version_ok=$version_ok\"",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-bash-git-check",
+      "name": "SSH Bash - Git检查",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1660,
+        720
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 决策：根据质检结果决定 PASS / REWORK / FAIL\nconst items = $input.all();\nconst mergeResult = $('Code - 合并结果').first().json;\n\n// 解析各项检查结果\nlet hardCheck = { all_exist: true, results: [] };\nlet softCheck = { pass: true, issues: [] };\nlet securityCheck = { pass: true, issues: [], details: { credentials: { checked: true, found: 0 }, sql_injection: { checked: true, found: 0 }, xss: { checked: true, found: 0 }, command_injection: { checked: true, found: 0 } } };\nlet integrationCheck = { imports_ok: 1, api_ok: 1 };\nlet performanceCheck = { size_ok: 1, complexity_ok: 1 };\nlet gitCheck = { branch_ok: 1, uncommitted: 0, version_ok: 1 };\nlet lintingCheck = { naming_ok: 1, position_ok: 1, credentials_ok: 1 };\n\nfor (const item of items) {\n  const stdout = item.json.stdout || '';\n\n  // 硬检查\n  const hardMatch = stdout.match(/\\{[\\s\\S]*\"check\"\\s*:\\s*\"workflow_existence\"[\\s\\S]*\\}/);\n  if (hardMatch) {\n    try {\n      hardCheck = JSON.parse(hardMatch[0]);\n    } catch (e) {}\n  }\n\n  // 软检查\n  const softMatch = stdout.match(/\\{[\\s\\S]*\"check\"\\s*:\\s*\"quality\"[\\s\\S]*\\}/);\n  if (softMatch) {\n    try {\n      softCheck = JSON.parse(softMatch[0]);\n    } catch (e) {}\n  }\n\n  // 安全检查（支持新的 details 格式）\n  const securityMatch = stdout.match(/\\{[\\s\\S]*\"check\"\\s*:\\s*\"security_scan\"[\\s\\S]*\\}/);\n  if (securityMatch) {\n    try {\n      securityCheck = JSON.parse(securityMatch[0]);\n    } catch (e) {}\n  }\n\n  // 集成检查\n  const integrationMatch = stdout.match(/INTEGRATION_CHECK_RESULT\\|imports_ok=(\\d+)\\|api_ok=(\\d+)/);\n  if (integrationMatch) {\n    integrationCheck = {\n      imports_ok: parseInt(integrationMatch[1]),\n      api_ok: parseInt(integrationMatch[2])\n    };\n  }\n\n  // 性能检查\n  const performanceMatch = stdout.match(/PERFORMANCE_CHECK_RESULT\\|size_ok=(\\d+)\\|complexity_ok=(\\d+)/);\n  if (performanceMatch) {\n    performanceCheck = {\n      size_ok: parseInt(performanceMatch[1]),\n      complexity_ok: parseInt(performanceMatch[2])\n    };\n  }\n\n  // Git检查\n  const gitMatch = stdout.match(/GIT_CHECK_RESULT\\|branch_ok=(\\d+)\\|uncommitted=(\\d+)\\|version_ok=(\\d+)/);\n  if (gitMatch) {\n    gitCheck = {\n      branch_ok: parseInt(gitMatch[1]),\n      uncommitted: parseInt(gitMatch[2]),\n      version_ok: parseInt(gitMatch[3])\n    };\n  }\n\n  // Linting检查\n  const lintingMatch = stdout.match(/LINTING_CHECK_RESULT\\|naming_ok=(\\d+)\\|position_ok=(\\d+)\\|credentials_ok=(\\d+)/);\n  if (lintingMatch) {\n    lintingCheck = {\n      naming_ok: parseInt(lintingMatch[1]),\n      position_ok: parseInt(lintingMatch[2]),\n      credentials_ok: parseInt(lintingMatch[3])\n    };\n  }\n}\n\n// 决策逻辑\nconst issues = [];\nlet decision = 'PASS';\nlet action = '质检通过，进入文档生成';\n\n// 严重问题 -> FAIL\nif (!hardCheck.all_exist) {\n  issues.push({ severity: 'critical', type: 'hardCheck', message: 'Workflow 创建失败或不存在', details: hardCheck.results });\n}\nif (!securityCheck.pass) {\n  issues.push({ severity: 'critical', type: 'security', message: `安全问题: ${securityCheck.issues.length} 个`, details: securityCheck.issues });\n}\n\n// 中等问题 -> REWORK\nif (!softCheck.pass) {\n  issues.push({ severity: 'high', type: 'softCheck', message: `质量问题: ${softCheck.issues.length} 个`, details: softCheck.issues });\n}\nif (mergeResult.summary.failed > 0) {\n  issues.push({ severity: 'high', type: 'execution', message: `执行失败: ${mergeResult.summary.failed} 个任务`, details: mergeResult.results.filter(r => r.status === 'failed') });\n}\nif (integrationCheck.imports_ok === 0) {\n  issues.push({ severity: 'high', type: 'integration', message: 'Workflow 连接不完整' });\n}\nif (integrationCheck.api_ok === 0) {\n  issues.push({ severity: 'high', type: 'integration', message: 'Workflow 存在孤立节点' });\n}\n\n// 低优先级问题 -> WARNING（仍然 PASS）\nif (performanceCheck.size_ok === 0) {\n  issues.push({ severity: 'low', type: 'performance', message: 'Workflow 节点数量过多（>50）' });\n}\nif (performanceCheck.complexity_ok === 0) {\n  issues.push({ severity: 'low', type: 'performance', message: 'Workflow 复杂度过高（代码>500行或嵌套>3层）' });\n}\nif (gitCheck.branch_ok === 0) {\n  issues.push({ severity: 'low', type: 'git', message: '工作在受保护分支（main/master）' });\n}\nif (gitCheck.uncommitted > 0) {\n  issues.push({ severity: 'low', type: 'git', message: `存在 ${gitCheck.uncommitted} 个未提交的变更` });\n}\nif (gitCheck.version_ok === 0) {\n  issues.push({ severity: 'low', type: 'git', message: '版本号不一致（package.json）' });\n}\nif (lintingCheck.naming_ok === 0) {\n  issues.push({ severity: 'low', type: 'linting', message: 'Workflow 节点命名不规范（建议使用中文描述）' });\n}\nif (lintingCheck.position_ok === 0) {\n  issues.push({ severity: 'low', type: 'linting', message: 'Workflow 节点位置有重叠' });\n}\nif (lintingCheck.credentials_ok === 0) {\n  issues.push({ severity: 'low', type: 'linting', message: 'Workflow 存在硬编码凭据（建议使用 credentials）' });\n}\n\n// 决策\nconst criticalCount = issues.filter(i => i.severity === 'critical').length;\nconst highCount = issues.filter(i => i.severity === 'high').length;\nconst lowCount = issues.filter(i => i.severity === 'low').length;\n\nif (criticalCount > 0) {\n  decision = 'FAIL';\n  action = '发现严重问题，需要人工介入';\n} else if (highCount > 0) {\n  decision = 'REWORK';\n  action = '需要修复问题后重试';\n} else if (lowCount > 0) {\n  decision = 'PASS';\n  action = `质检通过（有 ${lowCount} 个性能警告）`;\n}\n\nreturn [{\n  json: {\n    ...mergeResult,\n    decision,\n    action,\n    issues,\n    checks: {\n      hardCheck: { all_exist: hardCheck.all_exist, count: hardCheck.results?.length || 0 },\n      softCheck: { pass: softCheck.pass, issues: softCheck.issues?.length || 0 },\n      securityCheck: {\n        pass: securityCheck.pass,\n        issues: securityCheck.issues?.length || 0,\n        details: securityCheck.details || {}\n      },\n      integrationCheck: { imports_ok: integrationCheck.imports_ok === 1, api_ok: integrationCheck.api_ok === 1 },\n      performanceCheck: { size_ok: performanceCheck.size_ok === 1, complexity_ok: performanceCheck.complexity_ok === 1 },\n      gitCheck: { branch_ok: gitCheck.branch_ok === 1, uncommitted: gitCheck.uncommitted, version_ok: gitCheck.version_ok === 1 },\n      lintingCheck: { naming_ok: lintingCheck.naming_ok === 1, position_ok: lintingCheck.position_ok === 1, credentials_ok: lintingCheck.credentials_ok === 1 }\n    }\n  }\n}];"
+      },
+      "id": "code-decision",
+      "name": "Code - 决策",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "PASS",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "PASS"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "REWORK",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "REWORK"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "FAIL",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "FAIL"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "switch-decision",
+      "name": "Switch - 决策分支",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        2060,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=claude -p '为以下 workflows 生成文档：\n\n{{ JSON.stringify($json.results.filter(r => r.workflow_id), null, 2) }}\n\n要求生成 3 个文档：\n\n1. README.md - 功能说明\n   - 每个 workflow 的功能\n   - 触发方式（webhook path）\n   - 输入输出格式\n\n2. DEPLOY.md - 部署文档\n   - 依赖的凭据（SSH Key、API Key 等）\n   - 需要的环境变量\n   - 激活步骤\n   - 测试方法\n\n3. API.md - API 文档（如果有 webhook）\n   - Endpoint URL\n   - 请求格式\n   - 响应格式\n   - 示例调用\n\n保存到 /home/xx/dev/n8n-workflows/docs/{{ $json.run_id }}/' --allowedTools \"mcp__n8n__get_workflow_details,Write,Edit,Bash\" --model sonnet 2>&1 | tail -n 50",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-claude-doc-gen",
+      "name": "SSH Claude D - 生成文档",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        160
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=source /home/xx/dev/n8n-workflows/.secrets\nBASE_URL=\"https://zenithjoy21xx.app.n8n.cloud/api/v1\"\n\n# 创建 final 目录\nmkdir -p {{ $json.state_dir }}/final\n\n# 导出每个创建的 workflow\nfor workflow_id in $(echo '{{ JSON.stringify($json.results) }}' | jq -r '.[].workflow_id // empty' 2>/dev/null); do\n  if [ -n \"$workflow_id\" ]; then\n    curl -s -H \"X-N8N-API-KEY: $N8N_REST_API_KEY\" \\\n      \"$BASE_URL/workflows/$workflow_id\" \\\n      > {{ $json.state_dir }}/final/${workflow_id}.json\n    echo \"导出 workflow: $workflow_id\"\n  fi\ndone\n\n# 生成 manifest.json\necho '{{ JSON.stringify($json.results) }}' | jq '[.[] | select(.workflow_id) | {id: .workflow_id, task_id: .task_id, name: .name // \"unknown\"}]' \\\n  > {{ $json.state_dir }}/final/manifest.json\n\nls -lah {{ $json.state_dir }}/final/\necho \"最终产出已导出到: {{ $json.state_dir }}/final/\"",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-export-final",
+      "name": "SSH - 导出最终产出",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2420,
+        100
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 检查返工次数，超过 2 次则转为 FAIL\nconst data = $input.first().json;\nconst currentCount = data.rework_count || 0;\n\nif (currentCount >= 2) {\n  return [{\n    json: {\n      ...data,\n      decision: 'FAIL',\n      action: '返工次数超过限制（2次），需要人工介入',\n      rework_exceeded: true\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    ...data,\n    can_rework: true\n  }\n}];"
+      },
+      "id": "code-check-rework-count",
+      "name": "Code - 检查返工次数",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "can-rework",
+              "leftValue": "={{ $json.can_rework }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-can-rework",
+      "name": "IF - 是否可返工",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 构建返工计划：分析失败任务及其依赖链\nconst data = $input.first().json;\nconst failedTasks = data.results.filter(r => r.status === 'failed');\nconst allTasks = data.results;\n\n// 找出需要返工的任务（失败任务 + 依赖失败任务的任务）\nconst needRework = new Set();\nconst taskMap = new Map(allTasks.map(t => [t.task_id, t]));\n\n// 标记失败任务\nfailedTasks.forEach(t => needRework.add(t.task_id));\n\n// 找出依赖失败任务的任务（需要递归）\nfunction findDependents(taskId) {\n  for (const task of allTasks) {\n    if (task.depends_on && task.depends_on.includes(taskId)) {\n      if (!needRework.has(task.task_id)) {\n        needRework.add(task.task_id);\n        findDependents(task.task_id);\n      }\n    }\n  }\n}\n\nfailedTasks.forEach(t => findDependents(t.task_id));\n\n// 构建返工任务列表\nconst reworkTasks = Array.from(needRework).map(taskId => {\n  const task = taskMap.get(taskId);\n  return {\n    task_id: taskId,\n    reason: failedTasks.some(ft => ft.task_id === taskId) ? 'failed' : 'depends_on_failed',\n    original_result: task\n  };\n});\n\nconst newReworkCount = (data.rework_count || 0) + 1;\n\n// 保存返工计划到文件\nconst reworkPlan = {\n  rework_id: newReworkCount,\n  timestamp: new Date().toISOString(),\n  failed_count: failedTasks.length,\n  rework_count: reworkTasks.length,\n  tasks: reworkTasks,\n  issues: data.issues\n};\n\nreturn [{\n  json: {\n    ...data,\n    rework_plan: reworkPlan,\n    rework_count: newReworkCount,\n    rework_task_ids: Array.from(needRework)\n  }\n}];"
+      },
+      "id": "code-build-rework-plan",
+      "name": "Code - 构建返工计划",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=# 保存返工计划并执行返工\necho '{{ JSON.stringify($json.rework_plan) }}' > {{ $json.state_dir }}/rework/rework_{{ $json.rework_count }}.json\n\n# 更新状态\njq '.rework_count = {{ $json.rework_count }} | .status = \"reworking\"' {{ $json.state_dir }}/state.json > {{ $json.state_dir }}/state.json.tmp && mv {{ $json.state_dir }}/state.json.tmp {{ $json.state_dir }}/state.json\n\ncd /home/xx/dev/n8n-workflows\n\n# 对每个需要返工的任务执行 Claude 修复\nfor task_id in {{ $json.rework_task_ids.join(' ') }}; do\n  echo \"返工任务: $task_id\"\n  \n  # 读取任务详情\n  task_info=$(cat {{ $json.state_dir }}/tasks/${task_id}.json 2>/dev/null || echo '{}')\n  \n  # 读取失败原因\n  failure_reason=$(echo '{{ JSON.stringify($json.issues) }}' | jq -r \".[] | select(.type == \\\"execution\\\") | .details[] | select(.task_id == \\\"$task_id\\\") | .error // \\\"未知错误\\\"\")\n  \n  # 执行返工\n  claude -p \"修复以下任务的问题：\n\n任务ID: $task_id\n任务信息: $task_info\n失败原因: $failure_reason\n\n要求：\n1. 分析失败原因\n2. 修复问题并重新执行\n3. 返回 JSON：{\\\"task_id\\\": \\\"$task_id\\\", \\\"status\\\": \\\"success/failed\\\", \\\"reworked\\\": true}\" \\\n    --allowedTools \"mcp__n8n__search_workflows,mcp__n8n__get_workflow_details,mcp__n8n__execute_workflow,Read,Write,Edit,Bash\" \\\n    --model sonnet 2>&1 | tail -n 100 > {{ $json.state_dir }}/tasks/${task_id}_rework_{{ $json.rework_count }}.log\ndone\n\necho \"返工完成，任务数: {{ $json.rework_task_ids.length }}\"",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-execute-rework",
+      "name": "SSH - 执行返工",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2780,
+        260
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 解析返工结果，准备重新进入合并结果流程\nconst data = $input.first().json;\nconst stdout = data.stdout || '';\n\n// 读取所有返工任务的结果\nconst reworkResults = [];\n\nfor (const taskId of data.rework_task_ids) {\n  // 从日志中提取结果\n  const logMatch = stdout.match(new RegExp(`task_id[\"'\\\\s]*:[\"'\\\\s]*${taskId}[\\\\s\\\\S]*?status[\"'\\\\s]*:[\"'\\\\s]*(success|failed)`, 'i'));\n  \n  if (logMatch) {\n    reworkResults.push({\n      task_id: taskId,\n      status: logMatch[1],\n      reworked: true,\n      rework_iteration: data.rework_count\n    });\n  } else {\n    // 默认标记为失败\n    reworkResults.push({\n      task_id: taskId,\n      status: 'failed',\n      reworked: true,\n      rework_iteration: data.rework_count,\n      error: '无法解析返工结果'\n    });\n  }\n}\n\n// 合并原始结果和返工结果\nconst mergedResults = data.results.map(original => {\n  const reworked = reworkResults.find(r => r.task_id === original.task_id);\n  return reworked || original;\n});\n\n// 输出合并结果，模拟 SplitInBatches 的输出格式\nreturn mergedResults.map(result => ({\n  json: {\n    id: result.task_id,\n    run_id: data.run_id,\n    state_dir: data.state_dir,\n    target_workflow: data.target_workflow,\n    rework_count: data.rework_count,\n    started_at: data.started_at,\n    stdout: JSON.stringify(result)\n  }\n}));"
+      },
+      "id": "code-parse-rework-results",
+      "name": "Code - 解析返工结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2960,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=echo '更新状态文件(FAIL)...' && mkdir -p {{ $json.state_dir }} && echo '{\"status\": \"{{ $json.decision }}\", \"completed_at\": \"{{ $json.timestamp }}\", \"issues\": {{ JSON.stringify($json.issues) }}, \"rework_count\": {{ $json.rework_count || 0 }}}' > {{ $json.state_dir }}/state.json",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-update-state-fail",
+      "name": "SSH 更新状态(FAIL)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        480
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=echo '更新状态文件(超限)...' && mkdir -p {{ $json.state_dir }} && echo '{\"status\": \"{{ $json.decision }}\", \"completed_at\": \"{{ $json.timestamp }}\", \"issues\": {{ JSON.stringify($json.issues) }}, \"rework_count\": {{ $json.rework_count || 0 }}, \"rework_exceeded\": true}' > {{ $json.state_dir }}/state.json",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-update-state-exceeded",
+      "name": "SSH 更新状态(超限)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2600,
+        420
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 生成管理报告并保存\nconst data = $('Code - 决策').first().json;\n\n// 计算时长\nconst startedAt = new Date(data.started_at);\nconst completedAt = new Date();\nconst durationMinutes = Math.round((completedAt - startedAt) / 1000 / 60 * 100) / 100;\n\n// 统计模型调用次数（根据任务模型分配 + 固定角色）\nconst totalTasks = data.summary.total || 0;\nconst reworkCount = data.rework_count || 0;\n\n// 从 results 中提取任务模型分配（如果有的话）\nconst tasksByModel = { opus: 0, sonnet: 0, haiku: 0 };\ntry {\n  // 尝试从拓扑排序节点的输出中提取模型信息（需要从 state_dir 读取）\n  // 由于无法直接访问之前节点的详细数据，我们做保守估算\n  // 假设大部分任务用 sonnet，少量简单任务用 haiku\n  tasksByModel.sonnet = Math.ceil(totalTasks * 0.7);\n  tasksByModel.haiku = Math.floor(totalTasks * 0.2);\n  tasksByModel.opus = totalTasks - tasksByModel.sonnet - tasksByModel.haiku;\n} catch (e) {\n  // 默认全部用 sonnet\n  tasksByModel.sonnet = totalTasks;\n}\n\n// 计算各角色的模型调用\nconst opusCalls = tasksByModel.opus + (reworkCount * Math.ceil((data.rework_task_ids?.length || 0) * 0.1)); // 返工任务中10%可能是opus级别\nconst sonnetCalls = 1 + tasksByModel.sonnet + 1 + (reworkCount * Math.ceil((data.rework_task_ids?.length || 0) * 0.7)); // A分解(1) + B执行任务(sonnet部分) + C软检查(1) + 返工(70%)\nconst haikuCalls = tasksByModel.haiku + 1 + (reworkCount * Math.floor((data.rework_task_ids?.length || 0) * 0.2)); // B执行任务(haiku部分) + D文档生成(1) + 返工(20%)\n\n// 汇总报告\nconst summary = {\n  run_id: data.run_id,\n  factory_type: data.factory_type || 'workflow',\n  \n  execution: {\n    total_tasks: totalTasks,\n    completed: data.summary.success || 0,\n    failed: data.summary.failed || 0,\n    success_rate: data.summary.success_rate || '0%',\n    rework_count: reworkCount\n  },\n  \n  timeline: {\n    started_at: data.started_at,\n    completed_at: completedAt.toISOString(),\n    duration_minutes: durationMinutes\n  },\n  \n  quality: {\n    checks_passed: [\n      data.checks.hardCheck.all_exist ? 'hardCheck' : null,\n      data.checks.softCheck.pass ? 'softCheck' : null,\n      data.checks.securityCheck.pass ? 'security' : null,\n      data.checks.integrationCheck.imports_ok ? 'integration.imports' : null,\n      data.checks.integrationCheck.api_ok ? 'integration.api' : null,\n      data.checks.performanceCheck.size_ok ? 'performance.size' : null,\n      data.checks.performanceCheck.complexity_ok ? 'performance.complexity' : null\n    ].filter(Boolean),\n    checks_failed: [\n      !data.checks.hardCheck.all_exist ? 'hardCheck' : null,\n      !data.checks.softCheck.pass ? 'softCheck' : null,\n      !data.checks.securityCheck.pass ? 'security' : null,\n      !data.checks.integrationCheck.imports_ok ? 'integration.imports' : null,\n      !data.checks.integrationCheck.api_ok ? 'integration.api' : null,\n      !data.checks.performanceCheck.size_ok ? 'performance.size' : null,\n      !data.checks.performanceCheck.complexity_ok ? 'performance.complexity' : null\n    ].filter(Boolean),\n    issues_count: data.issues?.length || 0,\n    decision: data.decision\n  },\n  \n  model_usage: {\n    opus_calls: opusCalls,\n    sonnet_calls: sonnetCalls,\n    haiku_calls: haikuCalls,\n    total_calls: opusCalls + sonnetCalls + haikuCalls,\n    breakdown: {\n      tasks: tasksByModel,\n      roles: {\n        claude_a_decompose: 'sonnet',\n        claude_b_execute: 'dynamic (opus/sonnet/haiku)',\n        claude_c_quality: 'sonnet',\n        claude_d_docs: 'haiku'\n      }\n    }\n  },\n  \n  workflows_created: data.results.filter(r => r.workflow_id).map(r => r.workflow_id),\n  state_dir: data.state_dir\n};\n\nreturn [{\n  json: {\n    ...data,\n    summary_report: summary\n  }\n}];"
+      },
+      "id": "code-manage-report",
+      "name": "Code - 管理报告",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=# 保存 summary.json\nSUMMARY_JSON='{{ JSON.stringify($json.summary_report, null, 2) }}'\necho \"$SUMMARY_JSON\" > {{ $json.state_dir }}/reports/summary.json\necho \"报告已保存: {{ $json.state_dir }}/reports/summary.json\"\ncat {{ $json.state_dir }}/reports/summary.json",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-save-summary",
+      "name": "SSH 保存摘要报告",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2600,
+        160
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/bot/v2/hook/5bde68e0-9879-4a45-88ed-461a88229136",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"msg_type\": \"interactive\",\n  \"card\": {\n    \"header\": {\n      \"title\": {\n        \"tag\": \"plain_text\",\n        \"content\": \"{{ $json.decision === 'PASS' ? 'Workflow 生产完成' : ($json.decision === 'REWORK' ? 'Workflow 生产需返工' : 'Workflow 生产失败') }}\"\n      },\n      \"template\": \"{{ $json.decision === 'PASS' ? 'green' : ($json.decision === 'REWORK' ? 'orange' : 'red') }}\"\n    },\n    \"elements\": [\n      {\n        \"tag\": \"div\",\n        \"text\": {\n          \"tag\": \"lark_md\",\n          \"content\": \"**Run ID**: {{ $json.run_id }}\\n\\n**执行摘要**\\n- 总任务: {{ $json.summary.total }}\\n- 成功: {{ $json.summary.success }}\\n- 失败: {{ $json.summary.failed }}\\n- 成功率: {{ $json.summary.success_rate }}\\n- 返工次数: {{ $json.rework_count || 0 }}\\n\\n**质检结果**\\n- Workflow存在: {{ $json.checks.hardCheck.all_exist ? '✅' : '❌' }}\\n- 代码质量: {{ $json.checks.softCheck.pass ? '✅' : '❌' }}\\n- 安全扫描: {{ $json.checks.securityCheck.pass ? '✅' : '❌' }}\\n- 集成检查: {{ ($json.checks.integrationCheck.imports_ok && $json.checks.integrationCheck.api_ok) ? '✅' : '⚠️' }}\\n- 性能检查: {{ ($json.checks.performanceCheck.size_ok && $json.checks.performanceCheck.complexity_ok) ? '✅' : '⚠️' }}\\n\\n**决策**: {{ $json.decision }}\\n**操作**: {{ $json.action }}{{ $json.rework_exceeded ? '\\n⚠️ 返工次数超限' : '' }}\"\n        }\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "id": "http-feishu-notify",
+      "name": "HTTP - 飞书通知",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 生成完整流水线状态报告\n// 读取历史分析数据（如果存在）\nlet historyData = null;\ntry {\n  const historyNode = $('SSH - 更新历史分析');\n  if (historyNode && historyNode.first()) {\n    const historyOutput = historyNode.first().json.stdout;\n    if (historyOutput) {\n      historyData = JSON.parse(historyOutput);\n    }\n  }\n} catch (e) {\n  // 历史数据不存在或解析失败，忽略\n}\nconst data = $('Code - 管理报告').first().json;\nconst completedAt = new Date().toISOString();\n\n// 计算耗时\nconst startTime = new Date(data.started_at);\nconst endTime = new Date(completedAt);\nconst durationSec = Math.round((endTime - startTime) / 1000);\nconst durationStr = durationSec >= 60 ? `${Math.floor(durationSec/60)}m ${durationSec%60}s` : `${durationSec}s`;\n\n// 状态符号\nconst S = { ok: '✅', fail: '❌', warn: '⚠️', skip: '⏭️', run: '🔄' };\n\n// 流水线各阶段状态\nconst pipeline = {\n  '1_接收PRD': { status: S.ok, detail: `PRD长度: ${data.prd?.length || 0} 字符` },\n  '2_初始化': { status: S.ok, detail: `run_id: ${data.run_id}` },\n  '3_PRD分解': { status: data.summary?.total > 0 ? S.ok : S.fail, detail: `分解出 ${data.summary?.total || 0} 个任务` },\n  '4_任务执行': {\n    status: data.summary?.failed === 0 ? S.ok : (data.summary?.success > 0 ? S.warn : S.fail),\n    detail: `成功 ${data.summary?.success || 0}/${data.summary?.total || 0}，成功率 ${data.summary?.success_rate || '0%'}`\n  },\n  '5_质量检查': {\n    status: data.checks ? (Object.values(data.checks).every(c => c.pass !== false && c.all_exist !== false) ? S.ok : S.warn) : S.skip,\n    detail: [\n      `硬检查: ${data.checks?.hardCheck?.all_exist ? S.ok : S.fail}`,\n      `软检查: ${data.checks?.softCheck?.pass ? S.ok : S.fail}`,\n      `安全: ${data.checks?.securityCheck?.pass ? S.ok : S.fail}`,\n      `集成: ${(data.checks?.integrationCheck?.imports_ok && data.checks?.integrationCheck?.api_ok) ? S.ok : S.warn}`,\n      `性能: ${(data.checks?.performanceCheck?.size_ok && data.checks?.performanceCheck?.complexity_ok) ? S.ok : S.warn}`\n    ].join(' | ')\n  },\n  '6_决策': {\n    status: data.decision === 'PASS' ? S.ok : (data.decision === 'REWORK' ? S.warn : S.fail),\n    detail: `${data.decision} - ${data.action}`\n  },\n  '7_返工': {\n    status: (data.rework_count || 0) === 0 ? S.skip : ((data.rework_count || 0) <= 2 ? S.warn : S.fail),\n    detail: `返工 ${data.rework_count || 0}/2 次${data.rework_exceeded ? ' (超限)' : ''}`\n  },\n  '8_文档生成': {\n    status: data.decision === 'PASS' ? S.ok : S.skip,\n    detail: data.decision === 'PASS' ? `docs/${data.run_id}.md` : '跳过'\n  },\n  '9_报告保存': {\n    status: S.ok,\n    detail: `${data.state_dir}/reports/summary.json`\n  }\n};\n\n// 简洁的文本报告\nconst textReport = `## AI工厂-Workflow生产线 运行报告\n\n**Run ID**: \\`${data.run_id}\\`\n**决策**: ${data.decision === 'PASS' ? '✅ 通过' : (data.decision === 'REWORK' ? '⚠️ 返工' : '❌ 失败')}\n**耗时**: ${durationStr}\n\n### 流水线状态\n\n| 阶段 | 状态 | 详情 |\n|------|------|------|\n${Object.entries(pipeline).map(([k, v]) => `| ${k.replace('_', '. ')} | ${v.status} | ${v.detail} |`).join('\\n')}\n\n### 历史对比\n${historyData ? `- 历史平均耗时: ${historyData.avg_duration_minutes}分钟 (本次: ${(durationSec/60).toFixed(1)}分钟)\n- 历史平均任务数: ${historyData.avg_tasks_per_run} (本次: ${data.summary?.total || 0})\n- 历史成功率: ${historyData.success_rate} (总计 ${historyData.total_runs} 次运行)` : '- 暂无历史数据'}\n\n### 执行摘要\n- 总任务: ${data.summary?.total || 0}\n- 成功: ${data.summary?.success || 0}\n- 失败: ${data.summary?.failed || 0}\n- 返工: ${data.rework_count || 0} 次\n\n### 产出\n- Workflows: ${data.results?.filter(r => r.workflow_id).map(r => r.workflow_id).join(', ') || '无'}\n- 文档: ${data.state_dir}/docs/\n- 报告: ${data.state_dir}/reports/summary.json\n`;\n\n\n// 提取本次执行的经验教训\nconst lessons = [];\n\n// 如果有失败，记录失败原因\nif (data.issues && data.issues.length > 0) {\n  data.issues.forEach(issue => {\n    lessons.push({\n      type: 'issue',\n      severity: issue.severity || 'medium',\n      category: issue.type || 'unknown',\n      message: issue.message,\n      run_id: data.run_id,\n      timestamp: new Date().toISOString()\n    });\n  });\n}\n\n// 如果有返工，记录返工原因\nif (data.rework_count > 0) {\n  lessons.push({\n    type: 'rework',\n    count: data.rework_count,\n    reason: '质量检查未通过需要返工',\n    run_id: data.run_id,\n    timestamp: new Date().toISOString()\n  });\n}\n\n// 如果成功且无问题，记录最佳实践\nif (data.decision === 'PASS' && (!data.issues || data.issues.length === 0)) {\n  lessons.push({\n    type: 'success',\n    message: '一次性通过所有检查',\n    tasks_count: data.summary?.total,\n    duration: durationStr,\n    run_id: data.run_id,\n    timestamp: new Date().toISOString()\n  });\n}\n\n// 记录质检失败的具体原因\nif (data.checks) {\n  const failedChecks = [];\n  if (data.checks.hardCheck && !data.checks.hardCheck.all_exist) {\n    failedChecks.push('硬检查：文件缺失');\n  }\n  if (data.checks.softCheck && !data.checks.softCheck.pass) {\n    failedChecks.push('软检查：代码质量问题');\n  }\n  if (data.checks.securityCheck && !data.checks.securityCheck.pass) {\n    failedChecks.push('安全扫描：发现安全隐患');\n  }\n  if (data.checks.integrationCheck && (!data.checks.integrationCheck.imports_ok || !data.checks.integrationCheck.api_ok)) {\n    failedChecks.push('集成检查：依赖或API问题');\n  }\n  if (data.checks.performanceCheck && (!data.checks.performanceCheck.size_ok || !data.checks.performanceCheck.complexity_ok)) {\n    failedChecks.push('性能检查：代码复杂度或体积过大');\n  }\n\n  if (failedChecks.length > 0) {\n    lessons.push({\n      type: 'check_failure',\n      checks: failedChecks,\n      run_id: data.run_id,\n      timestamp: new Date().toISOString()\n    });\n  }\n}\n\nreturn [{\n  json: {\n    run_id: data.run_id,\n    decision: data.decision,\n    status: data.decision === 'PASS' ? 'success' : (data.decision === 'REWORK' ? 'needs_rework' : 'failed'),\n    duration: durationStr,\n    pipeline,\n    summary: data.summary,\n    workflows_created: data.results?.filter(r => r.workflow_id).map(r => r.workflow_id) || [],\n    issues_count: data.issues?.length || 0,\n    rework_count: data.rework_count || 0,\n    state_dir: data.state_dir,\n    text_report: textReport,\n    history_comparison: historyData,\n    completed_at: completedAt,\n    lessons: lessons\n  }\n}];"
+      },
+      "id": "code-response",
+      "name": "Code - 生成流水线报告",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1ff5bb0c-1c78-8082-8cf0-f2cce8f44fc7"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "title|title",
+              "title": "={{ 'Workflow生产-' + $json.run_id }}"
+            },
+            {
+              "key": "Decision|select",
+              "selectValue": "={{ $json.decision }}"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "={{ $json.status }}"
+            },
+            {
+              "key": "Duration|rich_text",
+              "textContent": "={{ $json.duration }}"
+            },
+            {
+              "key": "Tasks|rich_text",
+              "textContent": "={{ $json.summary.total + '个任务, 成功' + $json.summary.success + ', 失败' + $json.summary.failed }}"
+            },
+            {
+              "key": "Workflows|rich_text",
+              "textContent": "={{ $json.workflows_created.join(', ') || '无' }}"
+            }
+          ]
+        },
+        "blockUi": {
+          "blockValues": [
+            {
+              "type": "paragraph",
+              "richText": false,
+              "textContent": "={{ $json.text_report }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "notion-save-report",
+      "name": "Notion - 保存报告",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        3140,
+        300
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "JDYClose2lGSrmxz",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 返回最终结果（webhook响应）\nconst data = $('Code - 生成流水线报告').first().json;\nconst notionResult = $input.first().json;\n\nreturn [{\n  json: {\n    ...data,\n    notion_page_id: notionResult.id || null,\n    notion_url: notionResult.url || null\n  }\n}];"
+      },
+      "id": "code-final-response",
+      "name": "返回结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-resume",
+              "leftValue": "={{ $json.is_resume }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-is-resume",
+      "name": "IF - 是否续跑",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        560,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=# 加载断点状态\nSTATE_FILE={{ $json.state_dir }}/state.json\nWAVES_FILE={{ $json.state_dir }}/waves.json\n\nif [ ! -f \"$STATE_FILE\" ]; then\n  echo '{\"error\": \"state.json 不存在\", \"path\": \"'$STATE_FILE'\"}'\n  exit 1\nfi\n\n# 读取状态文件\nstate=$(cat $STATE_FILE)\nlast_wave=$(echo \"$state\" | jq -r '.last_completed_wave // -1')\nrework_count=$(echo \"$state\" | jq -r '.rework_count // 0')\n\n# 读取所有任务\nif [ -f \"$WAVES_FILE\" ]; then\n  waves=$(cat $WAVES_FILE)\nelse\n  # 从 tasks 目录重建\n  tasks=$(ls {{ $json.state_dir }}/tasks/*.json 2>/dev/null | xargs -I{} cat {} | jq -s '.')\n  waves='{\"waves\": [], \"tasks\": '\"$tasks\"'}'\nfi\n\n# 找出需要继续执行的任务（pending 或 failed）\npending_tasks=$(find {{ $json.state_dir }}/tasks -name '*.json' -exec sh -c '\n  status=$(jq -r \".status\" \"$1\")\n  if [ \"$status\" = \"pending\" ] || [ \"$status\" = \"executing\" ] || [ \"$status\" = \"failed\" ]; then\n    cat \"$1\"\n  fi\n' _ {} \\; | jq -s '.')\n\necho '{\"last_completed_wave\": '\"$last_wave\"', \"rework_count\": '\"$rework_count\"', \"pending_tasks\": '\"$pending_tasks\"', \"waves\": '\"$waves\"'}'",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-load-checkpoint",
+      "name": "SSH - 加载断点状态",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        720,
+        120
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 解析断点状态，准备任务列表\nconst initData = $('初始化Run').first().json;\nconst sshOutput = $input.first().json;\nconst stdout = sshOutput.stdout || '{}';\n\nlet checkpointData;\ntry {\n  checkpointData = JSON.parse(stdout);\n} catch (e) {\n  return [{ json: { error: '解析断点状态失败', details: e.message, raw: stdout, ...initData } }];\n}\n\nif (checkpointData.error) {\n  return [{ json: { error: checkpointData.error, path: checkpointData.path, ...initData } }];\n}\n\nconst pendingTasks = checkpointData.pending_tasks || [];\nconst lastWave = checkpointData.last_completed_wave || -1;\nconst reworkCount = checkpointData.rework_count || 0;\n\nif (pendingTasks.length === 0) {\n  return [{ json: { error: '没有待执行的任务', last_wave: lastWave, ...initData } }];\n}\n\n// 转换为执行格式\nconst tasksToExecute = pendingTasks.map((task, index) => ({\n  json: {\n    id: task.task_id || `task_${index}`,\n    name: task.name || task.task_name || `任务 ${index}`,\n    description: task.description || '',\n    depends_on: task.depends_on || [],\n    nodes_expected: task.nodes_expected || [],\n    waveIndex: task.waveIndex || lastWave + 1,\n    totalWaves: task.totalWaves || lastWave + 2,\n    ...initData,\n    rework_count: reworkCount,\n    is_checkpoint_resume: true,\n    last_completed_wave: lastWave\n  }\n}));\n\nreturn tasksToExecute;"
+      },
+      "id": "code-parse-checkpoint",
+      "name": "Code - 解析断点状态",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=# 保存 waves 信息和执行计划（用于断点续跑和任务追踪）\nWAVES_FILE={{ $json.state_dir }}/waves.json\nPLAN_FILE={{ $json.state_dir }}/plan.json\n\n# 保存 waves 数据\nWAVE_DATA='{{ JSON.stringify($json._waveData) }}'\n\nif [ ! -z \"$WAVE_DATA\" ] && [ \"$WAVE_DATA\" != \"null\" ]; then\n  echo \"$WAVE_DATA\" > $WAVES_FILE\n  echo \"Waves 信息已保存: $WAVES_FILE\"\nelse\n  echo \"警告: 没有 wave 数据\"\nfi\n\n# 保存执行计划\nPLAN_DATA='{{ JSON.stringify($json._executionPlan) }}'\n\nif [ ! -z \"$PLAN_DATA\" ] && [ \"$PLAN_DATA\" != \"null\" ]; then\n  echo \"$PLAN_DATA\" > $PLAN_FILE\n  echo \"执行计划已保存: $PLAN_FILE\"\n  \n  # 输出计划摘要\n  echo \"---\"\n  echo \"总任务数: $(echo \"$PLAN_DATA\" | jq -r '.summary.total_tasks // 0')\"\n  echo \"总波次数: $(echo \"$PLAN_DATA\" | jq -r '.summary.total_waves // 0')\"\n  echo \"预计时长: $(echo \"$PLAN_DATA\" | jq -r '.summary.estimated_total_minutes // 0') 分钟\"\n  echo \"模型分配 - Opus: $(echo \"$PLAN_DATA\" | jq -r '.summary.model_distribution.opus // 0'), Sonnet: $(echo \"$PLAN_DATA\" | jq -r '.summary.model_distribution.sonnet // 0'), Haiku: $(echo \"$PLAN_DATA\" | jq -r '.summary.model_distribution.haiku // 0')\"\nelse\n  echo \"警告: 没有执行计划数据\"\nfi",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-save-waves",
+      "name": "SSH 保存 Waves",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1020,
+        300
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=# Linting检查：验证 n8n workflow 规范性\nsource /home/xx/dev/n8n-workflows/.secrets\n\nnaming_ok=1\nposition_ok=1\ncredentials_ok=1\n\nfor workflow_id in $(echo '{{ JSON.stringify($json.results) }}' | jq -r '.[].workflow_id // empty'); do\n  if [ -n \"$workflow_id\" ]; then\n    response=$(curl -s -H \"X-N8N-API-KEY: $N8N_REST_API_KEY\" \\\n      \"https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$workflow_id\")\n\n    # 检查节点命名是否有中文描述（推荐至少一半节点有中文名）\n    chinese_names=$(echo \"$response\" | jq '[.nodes[].name | select(test(\"[\\\\u4e00-\\\\u9fa5]\"))] | length')\n    total_nodes=$(echo \"$response\" | jq '.nodes | length')\n    if [ \"$total_nodes\" -gt 0 ] && [ \"$chinese_names\" -lt \"$((total_nodes / 2))\" ]; then\n      naming_ok=0\n    fi\n\n    # 检查节点位置是否有重叠（简化检查：检查是否有节点位置完全相同）\n    duplicate_positions=$(echo \"$response\" | jq '[.nodes[].position] | group_by(.) | map(select(length > 1)) | length')\n    if [ \"$duplicate_positions\" -gt 0 ]; then\n      position_ok=0\n    fi\n\n    # 检查是否使用 credentials 而非硬编码\n    has_credentials=$(echo \"$response\" | jq '[.nodes[] | select(.credentials)] | length')\n    needs_credentials=$(echo \"$response\" | jq '[.nodes[] | select(.type | test(\"ssh|http|postgres|mysql|notion|slack|gmail\"))] | length')\n    if [ \"$needs_credentials\" -gt 0 ] && [ \"$has_credentials\" -lt \"$needs_credentials\" ]; then\n      credentials_ok=0\n    fi\n  fi\ndone\n\necho '{\"naming_ok\": '$naming_ok', \"position_ok\": '$position_ok', \"credentials_ok\": '$credentials_ok'}' > {{ $json.state_dir }}/qc/linting.json\necho \"LINTING_CHECK_RESULT|naming_ok=$naming_ok|position_ok=$position_ok|credentials_ok=$credentials_ok\"",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-bash-linting-check",
+      "name": "SSH Bash - Linting检查",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1660,
+        840
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=# 更新 CHANGELOG\nCHANGELOG_FILE=\"/home/xx/dev/n8n-workflows/CHANGELOG.md\"\nDATE=$(date +%Y-%m-%d)\nRUN_ID=\"{{ $json.run_id }}\"\n\n# 提取 workflow 信息\nWORKFLOWS=$(echo '{{ JSON.stringify($json.summary_report.results || []) }}' | jq -r '.[] | select(.workflow_id != null and .workflow_id != \"\") | \"- `\\(.workflow_id)`: \\(.task_id // \"Unknown task\") - \\(.status // \"Unknown\")\"' 2>/dev/null || echo \"\")\n\n# 如果没有 workflow 创建，显示 \"无新增\"\nif [ -z \"$WORKFLOWS\" ]; then\n  WORKFLOWS=\"- 无新增 Workflows（可能是修改或质检失败）\"\nfi\n\n# 生成新条目\nNEW_ENTRY=\"## [$DATE] Run: $RUN_ID\n\n### 新增/修改 Workflows\n$WORKFLOWS\n\n### 执行摘要\n- 总任务: {{ $json.summary_report.summary.total }}\n- 成功: {{ $json.summary_report.summary.success }}\n- 失败: {{ $json.summary_report.summary.failed }}\n- 成功率: {{ $json.summary_report.summary.success_rate }}\n- 决策: {{ $json.decision }}\n- 返工次数: {{ $json.rework_count || 0 }}\n\n### 质检结果\n- Workflow存在性: {{ $json.checks.hardCheck.all_exist ? '✅ PASS' : '❌ FAIL' }}\n- 代码质量: {{ $json.checks.softCheck.pass ? '✅ PASS' : '❌ FAIL' }}\n- 安全扫描: {{ $json.checks.securityCheck.pass ? '✅ PASS' : '❌ FAIL' }}\n- 集成检查: {{ ($json.checks.integrationCheck.imports_ok && $json.checks.integrationCheck.api_ok) ? '✅ PASS' : '⚠️ WARNING' }}\n- 性能检查: {{ ($json.checks.performanceCheck.size_ok && $json.checks.performanceCheck.complexity_ok) ? '✅ PASS' : '⚠️ WARNING' }}\n\n---\n\"\n\n# 追加到 CHANGELOG（新条目在最前面）\nif [ -f \"$CHANGELOG_FILE\" ]; then\n  echo \"$NEW_ENTRY\" | cat - \"$CHANGELOG_FILE\" > /tmp/changelog_tmp && mv /tmp/changelog_tmp \"$CHANGELOG_FILE\"\nelse\n  echo \"# AI工厂-Workflow生产线 CHANGELOG\n\n$NEW_ENTRY\" > \"$CHANGELOG_FILE\"\nfi\n\necho \"✅ CHANGELOG 已更新: $CHANGELOG_FILE\"\necho \"\"\necho \"最新条目:\"\nhead -40 \"$CHANGELOG_FILE\"",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-update-changelog",
+      "name": "SSH - 更新CHANGELOG",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2780,
+        160
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 生成验收清单\nconst data = $input.first().json;\n\nconst checklist = {\n  run_id: data.run_id,\n  generated_at: new Date().toISOString(),\n  \n  // 功能验收\n  functional: [\n    { item: 'Webhook 可访问', status: data.checks?.hardCheck?.all_exist ? 'PASS' : 'FAIL' },\n    { item: '所有节点已连接', status: data.checks?.integrationCheck?.api_ok ? 'PASS' : 'FAIL' },\n    { item: '凭据配置正确', status: data.checks?.lintingCheck?.credentials_ok !== 0 ? 'PASS' : 'WARN' }\n  ],\n  \n  // 质量验收\n  quality: [\n    { item: '代码质量检查通过', status: data.checks?.softCheck?.pass ? 'PASS' : 'FAIL' },\n    { item: '节点命名规范', status: data.checks?.lintingCheck?.naming_ok !== 0 ? 'PASS' : 'WARN' },\n    { item: '无安全问题', status: data.checks?.securityCheck?.pass ? 'PASS' : 'FAIL' }\n  ],\n  \n  // 性能验收\n  performance: [\n    { item: '节点数量合理(<50)', status: data.checks?.performanceCheck?.size_ok ? 'PASS' : 'WARN' },\n    { item: '代码复杂度合理', status: data.checks?.performanceCheck?.complexity_ok ? 'PASS' : 'WARN' }\n  ],\n  \n  // 文档验收\n  documentation: [\n    { item: '文档已生成', status: data.decision === 'PASS' ? 'PASS' : 'SKIP' },\n    { item: 'CHANGELOG 已更新', status: 'PASS' }\n  ],\n  \n  // 汇总\n  summary: {\n    total: 0,\n    passed: 0,\n    failed: 0,\n    warnings: 0\n  }\n};\n\n// 计算汇总\nconst allItems = [...checklist.functional, ...checklist.quality, ...checklist.performance, ...checklist.documentation];\nchecklist.summary.total = allItems.length;\nchecklist.summary.passed = allItems.filter(i => i.status === 'PASS').length;\nchecklist.summary.failed = allItems.filter(i => i.status === 'FAIL').length;\nchecklist.summary.warnings = allItems.filter(i => i.status === 'WARN').length;\n\nreturn [{ json: { ...data, checklist } }];"
+      },
+      "id": "code-generate-checklist",
+      "name": "Code - 生成验收清单",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=cat > {{ $json.state_dir }}/checklist.json << 'CHECKLIST_EOF'\n{{ JSON.stringify($json.checklist, null, 2) }}\nCHECKLIST_EOF\n\necho \"✅ 验收清单已保存到 {{ $json.state_dir }}/checklist.json\"\ncat {{ $json.state_dir }}/checklist.json",
+        "user": "xx",
+        "host": "146.190.52.84",
+        "cwd": "/home/xx",
+        "port": 22
+      },
+      "id": "ssh-save-checklist",
+      "name": "SSH - 保存验收清单",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        300
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "SSH VPS xx"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "# 更新经验库\nLESSONS_FILE=\"/home/xx/dev/n8n-workflows/lessons_learned.json\"\n\n# 初始化文件（如果不存在）\nif [ ! -f \"$LESSONS_FILE\" ]; then\n  echo '{\"lessons\": [], \"common_issues\": {}, \"best_practices\": [], \"updated_at\": \"\"}' > \"$LESSONS_FILE\"\nfi\n\n# 追加新经验\nNEW_LESSONS='{{ JSON.stringify($json.lessons || []) }}'\njq --argjson new \"$NEW_LESSONS\" '.lessons = ($new + .lessons[0:100]) | .updated_at = \"'$(date -Iseconds)'\"' \\\n  \"$LESSONS_FILE\" > \"${LESSONS_FILE}.tmp\" && mv \"${LESSONS_FILE}.tmp\" \"$LESSONS_FILE\"\n\n# 更新常见问题统计\njq '.common_issues = ([.lessons[] | select(.category != null) | .category] | group_by(.) | map({(.[0]): length}) | add // {})' \\\n  \"$LESSONS_FILE\" > \"${LESSONS_FILE}.tmp\" && mv \"${LESSONS_FILE}.tmp\" \"$LESSONS_FILE\"\n\n# 提取最佳实践（最近10次成功的案例）\njq '.best_practices = [.lessons[] | select(.type == \"success\")] | .[0:10]' \\\n  \"$LESSONS_FILE\" > \"${LESSONS_FILE}.tmp\" && mv \"${LESSONS_FILE}.tmp\" \"$LESSONS_FILE\"\n\necho \"✅ 经验库已更新，共 $(jq '.lessons | length' $LESSONS_FILE) 条记录\"\ncat \"$LESSONS_FILE\" | jq '{total_lessons: (.lessons | length), common_issues, best_practices_count: (.best_practices | length), updated_at}'",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-update-lessons",
+      "name": "SSH - 更新经验库",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2960,
+        80
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "bash /home/xx/dev/n8n-workflows/scripts/analyze_history.sh",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-analyze-history",
+      "name": "SSH - 更新历史分析",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2780,
+        20
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "rollback-check",
+              "leftValue": "={{ $json.is_rollback }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-is-rollback",
+      "name": "IF - 是否回滚",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        560,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "ROLLBACK_RUN_ID=\"{{ $json.rollback_run_id }}\"\nSTATE_DIR=\"/home/xx/data/runs/$ROLLBACK_RUN_ID\"\n\n# 检查目标版本是否存在\nif [ ! -d \"$STATE_DIR/final\" ]; then\n  echo '{\"status\": \"error\", \"message\": \"目标版本不存在或没有final产出\"}'\n  exit 1\nfi\n\n# 读取 manifest\nMANIFEST=$(cat \"$STATE_DIR/final/manifest.json\")\n\n# 对每个 workflow 执行回滚（用保存的 JSON 覆盖当前版本）\nsource /home/xx/dev/n8n-workflows/.secrets\nROLLBACK_COUNT=0\n\nfor workflow_file in $STATE_DIR/final/*.json; do\n  if [ \"$(basename $workflow_file)\" != \"manifest.json\" ]; then\n    workflow_id=$(basename $workflow_file .json)\n    \n    # 使用 PUT 请求替换整个 workflow\n    response=$(curl -s -X PUT -H \"X-N8N-API-KEY: $N8N_REST_API_KEY\"       -H \"Content-Type: application/json\"       -d @\"$workflow_file\"       \"https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$workflow_id\")\n    \n    if echo \"$response\" | jq -e '.id' > /dev/null 2>&1; then\n      echo \"✓ 已回滚: $workflow_id\"\n      ROLLBACK_COUNT=$((ROLLBACK_COUNT + 1))\n    else\n      echo \"✗ 回滚失败: $workflow_id - $response\"\n    fi\n  fi\ndone\n\necho '{\"status\": \"success\", \"rollback_from\": \"'$ROLLBACK_RUN_ID'\", \"workflows_count\": '$ROLLBACK_COUNT', \"manifest\": '$MANIFEST'}'",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-execute-rollback",
+      "name": "SSH - 执行回滚",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        720,
+        40
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 解析回滚结果并返回\nconst sshOutput = $input.first().json;\nconst stdout = sshOutput.stdout || '{}';\n\nlet rollbackResult;\ntry {\n  // 提取最后一行的 JSON\n  const lines = stdout.trim().split('\\n');\n  const lastLine = lines[lines.length - 1];\n  rollbackResult = JSON.parse(lastLine);\n} catch (e) {\n  return [{\n    json: {\n      status: 'error',\n      message: '解析回滚结果失败',\n      details: e.message,\n      raw_output: stdout\n    }\n  }];\n}\n\nif (rollbackResult.status === 'error') {\n  return [{\n    json: {\n      status: 'error',\n      message: rollbackResult.message,\n      rollback_run_id: $('初始化Run').first().json.rollback_run_id\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    status: 'success',\n    message: `成功回滚到版本 ${rollbackResult.rollback_from}`,\n    rollback_from: rollbackResult.rollback_from,\n    workflows_count: rollbackResult.workflows_count,\n    manifest: rollbackResult.manifest,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "code-rollback-result",
+      "name": "Code - 回滚结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        40
+      ]
+    }
+  ],
+  "connections": {
+    "接收PRD": {
+      "main": [
+        [
+          {
+            "node": "初始化Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "初始化Run": {
+      "main": [
+        [
+          {
+            "node": "IF - 是否回滚",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH 初始化状态目录": {
+      "main": [
+        [
+          {
+            "node": "SSH Claude A - 分解PRD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Claude A - 分解PRD": {
+      "main": [
+        [
+          {
+            "node": "Code - 拓扑排序",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - 拓扑排序": {
+      "main": [
+        [
+          {
+            "node": "SSH 保存 Waves",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SplitInBatches - 任务分批": {
+      "main": [
+        [
+          {
+            "node": "SSH Claude B - 执行任务",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code - 合并结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Claude B - 执行任务": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches - 任务分批",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - 合并结果": {
+      "main": [
+        [
+          {
+            "node": "SSH Bash - 硬检查",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SSH Claude C - 软检查",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SSH Bash - 安全扫描",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SSH Bash - 集成检查",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SSH Bash - 性能检查",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SSH Bash - Git检查",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SSH Bash - Linting检查",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Bash - 硬检查": {
+      "main": [
+        [
+          {
+            "node": "Code - 决策",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Claude C - 软检查": {
+      "main": [
+        [
+          {
+            "node": "Code - 决策",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Bash - 安全扫描": {
+      "main": [
+        [
+          {
+            "node": "Code - 决策",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Bash - 集成检查": {
+      "main": [
+        [
+          {
+            "node": "Code - 决策",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Bash - 性能检查": {
+      "main": [
+        [
+          {
+            "node": "Code - 决策",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Bash - Git检查": {
+      "main": [
+        [
+          {
+            "node": "Code - 决策",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - 决策": {
+      "main": [
+        [
+          {
+            "node": "Code - 生成验收清单",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - 决策分支": {
+      "main": [
+        [
+          {
+            "node": "SSH Claude D - 生成文档",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code - 检查返工次数",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SSH 更新状态(FAIL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Claude D - 生成文档": {
+      "main": [
+        [
+          {
+            "node": "SSH - 导出最终产出",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - 检查返工次数": {
+      "main": [
+        [
+          {
+            "node": "IF - 是否可返工",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - 是否可返工": {
+      "main": [
+        [
+          {
+            "node": "Code - 构建返工计划",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SSH 更新状态(超限)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - 构建返工计划": {
+      "main": [
+        [
+          {
+            "node": "SSH - 执行返工",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH - 执行返工": {
+      "main": [
+        [
+          {
+            "node": "Code - 解析返工结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - 解析返工结果": {
+      "main": [
+        [
+          {
+            "node": "Code - 合并结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH 更新状态(FAIL)": {
+      "main": [
+        [
+          {
+            "node": "HTTP - 飞书通知",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH 更新状态(超限)": {
+      "main": [
+        [
+          {
+            "node": "HTTP - 飞书通知",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - 管理报告": {
+      "main": [
+        [
+          {
+            "node": "SSH 保存摘要报告",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH 保存摘要报告": {
+      "main": [
+        [
+          {
+            "node": "SSH - 更新CHANGELOG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP - 飞书通知": {
+      "main": [
+        [
+          {
+            "node": "Code - 生成流水线报告",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - 生成流水线报告": {
+      "main": [
+        [
+          {
+            "node": "Notion - 保存报告",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion - 保存报告": {
+      "main": [
+        [
+          {
+            "node": "返回结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - 是否续跑": {
+      "main": [
+        [
+          {
+            "node": "SSH - 加载断点状态",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SSH 初始化状态目录",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH - 加载断点状态": {
+      "main": [
+        [
+          {
+            "node": "Code - 解析断点状态",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - 解析断点状态": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches - 任务分批",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH 保存 Waves": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches - 任务分批",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH - 导出最终产出": {
+      "main": [
+        [
+          {
+            "node": "Code - 管理报告",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Bash - Linting检查": {
+      "main": [
+        [
+          {
+            "node": "Code - 决策",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH - 更新CHANGELOG": {
+      "main": [
+        [
+          {
+            "node": "SSH - 更新历史分析",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - 生成验收清单": {
+      "main": [
+        [
+          {
+            "node": "SSH - 保存验收清单",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH - 保存验收清单": {
+      "main": [
+        [
+          {
+            "node": "Switch - 决策分支",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH - 更新经验库": {
+      "main": [
+        [
+          {
+            "node": "HTTP - 飞书通知",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH - 更新历史分析": {
+      "main": [
+        [
+          {
+            "node": "HTTP - 飞书通知",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - 是否回滚": {
+      "main": [
+        [
+          {
+            "node": "SSH - 执行回滚",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF - 是否续跑",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH - 执行回滚": {
+      "main": [
+        [
+          {
+            "node": "Code - 回滚结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - 回滚结果": {
+      "main": [
+        [
+          {
+            "node": "返回结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

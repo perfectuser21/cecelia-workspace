@@ -1,0 +1,49 @@
+{
+  "name": "social-media-scraper",
+  "version": "2.0.0",
+  "description": "Social Media Scraper - Core + Modules Architecture",
+  "private": true,
+  "workspaces": [
+    "core/api",
+    "core/workers",
+    "core/shared",
+    "modules/frontend",
+    "modules/workflows/*"
+  ],
+  "scripts": {
+    "dev": "pnpm --parallel dev",
+    "build": "pnpm --recursive build",
+    "test": "pnpm --recursive test",
+    "clean": "pnpm --recursive clean",
+    "api:dev": "pnpm --filter @scraper/api dev",
+    "api:build": "pnpm --filter @scraper/api build",
+    "api:start": "pnpm --filter @scraper/api start",
+    "frontend:dev": "pnpm --filter @scraper/frontend dev",
+    "frontend:build": "pnpm --filter @scraper/frontend build",
+    "workers:dev": "pnpm --filter @scraper/workers dev",
+    "workers:build": "pnpm --filter @scraper/workers build",
+    "deploy:workflow": "ts-node scripts/n8n_deploy_workflow.ts",
+    "deploy:activate": "ts-node scripts/n8n_deploy_workflow.ts --activate",
+    "test:n8n": "ts-node scripts/test-n8n-connection.ts"
+  },
+  "keywords": [
+    "social-media",
+    "scraper",
+    "automation",
+    "n8n",
+    "monorepo"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}

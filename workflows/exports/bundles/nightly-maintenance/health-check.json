@@ -1,0 +1,102 @@
+{
+  "name": "夜间健康检查",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger",
+      "name": "手动触发",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx",
+        "command": "#!/bin/bash\nset -e\n\nREPORT_FILE=~/maintenance-reports/health-$(date +%Y%m%d).md\nmkdir -p ~/maintenance-reports\n\necho \"# VPS Health Check Report\" > $REPORT_FILE\necho \"**Date**: $(date '+%Y-%m-%d %H:%M:%S')\" >> $REPORT_FILE\necho \"**Server**: 146.190.52.84\" >> $REPORT_FILE\necho \"\" >> $REPORT_FILE\n\nISSUES=0\nWARNINGS=0\n\n# ========== 1. 站点可用性 ==========\necho \"## 1. Website Availability\" >> $REPORT_FILE\nSITES=\"dashboard.zenjoymedia.media:3000 monitor.zenjoymedia.media:3000\"\nSITES_OK=true\nfor site in $SITES; do\n  HTTP_CODE=$(curl -s -o /dev/null -w \"%{http_code}\" --connect-timeout 5 \"https://$site\" 2>/dev/null || echo \"000\")\n  if [ \"$HTTP_CODE\" = \"200\" ] || [ \"$HTTP_CODE\" = \"301\" ] || [ \"$HTTP_CODE\" = \"302\" ]; then\n    echo \"- ✅ $site: HTTP $HTTP_CODE\" >> $REPORT_FILE\n  else\n    echo \"- ❌ $site: HTTP $HTTP_CODE\" >> $REPORT_FILE\n    SITES_OK=false\n    ISSUES=$((ISSUES + 1))\n  fi\ndone\necho \"\" >> $REPORT_FILE\n\n# ========== 2. SSL 证书 ==========\necho \"## 2. SSL Certificates\" >> $REPORT_FILE\nSSL_OK=true\nfor domain in dashboard.zenjoymedia.media monitor.zenjoymedia.media; do\n  EXPIRY=$(echo | openssl s_client -servername $domain -connect $domain:3000 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)\n  if [ -n \"$EXPIRY\" ]; then\n    EXPIRY_EPOCH=$(date -d \"$EXPIRY\" +%s 2>/dev/null || echo 0)\n    NOW_EPOCH=$(date +%s)\n    DAYS_LEFT=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))\n    if [ $DAYS_LEFT -lt 14 ]; then\n      echo \"- ⚠️ $domain: $DAYS_LEFT days left\" >> $REPORT_FILE\n      SSL_OK=false\n      WARNINGS=$((WARNINGS + 1))\n    else\n      echo \"- ✅ $domain: $DAYS_LEFT days left\" >> $REPORT_FILE\n    fi\n  else\n    echo \"- ❌ $domain: Cannot check\" >> $REPORT_FILE\n    ISSUES=$((ISSUES + 1))\n  fi\ndone\necho \"\" >> $REPORT_FILE\n\n# ========== 3. 磁盘空间 ==========\necho \"## 3. Disk Usage\" >> $REPORT_FILE\nDISK_PCT=$(df -h / | tail -1 | awk '{gsub(/%/,\"\"); print $5}')\nDISK_USED=$(df -h / | tail -1 | awk '{print $3}')\nDISK_TOTAL=$(df -h / | tail -1 | awk '{print $2}')\nif [ $DISK_PCT -gt 80 ]; then\n  echo \"- ⚠️ Root: ${DISK_PCT}% used (${DISK_USED} of ${DISK_TOTAL})\" >> $REPORT_FILE\n  DISK_STATUS=\"warning\"\n  WARNINGS=$((WARNINGS + 1))\nelse\n  echo \"- ✅ Root: ${DISK_PCT}% used (${DISK_USED} of ${DISK_TOTAL})\" >> $REPORT_FILE\n  DISK_STATUS=\"ok\"\nfi\necho \"\" >> $REPORT_FILE\n\n# ========== 4. 内存使用 ==========\necho \"## 4. Memory Usage\" >> $REPORT_FILE\nMEM_TOTAL=$(free -m | grep Mem | awk '{print $2}')\nMEM_USED=$(free -m | grep Mem | awk '{print $3}')\nMEM_PCT=$((MEM_USED * 100 / MEM_TOTAL))\nif [ $MEM_PCT -gt 90 ]; then\n  echo \"- ⚠️ Memory: ${MEM_PCT}% used (${MEM_USED}MB of ${MEM_TOTAL}MB)\" >> $REPORT_FILE\n  MEM_STATUS=\"warning\"\n  WARNINGS=$((WARNINGS + 1))\nelse\n  echo \"- ✅ Memory: ${MEM_PCT}% used (${MEM_USED}MB of ${MEM_TOTAL}MB)\" >> $REPORT_FILE\n  MEM_STATUS=\"ok\"\nfi\nLOAD=$(uptime | awk -F'load average:' '{print $2}' | xargs)\necho \"- Load Average: $LOAD\" >> $REPORT_FILE\necho \"\" >> $REPORT_FILE\n\n# ========== 5. Docker 容器 ==========\necho \"## 5. Docker Containers\" >> $REPORT_FILE\nCRITICAL_CONTAINERS=\"nginx-proxy-manager xray-reality\"\nCONTAINERS_OK=true\nfor c in $CRITICAL_CONTAINERS; do\n  STATUS=$(docker inspect -f '{{.State.Status}}' $c 2>/dev/null || echo \"not found\")\n  if [ \"$STATUS\" = \"running\" ]; then\n    echo \"- ✅ $c: running\" >> $REPORT_FILE\n  else\n    echo \"- ❌ $c: $STATUS\" >> $REPORT_FILE\n    CONTAINERS_OK=false\n    ISSUES=$((ISSUES + 1))\n  fi\ndone\n\n# 其他重要容器\nfor prefix in social-metrics claude-monitor; do\n  RUNNING=$(docker ps --format '{{.Names}}' | grep $prefix | wc -l)\n  TOTAL=$(docker ps -a --format '{{.Names}}' | grep $prefix | wc -l)\n  if [ $RUNNING -eq $TOTAL ] && [ $TOTAL -gt 0 ]; then\n    echo \"- ✅ ${prefix}-*: $RUNNING/$TOTAL running\" >> $REPORT_FILE\n  elif [ $TOTAL -gt 0 ]; then\n    echo \"- ⚠️ ${prefix}-*: $RUNNING/$TOTAL running\" >> $REPORT_FILE\n    WARNINGS=$((WARNINGS + 1))\n  fi\ndone\necho \"\" >> $REPORT_FILE\n\n# ========== 6. VNC 容器 ==========\necho \"## 6. VNC Containers\" >> $REPORT_FILE\nVNC_RUNNING=$(docker ps --format '{{.Names}}' | grep novnc | wc -l)\nVNC_TOTAL=$(docker ps -a --format '{{.Names}}' | grep novnc | wc -l)\necho \"- VNC containers: $VNC_RUNNING/$VNC_TOTAL running\" >> $REPORT_FILE\ndocker ps --format '{{.Names}}' | grep novnc | while read c; do\n  echo \"  - ✅ $c\" >> $REPORT_FILE\ndone\necho \"\" >> $REPORT_FILE\n\n# ========== 7. 关键端口 ==========\necho \"## 7. Critical Ports\" >> $REPORT_FILE\nPORTS=\"80 3000 3456 5173\"\nPORTS_OK=true\nfor port in $PORTS; do\n  if ss -tlnp | grep -q \":$port \"; then\n    SERVICE=$(ss -tlnp | grep \":$port \" | head -1 | awk '{print $NF}' | cut -d'\"' -f2)\n    echo \"- ✅ Port $port: $SERVICE\" >> $REPORT_FILE\n  else\n    echo \"- ⚠️ Port $port: not listening\" >> $REPORT_FILE\n    WARNINGS=$((WARNINGS + 1))\n  fi\ndone\necho \"\" >> $REPORT_FILE\n\n# ========== 总结 ==========\necho \"## Summary\" >> $REPORT_FILE\necho \"- Issues: $ISSUES\" >> $REPORT_FILE\necho \"- Warnings: $WARNINGS\" >> $REPORT_FILE\nif [ $ISSUES -eq 0 ] && [ $WARNINGS -eq 0 ]; then\n  echo \"- Status: ✅ All healthy\" >> $REPORT_FILE\nelif [ $ISSUES -eq 0 ]; then\n  echo \"- Status: ⚠️ Some warnings\" >> $REPORT_FILE\nelse\n  echo \"- Status: ❌ Has issues\" >> $REPORT_FILE\nfi\n\n# JSON 输出\ncat << JSONEOF\n{\n  \"success\": true,\n  \"issues\": $ISSUES,\n  \"warnings\": $WARNINGS,\n  \"disk_status\": \"$DISK_STATUS\",\n  \"disk_pct\": $DISK_PCT,\n  \"mem_status\": \"$MEM_STATUS\",\n  \"mem_pct\": $MEM_PCT,\n  \"sites_ok\": $( [ \"$SITES_OK\" = true ] && echo \"true\" || echo \"false\" ),\n  \"ssl_ok\": $( [ \"$SSL_OK\" = true ] && echo \"true\" || echo \"false\" ),\n  \"containers_ok\": $( [ \"$CONTAINERS_OK\" = true ] && echo \"true\" || echo \"false\" ),\n  \"vnc_running\": $VNC_RUNNING,\n  \"report_file\": \"$REPORT_FILE\",\n  \"timestamp\": \"$(date -Iseconds)\"\n}\nJSONEOF\n"
+      },
+      "id": "ssh",
+      "name": "执行健康检查",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json.stdout || '';\ntry {\n  const jsonMatch = output.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    return [{ json: JSON.parse(jsonMatch[0]) }];\n  }\n} catch (e) {}\nreturn [{ json: { success: false, error: 'Failed to parse output', raw: output } }];"
+      },
+      "id": "parse",
+      "name": "解析结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 1 1 *"
+            }
+          ]
+        }
+      },
+      "id": "placeholder_schedule",
+      "name": "占位触发器",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -200,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "手动触发": {
+      "main": [
+        [
+          {
+            "node": "执行健康检查",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "执行健康检查": {
+      "main": [
+        [
+          {
+            "node": "解析结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  }
+}

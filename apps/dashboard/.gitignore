@@ -1,0 +1,23 @@
+node_modules/
+.env
+.env.local
+dist/
+*.log
+sessions/
+.DS_Store
+*.sqlite
+*.db
+
+# Data directories
+postgres_data/
+n8n_data/
+data/uploads/
+
+# Temporary/generated files
+scripts/images/
+.archive/
+
+# Design assets (too large for git)
+悦升云端Logo/
+*.pdf
+uploads/

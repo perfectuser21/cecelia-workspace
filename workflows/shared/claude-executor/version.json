@@ -1,0 +1,10 @@
+{
+  "name": "claude-executor",
+  "description": "Claude Code SSH 执行器（共享组件）",
+  "version": "1.0.0",
+  "n8n_id": "JhHc95ZUfnUhKV4Y",
+  "used_by": ["ai-factory"],
+  "changelog": [
+    {"version": "1.0.0", "date": "2025-12-26", "change": "初始导入"}
+  ]
+}

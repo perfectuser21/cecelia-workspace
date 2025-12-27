@@ -1,0 +1,13 @@
+{
+  "name": "content-publish",
+  "description": "内容发布系统：Dashboard → 9平台自动发布",
+  "bundle_version": "1.0.0",
+  "components": {
+    "main": {"n8n_id": "L0PHKQ1AhMxMlZ2M", "version": "1.0.0"},
+    "toutiao-sub": {"n8n_id": "TKNuGcl9eQeu1XAg", "version": "1.0.0"}
+  },
+  "dependencies": {},
+  "changelog": [
+    {"version": "1.0.0", "date": "2025-12-26", "change": "初始导入"}
+  ]
+}

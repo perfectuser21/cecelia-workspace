@@ -1,0 +1,161 @@
+{
+  "version": "1.0",
+  "created_at": "2025-12-26T21:50:38+08:00",
+  "updated_at": "2025-12-26T22:29:53+08:00",
+  "runs": [
+    {
+      "run_id": "test-fix-1735224400",
+      "date": "2025-12-26T22:29:53+08:00",
+      "prd_summary": "创建一个 n8n workflow 接收 GitHub webhook：1. 使用 Webhook 节点接收 POST 请求 2. 使用 Code 节点解析 commit message 3. 使用 ",
+      "decision": "PASS",
+      "duration_seconds": 155,
+      "rework_count": 0,
+      "metrics": {
+        "soft_score": 82,
+        "low_dimensions": [
+          "parameters"
+        ],
+        "template_used": "",
+        "template_success": false,
+        "prd_similarity": 92
+      },
+      "issues": [
+        ""
+      ]
+    },
+    {
+      "run_id": "test-fix-1735224200",
+      "date": "2025-12-26T22:25:00+08:00",
+      "prd_summary": "创建一个 n8n workflow 接收 GitHub webhook：1. 使用 Webhook 节点接收 POST 请求 2. 使用 Code 节点解析 commit message 3. 使用 ",
+      "decision": "FAIL",
+      "duration_seconds": 118,
+      "rework_count": 0,
+      "metrics": {
+        "soft_score": 80,
+        "low_dimensions": [],
+        "template_used": "",
+        "template_success": false,
+        "prd_similarity": 85
+      },
+      "issues": [
+        "任务执行失败: 0/1 成功, 1 失败"
+      ]
+    },
+    {
+      "run_id": "test-fix-1735224000",
+      "date": "2025-12-26T22:21:45+08:00",
+      "prd_summary": "创建一个 n8n workflow 接收 GitHub webhook：1. 使用 Webhook 节点接收 POST 请求 2. 使用 Code 节点解析 commit message 3. 使用 ",
+      "decision": "BLOCKED",
+      "duration_seconds": 143,
+      "rework_count": 2,
+      "metrics": {
+        "soft_score": 73,
+        "low_dimensions": [
+          "parameters"
+        ],
+        "template_used": "webhook-response",
+        "template_success": false,
+        "prd_similarity": 95
+      },
+      "issues": [
+        "软检查评分不足: 73/100 (需>=80)"
+      ]
+    },
+    {
+      "run_id": "test-fix-1735223900",
+      "date": "2025-12-26T22:18:31+08:00",
+      "prd_summary": "创建一个 GitHub webhook 接收器：1. 接收 push 事件 2. 解析 commit 信息 3. 如果 commit message 包含 [deploy] 就触发部署脚本 4. 如果",
+      "decision": "",
+      "duration_seconds": 25,
+      "rework_count": 0,
+      "metrics": {
+        "soft_score": 0,
+        "low_dimensions": [],
+        "template_used": "",
+        "template_success": false,
+        "prd_similarity": 75
+      },
+      "issues": []
+    },
+    {
+      "run_id": "release-test-3b-1735222400",
+      "date": "2025-12-26T22:13:17+08:00",
+      "prd_summary": "创建一个 GitHub webhook 接收器：1. 接收 push 事件 2. 解析 commit 信息 3. 如果 commit message 包含 [deploy] 就触发部署脚本 4. 如果",
+      "decision": "BLOCKED",
+      "duration_seconds": 132,
+      "rework_count": 2,
+      "metrics": {
+        "soft_score": 78,
+        "low_dimensions": [
+          "parameters"
+        ],
+        "template_used": "webhook-response",
+        "template_success": false,
+        "prd_similarity": 100
+      },
+      "issues": [
+        "软检查评分不足: 78/100 (需>=80)"
+      ]
+    },
+    {
+      "run_id": "release-test-2-1735222000",
+      "date": "2025-12-26T22:09:19+08:00",
+      "prd_summary": "创建一个每天早上9点执行的定时任务：1. 检查服务器磁盘使用率 2. 如果超过80%就发飞书告警",
+      "decision": "PASS",
+      "duration_seconds": 141,
+      "rework_count": 0,
+      "metrics": {
+        "soft_score": 86,
+        "low_dimensions": [],
+        "template_used": "vps-health-check",
+        "template_success": true,
+        "prd_similarity": 92
+      },
+      "issues": [
+        ""
+      ]
+    },
+    {
+      "run_id": "verify-final-1735221000",
+      "date": "2025-12-26T21:50:38+08:00",
+      "prd_summary": "创建一个 Ping webhook 返回 pong",
+      "decision": "PASS",
+      "duration_seconds": 159,
+      "rework_count": 1,
+      "metrics": {
+        "soft_score": 80,
+        "low_dimensions": [],
+        "template_used": "webhook-response",
+        "template_success": true,
+        "prd_similarity": 85
+      },
+      "issues": [
+        ""
+      ]
+    }
+  ],
+  "patterns": {
+    "dimension_failures": {
+      "parameters": 3
+    },
+    "issue_frequency": {
+      "": 2,
+      "软检查评分不足: 78/100 (需>=80)": 1,
+      "软检查评分不足: 73/100 (需>=80)": 1,
+      "任务执行失败: 0/1 成功, 1 失败": 1
+    },
+    "template_stats": {
+      "webhook-response": {
+        "used": 3,
+        "success": 1
+      },
+      "vps-health-check": {
+        "used": 1,
+        "success": 1
+      }
+    }
+  },
+  "pending_optimizations": [],
+  "applied_optimizations": [],
+  "last_analysis": null
+}

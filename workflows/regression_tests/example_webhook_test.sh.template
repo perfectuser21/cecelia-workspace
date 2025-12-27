@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+# Example Regression Test: Webhook Configuration Validation
+#
+# This test validates that webhook workflows have correct configuration.
+# Rename this file to remove .template extension to activate it.
+#
+
+set -e
+
+WORKFLOW_IDS="$1"
+
+# Load secrets for API access
+source /home/xx/dev/n8n-workflows/.secrets 2>/dev/null || {
+  echo "Error: Cannot load .secrets file"
+  exit 1
+}
+
+if [[ -z "$N8N_REST_API_KEY" ]]; then
+  echo "Error: N8N_REST_API_KEY not set"
+  exit 1
+fi
+
+# Test: Validate webhook paths are unique
+declare -A webhook_paths
+
+for wid in $WORKFLOW_IDS; do
+  if [[ -z "$wid" ]]; then
+    continue
+  fi
+
+  # Fetch workflow details
+  wf_content=$(curl -s -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
+    "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$wid" 2>/dev/null)
+
+  # Extract webhook nodes
+  webhook_nodes=$(echo "$wf_content" | jq -r '.nodes[] | select(.type == "n8n-nodes-base.webhook")')
+
+  if [[ -n "$webhook_nodes" ]]; then
+    # Check webhook path
+    webhook_path=$(echo "$webhook_nodes" | jq -r '.parameters.path // empty' | head -1)
+
+    if [[ -n "$webhook_path" ]]; then
+      # Check for duplicates
+      if [[ -n "${webhook_paths[$webhook_path]}" ]]; then
+        echo "Error: Duplicate webhook path '$webhook_path' found in workflows $wid and ${webhook_paths[$webhook_path]}"
+        exit 1
+      fi
+
+      webhook_paths[$webhook_path]=$wid
+
+      # Validate path format (should start with /)
+      if [[ ! "$webhook_path" =~ ^/ ]]; then
+        echo "Error: Invalid webhook path '$webhook_path' in workflow $wid (should start with /)"
+        exit 1
+      fi
+    fi
+  fi
+done
+
+echo "Webhook configuration validation passed"
+exit 0

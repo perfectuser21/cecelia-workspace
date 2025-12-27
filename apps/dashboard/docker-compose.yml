@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # Core API 服务
+  api:
+    build:
+      context: ./core/api
+      dockerfile: Dockerfile
+    container_name: social-metrics-api
+    restart: unless-stopped
+    ports:
+      - "3333:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - COLLECTOR_API_KEY=dev-api-key-2025
+      - DB_HOST=social-metrics-postgres
+      - DB_PORT=5432
+      - DB_NAME=n8n_social_metrics
+      - DB_USER=n8n_user
+      - DB_PASSWORD=n8n_password_2025
+      - CORS_ORIGIN=*
+      - VPS_API_HOST=douyin-api
+      # Claude Stats - 本地日志目录
+      - CLAUDE_PROJECTS_DIR=/home/xx/.claude/projects
+      # Cloudflare Deploy Hook - 发布内容后自动触发 zenithjoyai.com 重新构建
+      # 在 Cloudflare Pages 项目设置中创建 Deploy Hook 后填入
+      - CLOUDFLARE_DEPLOY_HOOK=${CLOUDFLARE_DEPLOY_HOOK:-}
+      # n8n 发布 webhook - 触发自动发布到社交平台
+      - N8N_PUBLISH_WEBHOOK_URL=https://zenithjoy21xx.app.n8n.cloud/webhook/content-publish
+      # Notion Integration
+      - NOTION_API_KEY=${NOTION_API_KEY:-}
+      - NOTION_TASKS_DB_ID=${NOTION_TASKS_DB_ID:-}
+      # 飞书通知 - 发布完成后发送通知
+      - FEISHU_WEBHOOK_URL=${FEISHU_WEBHOOK_URL:-}
+    volumes:
+      - ./data/uploads:/app/data/uploads
+      - /home/xx/session_status.json:/home/xx/session_status.json:ro
+      - /home/xx/session_status.log:/home/xx/session_status.log:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /home/xx/.claude/projects:/home/xx/.claude/projects:ro
+    networks:
+      - n8n-network
+      - nginx-network  # 连接到 nginx-proxy-manager 网络
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: social-metrics-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: n8n_user
+      POSTGRES_PASSWORD: n8n_password_2025
+      POSTGRES_DB: n8n_social_metrics
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - n8n-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n_user -d n8n_social_metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 抖音登录 API（Playwright）
+  douyin-api:
+    build:
+      context: ./douyin-api
+      dockerfile: Dockerfile
+    container_name: douyin-api
+    restart: unless-stopped
+    volumes:
+      - /home/xx/.douyin:/root/.douyin
+    networks:
+      - n8n-network
+
+volumes:
+  postgres_data:
+    external: true
+    name: zenithjoy_postgres_data  # 固定名称，与项目无关
+  douyin_data:
+    driver: local
+
+networks:
+  n8n-network:
+    driver: bridge
+  nginx-network:
+    external: true
+    name: n8n-social-media-scraper_n8n-network

@@ -1,0 +1,99 @@
+{
+  "name": "Claude Code SSH执行器",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "每小时触发",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "prompt-id",
+              "name": "prompt",
+              "value": "当前时间: {{ $now.format(\"yyyy-MM-dd HH:mm:ss\") }}\n任务: 列出当前目录的所有 .js 文件",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-prompt",
+      "name": "设置Claude提示词",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=echo '{{ $json.prompt }}' | /usr/bin/claude",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx"
+      },
+      "id": "ssh-node",
+      "name": "SSH执行Claude Code",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "Dtbm2gp6GztuC3o0",
+          "name": "VPS SSH Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "每小时触发": {
+      "main": [
+        [
+          {
+            "node": "设置Claude提示词",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "设置Claude提示词": {
+      "main": [
+        [
+          {
+            "node": "SSH执行Claude Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  }
+}

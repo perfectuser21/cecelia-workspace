@@ -1,0 +1,161 @@
+{
+  "name": "API 集成模板",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "api-integration",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "触发器",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "webhookId": "{{WEBHOOK_ID}}"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 准备 API 请求参数\nconst input = $input.item.json.body || $input.item.json;\n\nconst apiConfig = {\n  url: input.api_url || 'https://api.example.com/endpoint',\n  method: input.method || 'GET',\n  headers: input.headers || {},\n  params: input.params || {},\n  body: input.body || null\n};\n\nreturn { json: apiConfig };"
+      },
+      "id": "prepare-request",
+      "name": "准备请求",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$json.url}}",
+        "method": "={{$json.method}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": "={{Object.entries($json.headers).map(([k,v]) => ({name: k, value: v}))}}"
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": "={{Object.entries($json.params).map(([k,v]) => ({name: k, value: v}))}}"
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{JSON.stringify($json.body || {})}}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "api-request",
+      "name": "API 请求",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// 处理 API 响应\nconst item = $input.item;\n\nif (item.error) {\n  return {\n    json: {\n      success: false,\n      error: item.error.message || '请求失败',\n      timestamp: new Date().toISOString()\n    }\n  };\n}\n\nconst response = item.json;\nconst processedData = {\n  success: true,\n  data: response,\n  timestamp: new Date().toISOString()\n};\n\nreturn { json: processedData };"
+      },
+      "id": "process-response",
+      "name": "处理响应",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "返回响应",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [240, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": $json.error.message || \"Internal Server Error\", \"timestamp\": new Date().toISOString() } }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "error-respond",
+      "name": "返回错误响应",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [460, 500]
+    }
+  ],
+  "connections": {
+    "触发器": {
+      "main": [
+        [
+          {
+            "node": "准备请求",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "准备请求": {
+      "main": [
+        [
+          {
+            "node": "API 请求",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API 请求": {
+      "main": [
+        [
+          {
+            "node": "处理响应",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "处理响应": {
+      "main": [
+        [
+          {
+            "node": "返回响应",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "返回错误响应",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

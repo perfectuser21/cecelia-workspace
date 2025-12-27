@@ -1,0 +1,97 @@
+{
+  "name": "飞书通知模板",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "notify-{{$randomUUID}}",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "触发器",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "webhookId": "{{WEBHOOK_ID}}"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 构建飞书消息\nconst input = $input.item.json.body || $input.item.json;\n\nconst msgType = input.type || 'text';\nconst title = input.title || '系统通知';\nconst content = input.content || input.message || '';\nconst level = input.level || 'info';\n\nconst colorMap = {\n  info: 'blue',\n  warning: 'orange', \n  error: 'red',\n  success: 'green'\n};\n\nconst feishuMsg = {\n  msg_type: 'interactive',\n  card: {\n    config: { wide_screen_mode: true },\n    header: {\n      title: { tag: 'plain_text', content: title },\n      template: colorMap[level]\n    },\n    elements: [\n      { tag: 'div', text: { tag: 'lark_md', content: content } },\n      { tag: 'hr' },\n      { tag: 'note', elements: [{ tag: 'plain_text', content: `发送时间: ${new Date().toLocaleString('zh-CN')}` }] }\n    ]\n  }\n};\n\nreturn {\n  json: {\n    webhook_url: $env.FEISHU_BOT_WEBHOOK,\n    message: feishuMsg\n  }\n};"
+      },
+      "id": "build-message",
+      "name": "构建消息",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$json.webhook_url}}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{JSON.stringify($json.message)}}",
+        "options": {}
+      },
+      "id": "send-feishu",
+      "name": "发送飞书",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\"success\": true, \"sent_at\": new Date().toISOString()} }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "返回响应",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [240, 500]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.FEISHU_BOT_WEBHOOK}}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"msg_type\": \"text\", \"content\": { \"text\": \"❌ 通知发送失败\\nWorkflow: \" + $json.workflow.name + \"\\n错误: \" + $json.execution.error.message } } }}",
+        "options": {}
+      },
+      "id": "notify-error",
+      "name": "错误告警",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 500]
+    }
+  ],
+  "connections": {
+    "触发器": {
+      "main": [[{ "node": "构建消息", "type": "main", "index": 0 }]]
+    },
+    "构建消息": {
+      "main": [[{ "node": "发送飞书", "type": "main", "index": 0 }]]
+    },
+    "发送飞书": {
+      "main": [[{ "node": "返回响应", "type": "main", "index": 0 }]]
+    },
+    "Error Trigger": {
+      "main": [[{ "node": "错误告警", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": []
+}

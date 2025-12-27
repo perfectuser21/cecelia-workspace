@@ -1,0 +1,64 @@
+#!/bin/bash
+#
+# Example Regression Test: Node Configuration Validation
+#
+# This test validates that critical nodes have required parameters configured.
+# Rename this file to remove .template extension to activate it.
+#
+
+set -e
+
+WORKFLOW_IDS="$1"
+
+# Load secrets for API access
+source /home/xx/dev/n8n-workflows/.secrets 2>/dev/null || {
+  echo "Error: Cannot load .secrets file"
+  exit 1
+}
+
+if [[ -z "$N8N_REST_API_KEY" ]]; then
+  echo "Error: N8N_REST_API_KEY not set"
+  exit 1
+fi
+
+# Test: Validate that SSH nodes have proper credentials configured
+for wid in $WORKFLOW_IDS; do
+  if [[ -z "$wid" ]]; then
+    continue
+  fi
+
+  # Fetch workflow details
+  wf_content=$(curl -s -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
+    "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$wid" 2>/dev/null)
+
+  # Check for SSH nodes
+  ssh_nodes=$(echo "$wf_content" | jq -r '.nodes[] | select(.type == "n8n-nodes-base.ssh")')
+
+  if [[ -n "$ssh_nodes" ]]; then
+    # Validate that SSH nodes have credentials
+    has_credentials=$(echo "$ssh_nodes" | jq -r '.credentials // empty' | head -1)
+
+    if [[ -z "$has_credentials" ]]; then
+      echo "Error: SSH node in workflow $wid has no credentials configured"
+      exit 1
+    fi
+
+    echo "SSH node validation passed for workflow $wid"
+  fi
+
+  # Check for Code nodes with dangerous operations
+  code_nodes=$(echo "$wf_content" | jq -r '.nodes[] | select(.type == "n8n-nodes-base.code")')
+
+  if [[ -n "$code_nodes" ]]; then
+    # Check for dangerous patterns (rm -rf, eval, etc.)
+    code_content=$(echo "$code_nodes" | jq -r '.parameters.jsCode // .parameters.code // empty')
+
+    if echo "$code_content" | grep -qE 'rm\s+-rf|eval\(|exec\('; then
+      echo "Warning: Code node in workflow $wid contains potentially dangerous operations"
+      # Don't fail, just warn
+    fi
+  fi
+done
+
+echo "Node configuration validation passed"
+exit 0

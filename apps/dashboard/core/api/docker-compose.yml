@@ -1,0 +1,73 @@
+version: '3.8'
+
+# ============================================
+# Core API - Standalone Module
+# ============================================
+#
+# Usage:
+#   docker-compose up -d
+#
+# Prerequisites:
+#   - PostgreSQL database running
+#   - Configure .env file with DB connection
+# ============================================
+
+networks:
+  social-metrics-network:
+    external: true
+
+volumes:
+  sessions_data:
+    driver: local
+  logs_data:
+    driver: local
+
+services:
+  core-api:
+    build:
+      context: ../..
+      dockerfile: core/api/Dockerfile
+    container_name: social-metrics-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3002
+
+      # Database (external)
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-social_metrics}
+
+      # Feishu OAuth
+      FEISHU_APP_ID: ${FEISHU_APP_ID}
+      FEISHU_APP_SECRET: ${FEISHU_APP_SECRET}
+      FEISHU_REDIRECT_URI: ${FEISHU_REDIRECT_URI}
+
+      # Session
+      SESSION_SECRET: ${SESSION_SECRET:-change-this-secret-in-production}
+
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - sessions_data:/app/sessions
+      - logs_data:/app/logs
+    ports:
+      - "${API_PORT:-3002}:3002"
+    networks:
+      - social-metrics-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M

@@ -1,0 +1,199 @@
+{
+  "name": "VPS 健康检查",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 * * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "df -h | grep -E '^/dev/' | awk '{print $1, $5, $6}'",
+        "host": "={{ $env.VPS_HOST }}",
+        "user": "={{ $env.VPS_USER }}",
+        "privateKey": "={{ $env.VPS_SSH_KEY }}"
+      },
+      "id": "ssh-disk-check",
+      "name": "SSH 磁盘检查",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.item.json.stdout;\nconst lines = output.trim().split('\\n');\n\nconst disks = lines.map(line => {\n  const [device, usage, mount] = line.trim().split(/\\s+/);\n  const usagePercent = parseInt(usage.replace('%', ''));\n  return {\n    device,\n    usage: usagePercent,\n    mount,\n    alert: usagePercent > 80\n  };\n});\n\nconst needsAlert = disks.some(d => d.alert);\nconst alertDisks = disks.filter(d => d.alert);\n\nreturn {\n  json: {\n    timestamp: new Date().toISOString(),\n    host: $env.VPS_HOST,\n    disks,\n    needsAlert,\n    alertDisks\n  }\n};"
+      },
+      "id": "parse-disk-usage",
+      "name": "解析磁盘使用率",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.needsAlert }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-need-alert",
+      "name": "是否需要告警",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FEISHU_BOT_WEBHOOK }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "msg_type",
+              "value": "text"
+            },
+            {
+              "name": "content",
+              "value": "={{ JSON.stringify({\n  text: `🚨 VPS 磁盘空间告警\\n\\n服务器: ${$json.host}\\n时间: ${$json.timestamp}\\n\\n超标磁盘:\\n${$json.alertDisks.map(d => `• ${d.device} (${d.mount}): ${d.usage}%`).join('\\n')}\\n\\n请及时处理！`\n}) }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "send-feishu-alert",
+      "name": "发送飞书告警",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [240, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FEISHU_BOT_WEBHOOK }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "msg_type",
+              "value": "text"
+            },
+            {
+              "name": "content",
+              "value": "={{ JSON.stringify({\n  text: `❌ VPS 健康检查异常\\n\\nworkflow: ${$workflow.name}\\n节点: ${$('Error Trigger').item.json.node?.name || 'Unknown'}\\n错误: ${$('Error Trigger').item.json.error?.message || 'Unknown error'}\\n时间: ${new Date().toISOString()}`\n}) }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "send-error-alert",
+      "name": "发送错误告警",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 500]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "SSH 磁盘检查",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH 磁盘检查": {
+      "main": [
+        [
+          {
+            "node": "解析磁盘使用率",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "解析磁盘使用率": {
+      "main": [
+        [
+          {
+            "node": "是否需要告警",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "是否需要告警": {
+      "main": [
+        [
+          {
+            "node": "发送飞书告警",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "发送错误告警",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-26T00:00:00.000Z",
+  "versionId": "1"
+}

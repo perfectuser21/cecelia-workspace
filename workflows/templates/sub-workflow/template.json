@@ -1,0 +1,147 @@
+{
+  "name": "子 Workflow 调用模板",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sub-workflow-demo",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "触发器",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "webhookId": "{{WEBHOOK_ID}}"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 准备调用子 workflow 的参数\nconst input = $input.item.json.body || $input.item.json;\n\n// 可以调用多个子 workflow\nconst tasks = [\n  {\n    workflow_id: input.task1_workflow_id || 'wqeeHpnTcJolnse4',\n    name: '健康检查',\n    params: {}\n  },\n  {\n    workflow_id: input.task2_workflow_id || '70DVZ55roILCGAMM',\n    name: '备份',\n    params: {}\n  }\n];\n\nreturn tasks.map(task => ({ json: task }));"
+      },
+      "id": "prepare-tasks",
+      "name": "准备子任务",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "mode": "id",
+        "workflowId": "={{$json.workflow_id}}",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "execute-workflow",
+      "name": "执行子 Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 收集所有子 workflow 的结果\nconst allResults = $input.all();\n\nconst summary = {\n  total: allResults.length,\n  results: allResults.map((item, index) => ({\n    index: index + 1,\n    workflow_id: item.json.workflow_id || 'unknown',\n    success: !item.error,\n    data: item.json,\n    error: item.error ? item.error.message : null\n  })),\n  completed_at: new Date().toISOString()\n};\n\nreturn { json: summary };"
+      },
+      "id": "merge-results",
+      "name": "合并结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "返回响应",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [240, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": $json.error.message || \"Error\" } }}",
+        "options": { "responseCode": 500 }
+      },
+      "id": "error-respond",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [460, 500]
+    }
+  ],
+  "connections": {
+    "触发器": {
+      "main": [
+        [
+          {
+            "node": "准备子任务",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "准备子任务": {
+      "main": [
+        [
+          {
+            "node": "执行子 Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "执行子 Workflow": {
+      "main": [
+        [
+          {
+            "node": "合并结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "合并结果": {
+      "main": [
+        [
+          {
+            "node": "返回响应",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

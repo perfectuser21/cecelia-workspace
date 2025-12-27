@@ -1,0 +1,154 @@
+{
+  "timestamp": "2025-12-26T10:00:00Z",
+  "workflows": [
+    {
+      "id": "Ar2BwcAElSsexIKC",
+      "name": "Trigger Claude via HTTP",
+      "active": true,
+      "createdAt": "2025-12-21T03:35:34.469Z",
+      "updatedAt": "2025-12-21T11:01:31.951Z",
+      "nodeCount": 3,
+      "triggerCount": 1
+    },
+    {
+      "id": "INcuVEV9PPJaQ7Yg",
+      "name": "sync-workflow-changelog",
+      "active": true,
+      "createdAt": "2025-12-23T10:31:07.058Z",
+      "updatedAt": "2025-12-23T11:28:08.821Z",
+      "nodeCount": 7,
+      "triggerCount": 1
+    },
+    {
+      "id": "wqeeHpnTcJolnse4",
+      "name": "夜间健康检查",
+      "active": true,
+      "createdAt": "2025-12-24T01:27:37.017Z",
+      "updatedAt": "2025-12-24T01:56:52.727Z",
+      "nodeCount": 4,
+      "triggerCount": 1
+    },
+    {
+      "id": "70DVZ55roILCGAMM",
+      "name": "夜间备份",
+      "active": true,
+      "createdAt": "2025-12-24T01:29:13.304Z",
+      "updatedAt": "2025-12-24T01:57:37.646Z",
+      "nodeCount": 4,
+      "triggerCount": 1
+    },
+    {
+      "id": "wOg5NRZ2yx0D18nY",
+      "name": "夜间清理",
+      "active": true,
+      "createdAt": "2025-12-24T01:29:47.490Z",
+      "updatedAt": "2025-12-24T01:58:27.981Z",
+      "nodeCount": 4,
+      "triggerCount": 1
+    },
+    {
+      "id": "wxYIxt8paRz82lbW",
+      "name": "抖音数据爬取",
+      "active": true,
+      "createdAt": "2025-12-22T03:23:40.630Z",
+      "updatedAt": "2025-12-24T04:28:34.820Z",
+      "nodeCount": 4,
+      "triggerCount": 1
+    },
+    {
+      "id": "8YC1JuIKo0aytgQz",
+      "name": "快手数据爬取",
+      "active": true,
+      "createdAt": "2025-12-22T12:55:15.335Z",
+      "updatedAt": "2025-12-24T04:28:42.430Z",
+      "nodeCount": 4,
+      "triggerCount": 1
+    },
+    {
+      "id": "I5It7tSAT7HadXYJ",
+      "name": "小红书数据爬取",
+      "active": true,
+      "createdAt": "2025-12-22T12:56:37.068Z",
+      "updatedAt": "2025-12-24T04:28:50.207Z",
+      "nodeCount": 4,
+      "triggerCount": 1
+    },
+    {
+      "id": "SmJ3WIeVmR69l2dF",
+      "name": "今日头条数据爬取",
+      "active": true,
+      "createdAt": "2025-12-22T12:56:43.042Z",
+      "updatedAt": "2025-12-24T04:28:57.355Z",
+      "nodeCount": 4,
+      "triggerCount": 1
+    },
+    {
+      "id": "VMS9m7rubG5zvyla",
+      "name": "微博数据爬取",
+      "active": true,
+      "createdAt": "2025-12-22T12:58:10.299Z",
+      "updatedAt": "2025-12-24T04:29:04.111Z",
+      "nodeCount": 4,
+      "triggerCount": 1
+    },
+    {
+      "id": "MnrpR0zzCaQvJ9yJ",
+      "name": "视频号数据爬取",
+      "active": true,
+      "createdAt": "2025-12-22T12:58:14.958Z",
+      "updatedAt": "2025-12-24T04:29:14.120Z",
+      "nodeCount": 4,
+      "triggerCount": 1
+    },
+    {
+      "id": "4zvOIMtubKNF7QC6",
+      "name": "数据采集调度器",
+      "active": true,
+      "createdAt": "2025-12-24T04:32:52.136Z",
+      "updatedAt": "2025-12-24T05:08:58.655Z",
+      "nodeCount": 15,
+      "triggerCount": 1
+    },
+    {
+      "id": "BLVEVjzdtjAPEblg",
+      "name": "头条AI测试数据爬取",
+      "active": true,
+      "createdAt": "2025-12-24T05:05:59.662Z",
+      "updatedAt": "2025-12-24T05:12:08.949Z",
+      "nodeCount": 4,
+      "triggerCount": 1
+    },
+    {
+      "id": "HegJi0788KPG1Bqh",
+      "name": "公众号数据爬取",
+      "active": true,
+      "createdAt": "2025-12-24T05:08:17.242Z",
+      "updatedAt": "2025-12-24T05:12:09.425Z",
+      "nodeCount": 4,
+      "triggerCount": 1
+    },
+    {
+      "id": "RDlBd8MRjDSICfRf",
+      "name": "知乎数据爬取",
+      "active": true,
+      "createdAt": "2025-12-24T05:08:17.593Z",
+      "updatedAt": "2025-12-24T05:12:10.209Z",
+      "nodeCount": 4,
+      "triggerCount": 1
+    },
+    {
+      "id": "YFqEplFiSl5Qd3x9",
+      "name": "nightly-scheduler",
+      "active": true,
+      "createdAt": "2025-12-23T14:02:27.424Z",
+      "updatedAt": "2025-12-26T03:21:53.028Z",
+      "nodeCount": 18,
+      "triggerCount": 1
+    }
+  ],
+  "summary": {
+    "total": 16,
+    "active": 16,
+    "inactive": 0
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "meta": {
+    "generated_at": "2025-12-25T08:06:03+08:00",
+    "analyzer_version": "1.0.0",
+    "runs_directory": "/home/xx/data/runs"
+  },
+  "period": "2025-12-24 to 2025-12-24",
+  "summary": {
+    "total_runs": 15,
+    "successful_runs": 1,
+    "failed_runs": 0,
+    "incomplete_runs": 14,
+    "success_rate": "6.7%",
+    "fail_rate": "0.0%",
+    "incomplete_rate": "93.3%"
+  },
+  "performance": {
+    "total_duration_seconds": 335,
+    "average_duration_seconds": 335,
+    "total_tasks_executed": 1,
+    "average_tasks_per_run": 0.1,
+    "total_rework_count": 0,
+    "average_rework_per_run": 0.00
+  },
+  "model_usage": {"opus": 0,"sonnet": 9,"haiku": 0},
+  "model_statistics": {
+    "total_model_calls": 9,
+    "opus_percentage": 0.0,
+    "sonnet_percentage": 100.0,
+    "haiku_percentage": 0.0
+  },
+  "decision_breakdown": {"PASS": 1,"INCOMPLETE": 14},
+  "status_breakdown": {"decomposing": 7,"executing": 3,"completed": 1,"documenting": 4},
+  "complexity_distribution": {"complexity_1": 9,"complexity_2": 1,"complexity_3": 0,"complexity_4": 0,"complexity_5": 0},
+  "common_failures": [],
+  "recommendations": ["Over 50% runs are incomplete - check for timeout or crash issues"]
+}

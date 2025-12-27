@@ -1,0 +1,16 @@
+{
+  "name": "windows-automation-runner",
+  "version": "1.0.0",
+  "description": "Windows browser automation runner with LLM support",
+  "main": "runner.js",
+  "scripts": {
+    "start": "node runner.js",
+    "login": "node runner.js --login"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "puppeteer-core": "^21.6.1",
+    "@anthropic-ai/sdk": "^0.14.1",
+    "uuid": "^9.0.0"
+  }
+}

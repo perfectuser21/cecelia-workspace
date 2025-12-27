@@ -1,0 +1,15 @@
+[Unit]
+Description=ZenithJoyAI Deploy Webhook
+After=network.target
+
+[Service]
+Type=simple
+User=xx
+WorkingDirectory=/home/xx/dev/n8n-social-media-scraper/scripts
+ExecStart=/home/xx/.nvm/versions/node/v20.19.6/bin/node /home/xx/dev/n8n-social-media-scraper/scripts/deploy-webhook.js
+Restart=always
+RestartSec=10
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

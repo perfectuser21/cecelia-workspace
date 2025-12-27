@@ -1,0 +1,276 @@
+version: '3.8'
+
+# ============================================
+# Social Media Metrics - Main Docker Compose
+# ============================================
+#
+# Deployment Profiles:
+# - minimal: postgres + core-api + frontend (default)
+# - n8n: includes n8n automation
+# - coze: includes coze integration (reserved)
+# - all: all services enabled
+#
+# Usage:
+#   docker-compose up                      # Minimal deployment
+#   docker-compose --profile n8n up       # With n8n
+#   docker-compose --profile all up       # Full stack
+# ============================================
+
+networks:
+  social-metrics-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  postgres_data:
+    driver: local
+  n8n_data:
+    driver: local
+  sessions_data:
+    driver: local
+  logs_data:
+    driver: local
+
+services:
+  # ==========================================
+  # PostgreSQL Database
+  # ==========================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: social-metrics-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-social_metrics}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../core/database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ../../database/migrations:/docker-entrypoint-initdb.d/migrations:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      social-metrics-network:
+        ipv4_address: 172.28.0.10
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-social_metrics}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # ==========================================
+  # Core API (Backend)
+  # ==========================================
+  core-api:
+    build:
+      context: ../..
+      dockerfile: core/api/Dockerfile
+    container_name: social-metrics-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3002
+
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${POSTGRES_DB:-social_metrics}
+
+      # Feishu OAuth
+      FEISHU_APP_ID: ${FEISHU_APP_ID}
+      FEISHU_APP_SECRET: ${FEISHU_APP_SECRET}
+      FEISHU_REDIRECT_URI: ${FEISHU_REDIRECT_URI}
+
+      # Session
+      SESSION_SECRET: ${SESSION_SECRET:-change-this-secret-in-production}
+
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - sessions_data:/app/sessions
+      - logs_data:/app/logs
+    ports:
+      - "${API_PORT:-3002}:3002"
+    networks:
+      social-metrics-network:
+        ipv4_address: 172.28.0.20
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # ==========================================
+  # Frontend (React + Nginx)
+  # ==========================================
+  frontend:
+    build:
+      context: ../..
+      dockerfile: modules/frontend/Dockerfile
+    container_name: social-metrics-frontend
+    restart: unless-stopped
+    depends_on:
+      - core-api
+    environment:
+      API_URL: ${API_URL:-http://localhost:3002}
+      N8N_URL: ${N8N_URL:-http://localhost:5678}
+      ENVIRONMENT: ${NODE_ENV:-production}
+    ports:
+      - "${FRONTEND_PORT:-3000}:8080"
+    networks:
+      social-metrics-network:
+        ipv4_address: 172.28.0.30
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+  # ==========================================
+  # n8n Workflow Automation (Optional)
+  # ==========================================
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: social-metrics-n8n
+    restart: unless-stopped
+    profiles: ["n8n", "all"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${N8N_DB_NAME:-n8n}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER:-postgres}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+
+      # n8n Configuration
+      N8N_HOST: ${N8N_HOST:-localhost}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://localhost:5678}
+
+      # Security
+      N8N_BASIC_AUTH_ACTIVE: ${N8N_BASIC_AUTH_ACTIVE:-true}
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER:-admin}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD:-admin}
+
+      # Execution
+      EXECUTIONS_DATA_SAVE_ON_ERROR: all
+      EXECUTIONS_DATA_SAVE_ON_SUCCESS: all
+      EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS: true
+
+      # Timezone
+      GENERIC_TIMEZONE: ${TIMEZONE:-Asia/Shanghai}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ../../modules/workflows/n8n:/workflows:ro
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    networks:
+      social-metrics-network:
+        ipv4_address: 172.28.0.40
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # ==========================================
+  # Coze Integration (Reserved - Optional)
+  # ==========================================
+  coze:
+    image: alpine:latest
+    container_name: social-metrics-coze
+    restart: "no"
+    profiles: ["coze", "all"]
+    command: echo "Coze integration placeholder - not implemented yet"
+    networks:
+      social-metrics-network:
+        ipv4_address: 172.28.0.50
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # ==========================================
+  # Nginx Gateway (Optional - Production)
+  # ==========================================
+  nginx-gateway:
+    image: nginx:1.25-alpine
+    container_name: social-metrics-nginx
+    restart: unless-stopped
+    profiles: ["production", "all"]
+    depends_on:
+      - core-api
+      - frontend
+    volumes:
+      - ../../infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../../infrastructure/nginx/ssl:/etc/nginx/ssl:ro
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    networks:
+      social-metrics-network:
+        ipv4_address: 172.28.0.100
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M

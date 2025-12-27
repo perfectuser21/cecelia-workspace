@@ -1,0 +1,144 @@
+{
+  "name": "VPS 健康检查",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 * * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "定时触发",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "df -h / | tail -1 | awk '{print $5}' | sed 's/%//'",
+        "options": {}
+      },
+      "id": "ssh-check",
+      "name": "SSH检查磁盘",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// 解析磁盘使用率并判断是否需要告警\nconst item = $input.item;\nconst stdout = item.json.stdout || '';\nconst stderr = item.json.stderr || '';\nconst exitCode = item.json.exitCode ?? 0;\n\nif (exitCode !== 0 || item.error) {\n  throw new Error(`SSH 执行失败: ${item.error?.message || stderr || 'Unknown error'}`);\n}\n\nconst diskUsage = parseInt(stdout.trim(), 10);\nif (isNaN(diskUsage)) {\n  throw new Error(`无法解析磁盘使用率: ${stdout}`);\n}\n\nconst threshold = 80;\nconst needAlert = diskUsage >= threshold;\n\nreturn {\n  json: {\n    disk_usage: diskUsage,\n    threshold: threshold,\n    need_alert: needAlert,\n    checked_at: new Date().toISOString(),\n    message: needAlert \n      ? `⚠️ 磁盘使用率 ${diskUsage}% 已超过阈值 ${threshold}%`\n      : `✅ 磁盘使用率 ${diskUsage}%，正常`\n  }\n};"
+      },
+      "id": "parse-result",
+      "name": "解析结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.need_alert}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-alert",
+      "name": "是否告警",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.FEISHU_BOT_WEBHOOK}}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"msg_type\": \"interactive\", \"card\": { \"config\": { \"wide_screen_mode\": true }, \"header\": { \"title\": { \"tag\": \"plain_text\", \"content\": \"⚠️ VPS 磁盘空间告警\" }, \"template\": \"red\" }, \"elements\": [ { \"tag\": \"div\", \"text\": { \"tag\": \"lark_md\", \"content\": \"**磁盘使用率**: \" + $json.disk_usage + \"%\\n**阈值**: \" + $json.threshold + \"%\\n**检查时间**: \" + $json.checked_at } }, { \"tag\": \"hr\" }, { \"tag\": \"note\", \"elements\": [{ \"tag\": \"plain_text\", \"content\": \"请及时清理磁盘空间\" }] } ] } } }}",
+        "options": {}
+      },
+      "id": "send-alert",
+      "name": "发送告警",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.FEISHU_BOT_WEBHOOK}}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"msg_type\": \"text\", \"content\": { \"text\": \"✅ VPS 健康检查正常\\n磁盘使用率: \" + $json.disk_usage + \"%\\n检查时间: \" + $json.checked_at } } }}",
+        "options": {}
+      },
+      "id": "send-success",
+      "name": "记录正常",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [240, 520]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.FEISHU_BOT_WEBHOOK}}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"msg_type\": \"interactive\", \"card\": { \"config\": { \"wide_screen_mode\": true }, \"header\": { \"title\": { \"tag\": \"plain_text\", \"content\": \"❌ VPS 健康检查失败\" }, \"template\": \"red\" }, \"elements\": [ { \"tag\": \"div\", \"text\": { \"tag\": \"lark_md\", \"content\": \"**Workflow**: \" + $json.workflow.name + \"\\n**错误**: \" + $json.execution.error.message + \"\\n**时间**: \" + new Date().toISOString() } } ] } } }}",
+        "options": {}
+      },
+      "id": "notify-error",
+      "name": "错误告警",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 520]
+    }
+  ],
+  "connections": {
+    "定时触发": {
+      "main": [[{ "node": "SSH检查磁盘", "type": "main", "index": 0 }]]
+    },
+    "SSH检查磁盘": {
+      "main": [[{ "node": "解析结果", "type": "main", "index": 0 }]]
+    },
+    "解析结果": {
+      "main": [[{ "node": "是否告警", "type": "main", "index": 0 }]]
+    },
+    "是否告警": {
+      "main": [
+        [{ "node": "发送告警", "type": "main", "index": 0 }],
+        [{ "node": "记录正常", "type": "main", "index": 0 }]
+      ]
+    },
+    "Error Trigger": {
+      "main": [[{ "node": "错误告警", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": []
+}

@@ -1,0 +1,21 @@
+{
+  "name": "data-collection",
+  "description": "社交媒体数据采集：9平台爬虫",
+  "bundle_version": "1.0.0",
+  "components": {
+    "scheduler": {"n8n_id": "4zvOIMtubKNF7QC6", "version": "1.0.0"},
+    "douyin": {"n8n_id": "wxYIxt8paRz82lbW", "version": "1.0.0"},
+    "kuaishou": {"n8n_id": "8YC1JuIKo0aytgQz", "version": "1.0.0"},
+    "xiaohongshu": {"n8n_id": "I5It7tSAT7HadXYJ", "version": "1.0.0"},
+    "toutiao": {"n8n_id": "SmJ3WIeVmR69l2dF", "version": "1.0.0"},
+    "toutiao-test": {"n8n_id": "BLVEVjzdtjAPEblg", "version": "1.0.0"},
+    "weibo": {"n8n_id": "VMS9m7rubG5zvyla", "version": "1.0.0"},
+    "shipinhao": {"n8n_id": "MnrpR0zzCaQvJ9yJ", "version": "1.0.0"},
+    "gongzhonghao": {"n8n_id": "HegJi0788KPG1Bqh", "version": "1.0.0"},
+    "zhihu": {"n8n_id": "RDlBd8MRjDSICfRf", "version": "1.0.0"}
+  },
+  "dependencies": {},
+  "changelog": [
+    {"version": "1.0.0", "date": "2025-12-26", "change": "初始导入"}
+  ]
+}

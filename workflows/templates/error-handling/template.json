@@ -1,0 +1,211 @@
+{
+  "name": "错误处理模板",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "error-handling-demo",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "触发器",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 400],
+      "webhookId": "{{WEBHOOK_ID}}"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 主业务逻辑\nconst input = $input.item.json.body || $input.item.json;\n\n// 模拟可能失败的操作\nif (!input.url) {\n  throw new Error('Missing required parameter: url');\n}\n\nreturn {\n  json: {\n    url: input.url,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "main-logic",
+      "name": "主逻辑",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$json.url}}",
+        "method": "GET",
+        "options": {
+          "timeout": 10000,
+          "retry": {
+            "retry": {
+              "maxRetries": 3,
+              "retryInterval": 1000
+            }
+          }
+        }
+      },
+      "id": "http-request",
+      "name": "HTTP 请求",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// 检查是否有错误\nconst item = $input.item;\n\nif (item.error) {\n  // 有错误，传递到错误处理分支\n  throw new Error(item.error.message || '请求失败');\n}\n\n// 成功，返回结果\nreturn {\n  json: {\n    success: true,\n    data: item.json,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "check-error",
+      "name": "检查结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// 错误处理逻辑\nconst error = $input.item.error || {};\nconst errorMsg = error.message || '未知错误';\n\n// 记录错误日志\nconsole.error('执行失败:', errorMsg);\n\n// 构建错误响应\nconst errorResponse = {\n  success: false,\n  error: errorMsg,\n  timestamp: new Date().toISOString(),\n  input: $input.item.json\n};\n\nreturn { json: errorResponse };"
+      },
+      "id": "error-handler",
+      "name": "错误处理",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 500]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.FEISHU_BOT_WEBHOOK}}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"msg_type\": \"text\",\n  \"content\": {\n    \"text\": \"[错误告警] \" + $json.error + \"\\n时间: \" + $json.timestamp\n  }\n} }}",
+        "options": {}
+      },
+      "id": "notify-error",
+      "name": "发送告警",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": "={{ $json.success ? 200 : 500 }}"
+        }
+      },
+      "id": "respond",
+      "name": "返回响应",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1340, 400]
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [240, 600]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": $json.error.message || \"Unexpected Error\" } }}",
+        "options": { "responseCode": 500 }
+      },
+      "id": "global-error-respond",
+      "name": "全局错误响应",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [460, 600]
+    }
+  ],
+  "connections": {
+    "触发器": {
+      "main": [
+        [
+          {
+            "node": "主逻辑",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "主逻辑": {
+      "main": [
+        [
+          {
+            "node": "HTTP 请求",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP 请求": {
+      "main": [
+        [
+          {
+            "node": "检查结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "检查结果": {
+      "main": [
+        [
+          {
+            "node": "返回响应",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "错误处理",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "错误处理": {
+      "main": [
+        [
+          {
+            "node": "发送告警",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "发送告警": {
+      "main": [
+        [
+          {
+            "node": "返回响应",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "全局错误响应",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

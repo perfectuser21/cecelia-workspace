@@ -1,0 +1,88 @@
+# ============================================
+# Root .dockerignore
+# ============================================
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+README*
+LICENSE
+CHANGELOG*
+docs/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE and Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependencies
+**/node_modules/
+**/bower_components/
+
+# Build outputs
+**/dist/
+**/build/
+**/.next/
+**/.cache/
+
+# Testing
+**/coverage/
+**/.nyc_output/
+**/test/
+**/__tests__/
+*.test.js
+*.spec.js
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Temporary files
+**/tmp/
+**/temp/
+*.tmp
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Database
+**/postgres_data/
+**/n8n_data/
+*.sql
+*.db
+*.sqlite
+
+# Screenshots and media
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+!logo.svg
+!icon.svg

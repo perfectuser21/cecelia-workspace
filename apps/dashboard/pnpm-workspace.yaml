@@ -1,0 +1,11 @@
+packages:
+  # Core services
+  - 'core/api'
+  - 'core/workers'
+  - 'core/shared'
+  - 'core/database'
+
+  # Modules
+  - 'modules/frontend'
+  - 'modules/workflows/*'
+  - 'modules/services/*'

@@ -1,0 +1,27 @@
+{
+  "webhook-trigger": {
+    "description": "Webhook触发的标准流程",
+    "nodes": ["Webhook", "Code处理", "HTTP响应"],
+    "use_case": "API端点、回调处理"
+  },
+  "scheduled-job": {
+    "description": "定时执行的任务",
+    "nodes": ["Schedule Trigger", "SSH执行", "飞书通知"],
+    "use_case": "定时备份、定时检查"
+  },
+  "data-sync": {
+    "description": "数据同步流程",
+    "nodes": ["触发器", "HTTP获取", "Code转换", "数据库保存"],
+    "use_case": "API数据同步、爬虫"
+  },
+  "multi-step-approval": {
+    "description": "多步骤处理",
+    "nodes": ["触发器", "步骤1", "IF判断", "步骤2", "通知"],
+    "use_case": "审批流、多阶段处理"
+  },
+  "error-handling": {
+    "description": "错误处理模式",
+    "nodes": ["Try", "Catch", "错误通知", "重试逻辑"],
+    "use_case": "需要错误恢复的流程"
+  }
+}

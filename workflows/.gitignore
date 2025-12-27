@@ -1,0 +1,16 @@
+# n8n MCP 配置文件包含 API key，不要提交
+.mcp.json
+.claude/mcp.json
+
+# Node modules
+node_modules/
+
+# 环境变量和密钥
+.env
+.env.local
+.secrets
+
+# 临时文件
+*.tmp
+*.log
+workflows/.locks/

@@ -1,0 +1,153 @@
+{
+  "lessons": [
+    {
+      "run_id": "20251224234639-5ciy6h",
+      "date": "2025-12-25T07:52:17+08:00",
+      "prd": "创建一个 Ping Webhook，收到请求后返回 pong\n",
+      "decision": "PASS",
+      "rework_count": 0
+    },
+    null,
+    {
+      "run_id": "20251225-simple-test",
+      "date": "2025-12-25T16:12:24+08:00",
+      "prd": "创建一个简单的 Ping webhook 返回 pong\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "20251225-full-test2",
+      "date": "2025-12-25T16:38:27+08:00",
+      "prd": "创建一个 Ping webhook，收到请求返回 pong 和时间戳\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "fix-test-002",
+      "date": "2025-12-25T17:38:52+08:00",
+      "prd": "创建 Ping webhook\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "test-fix-001",
+      "date": "2025-12-25T23:40:57+08:00",
+      "prd": "创建一个 Ping webhook，收到请求返回 pong\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "complex-test-003",
+      "date": "2025-12-25T23:59:44+08:00",
+      "prd": "创建一个 GitHub Star 通知系统：\n1. 每小时检查指定仓库的 star 数量\n2. 如果 sta",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "test-after-fix-001",
+      "date": "2025-12-26T10:53:14+08:00",
+      "prd": "创建一个简单的 Ping webhook，返回 pong\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "concurrent-2",
+      "date": "2025-12-26T10:58:01+08:00",
+      "prd": "创建 ping-2 webhook\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "concurrent-3",
+      "date": "2025-12-26T10:58:10+08:00",
+      "prd": "创建 ping-3 webhook\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "debug-test-2",
+      "date": "2025-12-26T11:07:37+08:00",
+      "prd": "ping\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "stress-v2-3",
+      "date": "2025-12-26T11:12:42+08:00",
+      "prd": "创建 echo webhook\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "stress-v2-2",
+      "date": "2025-12-26T11:12:47+08:00",
+      "prd": "创建 status webhook\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "stress-v2-1",
+      "date": "2025-12-26T11:13:15+08:00",
+      "prd": "创建 health check webhook\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "final-test-001",
+      "date": "2025-12-26T11:18:12+08:00",
+      "prd": "创建 ping webhook 返回 pong\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "final-v1-1766747057",
+      "date": "2025-12-26T19:06:00+08:00",
+      "prd": "创建 VPS 健康检查 workflow：1. Schedule Trigger 每小时触发 2. SSH 检查磁盘空间 3. ",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "github-star-1766747508",
+      "date": "2025-12-26T19:13:13+08:00",
+      "prd": "创建 GitHub Star 通知 workflow：1. 每小时检查指定仓库的 star 数量 2. 与上次记�",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "time-test-1766748799",
+      "date": "2025-12-26T19:35:40+08:00",
+      "prd": "创建定时任务 workflow：每天凌晨 3 点清理临时文件，完成后发飞书通知\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "verify-fix-1766752200",
+      "date": "2025-12-26T19:57:44+08:00",
+      "prd": "创建一个 Webhook 测试 workflow：收到 POST 请求后返回 pong\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "verify-complete-1766756100",
+      "date": "2025-12-26T20:35:54+08:00",
+      "prd": "创建一个每小时检查 GitHub 仓库 star 数量的 workflow，如果有新增 star 就发飞�",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "no-haiku-1766756500",
+      "date": "2025-12-26T20:41:10+08:00",
+      "prd": "创建一个 Ping webhook，返回 pong\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "verify-mech-v2-1735220600",
+      "date": "2025-12-26T21:46:20+08:00",
+      "prd": "创建一个 Ping webhook 返回 pong\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "verify-final-1735221000",
+      "date": "2025-12-26T21:50:36+08:00",
+      "prd": "创建一个 Ping webhook 返回 pong\n",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "release-test-2-1735222000",
+      "date": "2025-12-26T22:09:17+08:00",
+      "prd": "创建一个每天早上9点执行的定时任务：1. 检查服务器磁盘使用率 2. 如果超�",
+      "decision": "PASS"
+    },
+    {
+      "run_id": "test-fix-1735224400",
+      "date": "2025-12-26T22:29:51+08:00",
+      "prd": "创建一个 n8n workflow 接收 GitHub webhook：1. 使用 Webhook 节点接收 POST 请求 2. 使�",
+      "decision": "PASS"
+    }
+  ],
+  "common_issues": {},
+  "best_practices": [],
+  "updated_at": "2025-12-26T22:29:52+08:00"
+}
