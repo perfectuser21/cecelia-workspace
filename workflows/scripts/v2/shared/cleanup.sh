@@ -73,17 +73,17 @@ if [[ -n "$(git status --porcelain)" ]]; then
   fi
 
   # 构建 commit 消息
-  local commit_type="feat"
-  local commit_suffix=""
+  COMMIT_TYPE="feat"
+  COMMIT_SUFFIX=""
 
   if [[ "$PASSED" != "true" ]]; then
-    commit_type="wip"
-    commit_suffix=" (需人工处理)"
+    COMMIT_TYPE="wip"
+    COMMIT_SUFFIX=" (需人工处理)"
   elif [[ "$RETRY_COUNT" -gt 0 ]]; then
-    commit_suffix=" [retry-$RETRY_COUNT]"
+    COMMIT_SUFFIX=" [retry-$RETRY_COUNT]"
   fi
 
-  COMMIT_MSG="${commit_type}(${TASK_ID:0:8}): ${TASK_NAME}${commit_suffix}
+  COMMIT_MSG="${COMMIT_TYPE}(${TASK_ID:0:8}): ${TASK_NAME}${COMMIT_SUFFIX}
 
 Task: https://notion.so/${TASK_ID}
 Run ID: $RUN_ID

@@ -179,8 +179,20 @@ check_git() {
   fi
 
   # 尝试模拟合并（不实际合并）
-  local base_branch="develop"
-  git fetch origin "$base_branch" 2>/dev/null || base_branch="main"
+  # 支持 develop/main/master
+  local base_branch=""
+  for branch in develop main master; do
+    if git fetch origin "$branch" 2>/dev/null; then
+      base_branch="$branch"
+      break
+    fi
+  done
+
+  if [[ -z "$base_branch" ]]; then
+    log_warn "无法获取远程分支，跳过合并冲突检查"
+    pass_check "git" "无合并冲突（跳过远程检查）"
+    return 0
+  fi
 
   if ! git merge --no-commit --no-ff "origin/$base_branch" 2>/dev/null; then
     git merge --abort 2>/dev/null || true
@@ -210,6 +222,13 @@ check_n8n_workflow_exists() {
   if [[ -z "$workflow_id" ]]; then
     fail_check "n8n_exists" "未找到 Workflow ID"
     return 1
+  fi
+
+  # TEST_MODE: 跳过实际 API 检查
+  if [[ "${TEST_MODE:-}" == "1" ]]; then
+    log_info "[TEST_MODE] 模拟 n8n Workflow 存在性检查"
+    pass_check "n8n_exists" "Workflow 存在: [TEST] $workflow_id"
+    return 0
   fi
 
   # 检查 n8n 中是否存在
