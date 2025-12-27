@@ -141,9 +141,58 @@ fi
 
 # 如果没有模板或模板加载失败，使用 Claude 生成
 if [[ -z "$WORKFLOW_JSON" ]]; then
-  log_info "使用 Claude 生成 Workflow JSON..."
+  # TEST_MODE: 使用 mock workflow JSON
+  if [[ "${TEST_MODE:-}" == "1" ]]; then
+    log_info "[TEST_MODE] 使用 mock Workflow JSON"
+    WORKFLOW_JSON=$(jq -n \
+      --arg name "$TASK_NAME" \
+      '{
+        name: $name,
+        nodes: [
+          {
+            id: "trigger-1",
+            name: "定时触发器",
+            type: "n8n-nodes-base.scheduleTrigger",
+            typeVersion: 1,
+            position: [250, 300],
+            parameters: {
+              rule: {
+                interval: [{ field: "hours", hoursInterval: 1 }]
+              }
+            }
+          },
+          {
+            id: "ssh-1",
+            name: "检查磁盘空间",
+            type: "n8n-nodes-base.ssh",
+            typeVersion: 1,
+            position: [450, 300],
+            parameters: {
+              command: "df -h / | tail -1 | awk '\"'\"'{print $5}'\"'\"'"
+            }
+          },
+          {
+            id: "http-1",
+            name: "发送飞书告警",
+            type: "n8n-nodes-base.httpRequest",
+            typeVersion: 4,
+            position: [650, 300],
+            parameters: {
+              method: "POST",
+              url: "={{ $env.FEISHU_BOT_WEBHOOK }}"
+            }
+          }
+        ],
+        connections: {
+          "定时触发器": { main: [[{ node: "检查磁盘空间", type: "main", index: 0 }]] },
+          "检查磁盘空间": { main: [[{ node: "发送飞书告警", type: "main", index: 0 }]] }
+        },
+        settings: { executionOrder: "v1" }
+      }')
+  else
+    log_info "使用 Claude 生成 Workflow JSON..."
 
-  PROMPT="根据以下任务描述，生成一个完整的 n8n workflow JSON 结构。
+    PROMPT="根据以下任务描述，生成一个完整的 n8n workflow JSON 结构。
 
 任务名: $TASK_NAME
 任务描述:
@@ -203,6 +252,7 @@ $TASK_CONTENT
   fi
 
   log_info "Workflow JSON 生成成功"
+  fi
 fi
 
 # 保存 Workflow JSON
@@ -214,56 +264,68 @@ log_info "Workflow JSON 已保存: $WORK_DIR/workflow.json"
 # ============================================================
 log_info "[3/4] 创建 Workflow..."
 
-if [[ -z "$N8N_REST_API_KEY" ]]; then
-  log_error "N8N_REST_API_KEY 未设置"
-  exit 1
-fi
+# TEST_MODE: 使用 mock API 响应
+if [[ "${TEST_MODE:-}" == "1" ]]; then
+  log_info "[TEST_MODE] 模拟 n8n API 创建"
+  WORKFLOW_ID="test-workflow-$(date +%s)"
+  WORKFLOW_NAME=$(echo "$WORKFLOW_JSON" | jq -r '.name')
+  NODE_COUNT=$(echo "$WORKFLOW_JSON" | jq '.nodes | length')
+  log_info "Workflow 创建成功: $WORKFLOW_NAME (ID: $WORKFLOW_ID, 节点数: $NODE_COUNT)"
 
-N8N_API_URL="https://zenithjoy21xx.app.n8n.cloud/api/v1"
-
-# 过滤 JSON，只保留 API 接受的字段
-FILTERED_JSON=$(echo "$WORKFLOW_JSON" | jq '{
-  name: .name,
-  nodes: .nodes,
-  connections: .connections,
-  settings: (.settings // {executionOrder: "v1"})
-}')
-
-# 创建 Workflow
-RESPONSE=$(curl -sf -w "\n%{http_code}" -X POST "$N8N_API_URL/workflows" \
-  -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d "$FILTERED_JSON" 2>&1)
-
-HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
-
-if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" ]]; then
-  log_error "n8n API 创建失败 (HTTP $HTTP_CODE)"
-  echo "$RESPONSE_BODY" > "$WORK_DIR/api_error.json"
-  exit 1
-fi
-
-WORKFLOW_ID=$(echo "$RESPONSE_BODY" | jq -r '.id')
-WORKFLOW_NAME=$(echo "$RESPONSE_BODY" | jq -r '.name')
-NODE_COUNT=$(echo "$RESPONSE_BODY" | jq '.nodes | length')
-
-log_info "Workflow 创建成功: $WORKFLOW_NAME (ID: $WORKFLOW_ID, 节点数: $NODE_COUNT)"
-
-# ============================================================
-# 激活 Workflow
-# ============================================================
-log_info "[4/4] 激活 Workflow..."
-
-ACTIVATE_RESPONSE=$(curl -sf -X PATCH "$N8N_API_URL/workflows/$WORKFLOW_ID" \
-  -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"active": true}' 2>&1)
-
-if echo "$ACTIVATE_RESPONSE" | jq -e '.active == true' > /dev/null 2>&1; then
-  log_info "Workflow 已激活"
+  log_info "[4/4] 激活 Workflow..."
+  log_info "[TEST_MODE] 模拟激活成功"
 else
-  log_warn "Workflow 激活失败，但继续执行"
+  if [[ -z "$N8N_REST_API_KEY" ]]; then
+    log_error "N8N_REST_API_KEY 未设置"
+    exit 1
+  fi
+
+  N8N_API_URL="https://zenithjoy21xx.app.n8n.cloud/api/v1"
+
+  # 过滤 JSON，只保留 API 接受的字段
+  FILTERED_JSON=$(echo "$WORKFLOW_JSON" | jq '{
+    name: .name,
+    nodes: .nodes,
+    connections: .connections,
+    settings: (.settings // {executionOrder: "v1"})
+  }')
+
+  # 创建 Workflow
+  RESPONSE=$(curl -sf -w "\n%{http_code}" -X POST "$N8N_API_URL/workflows" \
+    -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d "$FILTERED_JSON" 2>&1)
+
+  HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+  RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
+
+  if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" ]]; then
+    log_error "n8n API 创建失败 (HTTP $HTTP_CODE)"
+    echo "$RESPONSE_BODY" > "$WORK_DIR/api_error.json"
+    exit 1
+  fi
+
+  WORKFLOW_ID=$(echo "$RESPONSE_BODY" | jq -r '.id')
+  WORKFLOW_NAME=$(echo "$RESPONSE_BODY" | jq -r '.name')
+  NODE_COUNT=$(echo "$RESPONSE_BODY" | jq '.nodes | length')
+
+  log_info "Workflow 创建成功: $WORKFLOW_NAME (ID: $WORKFLOW_ID, 节点数: $NODE_COUNT)"
+
+  # ============================================================
+  # 激活 Workflow
+  # ============================================================
+  log_info "[4/4] 激活 Workflow..."
+
+  ACTIVATE_RESPONSE=$(curl -sf -X PATCH "$N8N_API_URL/workflows/$WORKFLOW_ID" \
+    -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{"active": true}' 2>&1)
+
+  if echo "$ACTIVATE_RESPONSE" | jq -e '.active == true' > /dev/null 2>&1; then
+    log_info "Workflow 已激活"
+  else
+    log_warn "Workflow 激活失败，但继续执行"
+  fi
 fi
 
 # ============================================================
