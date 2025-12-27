@@ -421,9 +421,9 @@ create_feature_branch() {
 
   cd "$PROJECT_DIR" || return 1
 
-  # 切换到 develop 并拉取最新
-  log_info "切换到 develop 分支..."
-  git checkout develop 2>/dev/null || git checkout main
+  # 切换到基础分支并拉取最新（支持 develop/main/master）
+  log_info "切换到基础分支..."
+  git checkout develop 2>/dev/null || git checkout main 2>/dev/null || git checkout master
   git pull origin "$(git branch --show-current)" 2>/dev/null || true
 
   # 检查分支是否已存在
