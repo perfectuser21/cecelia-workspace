@@ -1,0 +1,127 @@
+{
+  "name": "测试任务 - 创建监控告警 Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 * * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "定时触发",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 执行定时任务逻辑\nconst now = new Date();\n\nconst result = {\n  executed_at: now.toISOString(),\n  task: '定时任务',\n  status: 'completed'\n};\n\nreturn { json: result };"
+      },
+      "id": "task-logic",
+      "name": "任务逻辑",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "={{$env.FEISHU_BOT_WEBHOOK}}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"msg_type\": \"text\", \"content\": { \"text\": \"✅ \" + $json.task + \" 执行完成\\n时间: \" + $json.executed_at } } }}",
+        "options": {}
+      },
+      "id": "notify-success",
+      "name": "成功通知",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.FEISHU_BOT_WEBHOOK}}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"msg_type\": \"text\", \"content\": { \"text\": \"❌ Workflow 执行失败\\n名称: \" + $json.workflow.name + \"\\n错误: \" + $json.execution.error.message + \"\\n时间: \" + new Date().toISOString() } } }}",
+        "options": {}
+      },
+      "id": "notify-error",
+      "name": "错误告警",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "定时触发": {
+      "main": [
+        [
+          {
+            "node": "任务逻辑",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "任务逻辑": {
+      "main": [
+        [
+          {
+            "node": "成功通知",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "错误告警",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "n8n_id": "test-workflow-1766850823"
+}
