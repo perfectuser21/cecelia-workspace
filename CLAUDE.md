@@ -7,9 +7,11 @@ Monorepo 整合项目，包含 Dashboard 和 n8n Workflows 两个核心模块。
 ```
 zenithjoy-autopilot/
 ├── apps/
-│   ├── dashboard/       # 运营中台（React + Express）
-│   └── api/             # 预留：独立后端服务
-├── workflows/           # n8n 工作流
+│   └── dashboard/           # 运营中台
+│       ├── frontend/        # React 前端
+│       ├── core/api/        # Express 后端 (16 模块)
+│       └── douyin-api/      # 抖音登录服务 (Python)
+├── workflows/               # n8n 工作流
 │   ├── exports/         # 导出的 workflow JSON
 │   ├── docs/            # 工作流文档
 │   ├── templates/       # 工作流模板
