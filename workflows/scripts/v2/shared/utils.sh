@@ -450,16 +450,16 @@ create_feature_branch() {
 
   # 切换到基础分支并拉取最新（支持 develop/main/master）
   log_info "切换到基础分支..."
-  git checkout develop 2>/dev/null || git checkout main 2>/dev/null || git checkout master
-  git pull origin "$(git branch --show-current)" 2>/dev/null || true
+  git checkout develop >/dev/null 2>&1 || git checkout main >/dev/null 2>&1 || git checkout master >/dev/null 2>&1
+  git pull origin "$(git branch --show-current)" >/dev/null 2>&1 || true
 
   # 检查分支是否已存在
   if git show-ref --verify --quiet "refs/heads/$branch_name"; then
     log_info "分支已存在，切换到: $branch_name"
-    git checkout "$branch_name"
+    git checkout "$branch_name" >/dev/null 2>&1
   else
     log_info "创建新分支: $branch_name"
-    git checkout -b "$branch_name"
+    git checkout -b "$branch_name" >/dev/null 2>&1
   fi
 
   echo "$branch_name"
