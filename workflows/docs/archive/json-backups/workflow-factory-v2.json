@@ -1,0 +1,96 @@
+{
+  "name": "AI工厂-Workflow生产线-v2",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "workflow-factory",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "接收PRD",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "workflow-factory-v2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 初始化 Run\nconst now = new Date();\nconst input = $input.first().json;\n\nconst resumeRunId = input.resume_run_id || input.body?.resume_run_id || null;\nconst rollbackRunId = input.rollback_run_id || input.body?.rollback_run_id || null;\nconst runId = resumeRunId || (now.toISOString().replace(/[-:T]/g, '').slice(0, 14) + '-' + Math.random().toString(36).slice(2, 8));\n\nconst prd = input.prd || input.body?.prd || '未提供PRD';\nconst targetWorkflow = input.target_workflow || input.body?.target_workflow || null;\nconst project = input.project || input.body?.project || 'default';\n\nreturn [{\n  json: {\n    run_id: runId,\n    prd: prd,\n    target_workflow: targetWorkflow,\n    project: project,\n    resume_run_id: resumeRunId,\n    rollback_run_id: rollbackRunId,\n    started_at: now.toISOString()\n  }\n}];"
+      },
+      "id": "init",
+      "name": "初始化Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx",
+        "command": "=/home/xx/bin/workflow-factory.sh --run-id '{{ $json.run_id }}' --prd '{{ $json.prd.replace(/'/g, \"'\") }}' {{ $json.target_workflow ? \"--target-workflow '\" + $json.target_workflow + \"'\" : \"\" }} {{ $json.resume_run_id ? \"--resume '\" + $json.resume_run_id + \"'\" : \"\" }} {{ $json.rollback_run_id ? \"--rollback '\" + $json.rollback_run_id + \"'\" : \"\" }} --project '{{ $json.project }}' 2>&1"
+      },
+      "id": "ssh-execute",
+      "name": "SSH执行主控脚本",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [600, 300],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 解析主控脚本输出的JSON结果\nconst stdout = $input.first().json.stdout || '';\nconst initData = $('初始化Run').first().json;\n\nlet result;\n\ntry {\n  // 查找最后一个完整的JSON对象（摘要报告）\n  const lines = stdout.split('\\n');\n  for (let i = lines.length - 1; i >= 0; i--) {\n    const line = lines[i].trim();\n    if (line.startsWith('{') && line.endsWith('}')) {\n      try {\n        const parsed = JSON.parse(line);\n        if (parsed.run_id) {\n          result = parsed;\n          break;\n        }\n      } catch (e) {\n        continue;\n      }\n    }\n  }\n  \n  // 如果没找到单行JSON，尝试匹配多行JSON\n  if (!result) {\n    const jsonMatch = stdout.match(/\\{[\\s\\S]*\"run_id\"[\\s\\S]*\"decision\"[\\s\\S]*\\}/g);\n    if (jsonMatch) {\n      for (const match of jsonMatch.reverse()) {\n        try {\n          result = JSON.parse(match);\n          if (result.run_id) break;\n        } catch (e) {\n          continue;\n        }\n      }\n    }\n  }\n  \n  if (!result) {\n    throw new Error('无法解析结果JSON');\n  }\n} catch (e) {\n  result = {\n    run_id: initData.run_id,\n    prd: initData.prd,\n    decision: 'ERROR',\n    error: e.message,\n    raw_output: stdout.slice(-500)\n  };\n}\n\n// 合并初始数据\nresult.started_at = initData.started_at;\nresult.project = initData.project;\n\nreturn [{ json: result }];"
+      },
+      "id": "parse-result",
+      "name": "解析结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/bot/v2/hook/5bde68e0-9879-4a45-88ed-461a88229136",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"msg_type\": \"interactive\",\n  \"card\": {\n    \"header\": {\n      \"title\": {\n        \"tag\": \"plain_text\",\n        \"content\": \"{{ $json.decision === 'PASS' ? '✅' : $json.decision === 'FAIL' ? '❌' : '⚠️' }} AI工厂执行完成\"\n      },\n      \"template\": \"{{ $json.decision === 'PASS' ? 'green' : $json.decision === 'FAIL' ? 'red' : 'orange' }}\"\n    },\n    \"elements\": [\n      {\n        \"tag\": \"div\",\n        \"fields\": [\n          { \"is_short\": true, \"text\": { \"tag\": \"lark_md\", \"content\": \"**Run ID**\\n{{ $json.run_id }}\" } },\n          { \"is_short\": true, \"text\": { \"tag\": \"lark_md\", \"content\": \"**决策**\\n{{ $json.decision }}\" } }\n        ]\n      },\n      { \"tag\": \"div\", \"text\": { \"tag\": \"lark_md\", \"content\": \"**PRD**: {{ ($json.prd || '').substring(0, 80) }}...\" } },\n      {\n        \"tag\": \"div\",\n        \"fields\": [\n          { \"is_short\": true, \"text\": { \"tag\": \"lark_md\", \"content\": \"**任务数**\\n{{ $json.tasks?.total || 0 }}\" } },\n          { \"is_short\": true, \"text\": { \"tag\": \"lark_md\", \"content\": \"**耗时**\\n{{ $json.duration_seconds || 0 }}s\" } }\n        ]\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "id": "feishu-notify",
+      "name": "飞书通知",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 返回最终结果\nconst result = $('解析结果').first().json;\n\nreturn [{\n  json: {\n    success: result.decision === 'PASS',\n    run_id: result.run_id,\n    decision: result.decision,\n    prd: result.prd,\n    tasks: result.tasks,\n    duration_seconds: result.duration_seconds,\n    rework_count: result.rework_count,\n    completed_at: result.completed_at\n  }\n}];"
+      },
+      "id": "return-result",
+      "name": "返回结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 300]
+    }
+  ],
+  "connections": {
+    "接收PRD": { "main": [[{ "node": "初始化Run", "type": "main", "index": 0 }]] },
+    "初始化Run": { "main": [[{ "node": "SSH执行主控脚本", "type": "main", "index": 0 }]] },
+    "SSH执行主控脚本": { "main": [[{ "node": "解析结果", "type": "main", "index": 0 }]] },
+    "解析结果": { "main": [[{ "node": "飞书通知", "type": "main", "index": 0 }]] },
+    "飞书通知": { "main": [[{ "node": "返回结果", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

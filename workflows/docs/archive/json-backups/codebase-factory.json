@@ -1,0 +1,147 @@
+{
+  "name": "AI工厂-基座生产线",
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "nodes": [
+    {
+      "name": "接收PRD",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 400],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "codebase-factory",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "webhookId": "codebase-factory-webhook"
+    },
+    {
+      "name": "手动触发",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 600]
+    },
+    {
+      "name": "初始化Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 500],
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst runId = now.toISOString().replace(/[-:T]/g, '').slice(0, 14) + '-' + Math.random().toString(36).slice(2, 8);\n\nconst prd = $input.first().json.prd || $input.first().json.body?.prd || '未提供PRD';\nconst project = $input.first().json.project || 'n8n-social-media-scraper';\nconst projectPath = $input.first().json.project_path || '/home/xx/dev/' + project;\n\nreturn [{\n  json: {\n    run_id: runId,\n    prd: prd,\n    project: project,\n    project_path: projectPath,\n    started_at: now.toISOString(),\n    factory_type: 'codebase'\n  }\n}];"
+      }
+    },
+    {
+      "name": "构建Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 500],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nconst systemPrompt = `你是基座工厂的执行者（Claude Code 无头模式）。\n\n## 你的任务\n根据 PRD 在项目中创建或修改代码。\n\n## PRD 内容\n${data.prd}\n\n## 项目信息\n- 项目名: ${data.project}\n- 项目路径: ${data.project_path}\n\n## 执行规则\n\n### 1. 分解任务\n- 将 PRD 分解为原子任务\n- 每个任务必须有明确的输出文件\n- 按依赖关系排序执行\n\n### 2. 代码规范\n- TypeScript 优先\n- 单文件不超过 500 行，超过就拆分\n- 重复 3 次的代码要提取函数\n- 不要创建 *New.tsx、*Old.tsx、*Backup.* 临时文件\n- 完成后删除 console.log 和注释掉的代码\n\n### 3. 质量检查（执行完代码后必须做）\n- 运行 TypeScript 类型检查（如果项目支持）\n- 检查是否有语法错误\n- 检查是否有安全问题（硬编码密钥、SQL注入等）\n- 如果有测试，运行测试\n\n### 4. Git 操作\n- 如果有修改，创建规范的 commit\n- commit message 格式: feat/fix/refactor: 简短描述\n- 不要 push（让用户决定）\n\n### 5. 错误处理\n- 如果某个任务失败，记录原因，继续下一个\n- 最后汇总所有失败任务\n\n## 输出要求\n完成后，在最后一行输出 JSON（必须是单独一行）:\n{\n  \"success\": true,\n  \"files_created\": [\"path/to/file1.ts\", ...],\n  \"files_modified\": [\"path/to/file2.ts\", ...],\n  \"tests_passed\": true,\n  \"commit_hash\": \"abc123\" 或 null,\n  \"message\": \"简短说明\"\n}\n\n如果失败:\n{\"success\": false, \"message\": \"失败原因\", \"failed_tasks\": [...]}\n\n## Run ID\n${data.run_id}`;\n\n// 转义用于 shell\nconst escapedPrompt = systemPrompt.replace(/'/g, \"'\\\\''\")\n                                   .replace(/\\$/g, '\\\\$');\n\nconst command = `cd ${data.project_path} && claude -p '${escapedPrompt}' --allowedTools 'Edit,Write,Read,Bash,Glob,Grep,TodoWrite' 2>&1 | tail -150`;\n\nreturn [{\n  json: {\n    ...data,\n    command: command\n  }\n}];"
+      }
+    },
+    {
+      "name": "执行Claude",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [960, 500],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH"
+        }
+      },
+      "parameters": {
+        "authentication": "privateKey",
+        "host": "146.190.52.84",
+        "port": 22,
+        "user": "xx",
+        "command": "={{ $json.command }}"
+      }
+    },
+    {
+      "name": "解析结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 500],
+      "parameters": {
+        "jsCode": "const stdout = $input.first().json.stdout || '';\nconst stderr = $input.first().json.stderr || '';\nconst exitCode = $input.first().json.code || 0;\nconst initData = $('初始化Run').first().json;\n\n// 从输出中提取最后的 JSON 结果\nlet result = { success: false, message: '无法解析结果' };\ntry {\n  const lines = stdout.split('\\n').reverse();\n  for (const line of lines) {\n    if (line.includes('\"success\"')) {\n      // 尝试匹配可能跨行的 JSON\n      const jsonMatch = line.match(/\\{[^]*\"success\"[^]*\\}/);\n      if (jsonMatch) {\n        result = JSON.parse(jsonMatch[0]);\n        break;\n      }\n    }\n  }\n} catch (e) {\n  result.message = '解析失败: ' + e.message;\n}\n\nreturn [{\n  json: {\n    run_id: initData.run_id,\n    factory_type: 'codebase',\n    project: initData.project,\n    project_path: initData.project_path,\n    success: exitCode === 0 && result.success,\n    files_created: result.files_created || [],\n    files_modified: result.files_modified || [],\n    tests_passed: result.tests_passed || null,\n    commit_hash: result.commit_hash || null,\n    failed_tasks: result.failed_tasks || [],\n    message: result.message || (exitCode === 0 ? '执行完成' : '执行失败'),\n    stdout_tail: stdout.slice(-2000),\n    stderr: stderr,\n    exit_code: exitCode,\n    started_at: initData.started_at,\n    completed_at: new Date().toISOString()\n  }\n}];"
+      }
+    },
+    {
+      "name": "检查结果",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1440, 500],
+      "parameters": {
+        "conditions": {
+          "options": { "version": 2, "caseSensitive": true, "typeValidation": "strict" },
+          "combinator": "and",
+          "conditions": [{ "id": "c1", "leftValue": "={{ $json.success }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }]
+        }
+      }
+    },
+    {
+      "name": "成功通知",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1680, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/bot/v2/hook/5bde68e0-9879-4a45-88ed-461a88229136",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ msg_type: 'text', content: { text: '✅ 基座工厂执行成功\\n\\nRun: ' + $json.run_id + '\\n项目: ' + $json.project + '\\n新建: ' + $json.files_created.length + ' 文件\\n修改: ' + $json.files_modified.length + ' 文件\\n测试: ' + ($json.tests_passed === null ? '未运行' : ($json.tests_passed ? '通过' : '失败')) + '\\nCommit: ' + ($json.commit_hash || '无') + '\\n说明: ' + $json.message } }) }}",
+        "options": {}
+      }
+    },
+    {
+      "name": "成功响应",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1920, 400],
+      "parameters": {
+        "jsCode": "const data = $('解析结果').first().json;\nreturn [{\n  json: {\n    status: 'success',\n    run_id: data.run_id,\n    project: data.project,\n    files_created: data.files_created,\n    files_modified: data.files_modified,\n    tests_passed: data.tests_passed,\n    commit_hash: data.commit_hash,\n    message: data.message,\n    completed_at: data.completed_at\n  }\n}];"
+      }
+    },
+    {
+      "name": "失败通知",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1680, 600],
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/bot/v2/hook/5bde68e0-9879-4a45-88ed-461a88229136",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ msg_type: 'text', content: { text: '❌ 基座工厂执行失败\\n\\nRun: ' + $json.run_id + '\\n项目: ' + $json.project + '\\n错误: ' + $json.message + '\\n失败任务: ' + ($json.failed_tasks?.length || 0) + ' 个\\n时间: ' + $json.completed_at } }) }}",
+        "options": {}
+      }
+    },
+    {
+      "name": "失败响应",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1920, 600],
+      "parameters": {
+        "jsCode": "const data = $('解析结果').first().json;\nreturn [{\n  json: {\n    status: 'failed',\n    run_id: data.run_id,\n    project: data.project,\n    message: data.message,\n    failed_tasks: data.failed_tasks,\n    error_detail: data.stderr || data.stdout_tail?.slice(-500),\n    completed_at: data.completed_at\n  }\n}];"
+      }
+    }
+  ],
+  "connections": {
+    "接收PRD": { "main": [[{ "node": "初始化Run", "type": "main", "index": 0 }]] },
+    "手动触发": { "main": [[{ "node": "初始化Run", "type": "main", "index": 0 }]] },
+    "初始化Run": { "main": [[{ "node": "构建Prompt", "type": "main", "index": 0 }]] },
+    "构建Prompt": { "main": [[{ "node": "执行Claude", "type": "main", "index": 0 }]] },
+    "执行Claude": { "main": [[{ "node": "解析结果", "type": "main", "index": 0 }]] },
+    "解析结果": { "main": [[{ "node": "检查结果", "type": "main", "index": 0 }]] },
+    "检查结果": { "main": [[{ "node": "成功通知", "type": "main", "index": 0 }], [{ "node": "失败通知", "type": "main", "index": 0 }]] },
+    "成功通知": { "main": [[{ "node": "成功响应", "type": "main", "index": 0 }]] },
+    "失败通知": { "main": [[{ "node": "失败响应", "type": "main", "index": 0 }]] }
+  }
+}

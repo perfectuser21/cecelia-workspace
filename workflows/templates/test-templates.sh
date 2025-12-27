@@ -3,7 +3,7 @@
 # 模板库测试脚本
 #
 
-TEMPLATES_DIR="/home/xx/dev/n8n-workflows/templates"
+TEMPLATES_DIR="$(dirname "$0")"
 
 echo "========================================="
 echo "n8n 模板库测试"

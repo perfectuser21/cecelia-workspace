@@ -1,0 +1,499 @@
+{
+  "name": "AI工厂-基座生产线",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "codebase-factory",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "接收PRD",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 初始化 Run，生成 run_id 和状态目录\nconst now = new Date();\nconst runId = now.toISOString().replace(/[-:T]/g, '').slice(0, 14) + '-' + Math.random().toString(36).slice(2, 8);\n\nconst prd = $input.first().json.prd || $input.first().json.body?.prd || '未提供PRD';\nconst projectPath = $input.first().json.projectPath || '/home/xx/dev/n8n-social-media-scraper';\n\nreturn [{\n  json: {\n    run_id: runId,\n    prd: prd,\n    projectPath: projectPath,\n    started_at: now.toISOString(),\n    factory_type: 'codebase',\n    state_dir: `/home/xx/data/runs/${runId}`\n  }\n}];"
+      },
+      "id": "code-init-run",
+      "name": "初始化Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=mkdir -p {{ $json.state_dir }}/tasks && echo '{{ $json.prd }}' > {{ $json.state_dir }}/prd.md && echo '{\"status\": \"decomposing\", \"started_at\": \"{{ $json.started_at }}\"}' > {{ $json.state_dir }}/state.json"
+      },
+      "id": "ssh-init-state",
+      "name": "SSH 初始化状态目录",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [560, 300],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=cd {{ $json.projectPath }} && claude -p '你是架构师。分析以下PRD，将其分解为可执行的任务列表。返回JSON格式：{\"tasks\": [{\"id\": \"task-1\", \"name\": \"任务名\", \"description\": \"详细描述\", \"depends_on\": [], \"files_expected\": [\"file1.ts\"], \"complexity\": \"low|medium|high\"}]}。\n\nPRD内容：\n{{ $json.prd }}' --model sonnet --allowedTools \"Read,Write,Edit,Glob,Grep,Bash\" 2>&1 | tail -100"
+      },
+      "id": "claude-a-decompose",
+      "name": "SSH Claude A - 分解PRD",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [720, 300],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 拓扑排序：把任务按依赖关系排成波次\nconst items = $input.all();\nconst rawOutput = items[0].json.stdout || '';\nconst initData = $('初始化Run').first().json;\n\n// 提取 JSON（Claude 可能返回带 markdown 的）\nlet tasksData;\ntry {\n  const jsonMatch = rawOutput.match(/\\{[\\s\\S]*\"tasks\"[\\s\\S]*\\}/m);\n  if (jsonMatch) {\n    tasksData = JSON.parse(jsonMatch[0]);\n  } else {\n    tasksData = JSON.parse(rawOutput);\n  }\n} catch (e) {\n  return [{ json: { error: '无法解析任务列表', raw: rawOutput, ...initData } }];\n}\n\nconst tasks = tasksData.tasks || [];\nif (tasks.length === 0) {\n  return [{ json: { error: '任务列表为空', ...initData } }];\n}\n\n// 拓扑排序\nconst taskMap = new Map(tasks.map(t => [t.id, t]));\nconst waves = [];\nconst completed = new Set();\n\nwhile (completed.size < tasks.length) {\n  const wave = [];\n  \n  for (const task of tasks) {\n    if (completed.has(task.id)) continue;\n    \n    const deps = task.depends_on || [];\n    const depsReady = deps.every(depId => completed.has(depId));\n    \n    if (depsReady) {\n      wave.push(task);\n    }\n  }\n  \n  if (wave.length === 0) {\n    return [{ json: { error: '检测到循环依赖', completed: Array.from(completed), ...initData } }];\n  }\n  \n  waves.push(wave);\n  wave.forEach(t => completed.add(t.id));\n}\n\n// 返回扁平化的任务列表，每个任务带 waveIndex 和 initData\nconst sortedTasks = [];\nwaves.forEach((wave, waveIndex) => {\n  wave.forEach(task => {\n    sortedTasks.push({\n      ...task,\n      waveIndex,\n      totalWaves: waves.length,\n      ...initData\n    });\n  });\n});\n\nreturn sortedTasks.map(task => ({ json: task }));"
+      },
+      "id": "code-topology-sort",
+      "name": "Code - 拓扑排序",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 3,
+        "options": {}
+      },
+      "id": "split-batches",
+      "name": "SplitInBatches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=cd {{ $json.projectPath }} && echo '{\"task_id\": \"{{ $json.id }}\", \"status\": \"executing\", \"started_at\": \"'$(date -Iseconds)'\"}' > {{ $json.state_dir }}/tasks/{{ $json.id }}.json && claude -p '你是开发工程师。执行以下任务：\n\n任务ID: {{ $json.id }}\n任务名: {{ $json.name }}\n描述: {{ $json.description }}\n预期文件: {{ $json.files_expected }}\n\n要求：\n1. 创建/修改必要的代码文件\n2. 确保代码符合TypeScript最佳实践\n3. 添加必要的类型定义和错误处理\n4. 完成后输出 JSON：{\"task_id\": \"{{ $json.id }}\", \"status\": \"success\", \"files_created\": [...], \"files_modified\": [...]}' --model sonnet --allowedTools \"Read,Write,Edit,Glob,Grep,Bash\" 2>&1 | tail -100"
+      },
+      "id": "claude-b-execute",
+      "name": "SSH Claude B - 执行任务",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [1260, 300],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 合并所有任务的执行结果\nconst items = $input.all();\nconst results = [];\nconst errors = [];\nlet initData = {};\n\nfor (const item of items) {\n  const stdout = item.json.stdout || '';\n  const stderr = item.json.stderr || '';\n  \n  // 保存 initData\n  if (item.json.run_id) {\n    initData = {\n      run_id: item.json.run_id,\n      projectPath: item.json.projectPath,\n      state_dir: item.json.state_dir\n    };\n  }\n  \n  // 尝试解析 Claude 输出的 JSON\n  try {\n    const jsonMatch = stdout.match(/\\{[\\s\\S]*\"task_id\"[\\s\\S]*\"status\"[\\s\\S]*\\}/m);\n    if (jsonMatch) {\n      const result = JSON.parse(jsonMatch[0]);\n      results.push(result);\n    } else {\n      results.push({\n        task_id: item.json.id || 'unknown',\n        status: 'completed',\n        output: stdout.slice(-500)\n      });\n    }\n  } catch (e) {\n    errors.push({\n      task_id: item.json.id || 'unknown',\n      status: 'failed',\n      error: stderr || e.message,\n      output: stdout.slice(-500)\n    });\n  }\n}\n\nreturn [{\n  json: {\n    ...initData,\n    totalTasks: results.length + errors.length,\n    successCount: results.filter(r => r.status === 'success').length,\n    errorCount: errors.length,\n    results,\n    errors,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "code-merge-results",
+      "name": "Code - 合并结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1440, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=cd {{ $json.projectPath }} && (\n  echo '=== 文件检查 ==='\n  missing=0\n  for result in $(echo '{{ JSON.stringify($json.results) }}' | jq -r '.[].files_created[]? // empty, .[].files_modified[]? // empty' 2>/dev/null); do\n    if [ -f \"$result\" ]; then\n      echo \"OK $result\"\n    else\n      echo \"MISSING $result\"\n      missing=$((missing+1))\n    fi\n  done\n  \n  echo ''\n  echo '=== TypeScript 语法检查 ==='\n  if [ -f \"tsconfig.json\" ]; then\n    npx tsc --noEmit --skipLibCheck 2>&1 | head -20\n    ts_exit=$?\n  else\n    echo 'No tsconfig.json, skipping'\n    ts_exit=0\n  fi\n  \n  echo ''\n  echo \"HARD_CHECK_RESULT|missing=$missing|ts_exit=$ts_exit\"\n)"
+      },
+      "id": "bash-hard-check",
+      "name": "SSH Bash - 硬检查",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [1660, 180],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=cd {{ $json.projectPath }} && claude -p '你是代码审查员。快速检查本次修改的代码质量：\n\n修改的文件：\n{{ JSON.stringify($json.results.map(r => [...(r.files_created || []), ...(r.files_modified || [])].flat()), null, 2) }}\n\n只检查以下几点：\n1. 是否有明显的 bug\n2. 是否有未处理的错误\n3. 是否有安全问题\n\n返回 JSON：{\"check\": \"quality\", \"pass\": true/false, \"issues\": [{\"file\": \"xxx\", \"line\": 10, \"issue\": \"描述\"}]}' --model sonnet --allowedTools \"Read,Grep\" 2>&1 | tail -50"
+      },
+      "id": "claude-c-soft-check",
+      "name": "SSH Claude C - 软检查",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [1660, 300],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=cd {{ $json.projectPath }} && (\n  echo '=== 版本一致性检查 ==='\n  \n  if [ -f \"package.json\" ]; then\n    echo \"package.json exists\"\n    # 检查是否有 lock 文件\n    if [ -f \"package-lock.json\" ] || [ -f \"pnpm-lock.yaml\" ] || [ -f \"yarn.lock\" ]; then\n      echo \"Lock file exists\"\n      lock_ok=1\n    else\n      echo \"WARNING: No lock file found\"\n      lock_ok=0\n    fi\n    \n    # 检查 node_modules\n    if [ -d \"node_modules\" ]; then\n      echo \"node_modules exists\"\n      nm_ok=1\n    else\n      echo \"WARNING: node_modules not found, may need npm install\"\n      nm_ok=0\n    fi\n  else\n    echo \"No package.json, skipping\"\n    lock_ok=1\n    nm_ok=1\n  fi\n  \n  echo \"\"\n  echo \"VERSION_CHECK_RESULT|lock_ok=$lock_ok|nm_ok=$nm_ok\"\n)"
+      },
+      "id": "bash-version-check",
+      "name": "SSH Bash - 版本检查",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [1660, 420],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=cd {{ $json.projectPath }} && (\n  echo '=== 安全扫描 ==='\n  issues=0\n  \n  echo '检查硬编码密钥...'\n  found=$(grep -r -l -E '(password|secret|api[_-]?key|token)\\s*[:=]\\s*[\"'\"'][A-Za-z0-9+/=]{20,}[\"'\"']' --include='*.ts' --include='*.js' --include='*.json' . 2>/dev/null | grep -v node_modules | head -5)\n  if [ -n \"$found\" ]; then\n    echo \"WARN: Potential hardcoded secrets in:\"\n    echo \"$found\"\n    issues=$((issues+1))\n  else\n    echo \"OK: No hardcoded secrets\"\n  fi\n  \n  echo ''\n  echo '检查 eval 使用...'\n  found=$(grep -r -l 'eval\\s*(' --include='*.ts' --include='*.js' . 2>/dev/null | grep -v node_modules | head -5)\n  if [ -n \"$found\" ]; then\n    echo \"WARN: eval() usage in:\"\n    echo \"$found\"\n    issues=$((issues+1))\n  else\n    echo \"OK: No eval usage\"\n  fi\n  \n  echo ''\n  echo \"SECURITY_CHECK_RESULT|issues=$issues\"\n)"
+      },
+      "id": "bash-security-scan",
+      "name": "SSH Bash - 安全扫描",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [1660, 540],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 决策：根据质检结果决定 PASS / REWORK / FAIL\nconst items = $input.all();\nconst mergeResult = $('Code - 合并结果').first().json;\n\n// 解析各项检查结果\nlet hardCheck = { missing: 0, ts_exit: 0 };\nlet softCheck = { pass: true, issues: [] };\nlet versionCheck = { lock_ok: 1, nm_ok: 1 };\nlet securityCheck = { issues: 0 };\n\nfor (const item of items) {\n  const stdout = item.json.stdout || '';\n  \n  // 硬检查\n  const hardMatch = stdout.match(/HARD_CHECK_RESULT\\|missing=(\\d+)\\|ts_exit=(\\d+)/);\n  if (hardMatch) {\n    hardCheck.missing = parseInt(hardMatch[1]);\n    hardCheck.ts_exit = parseInt(hardMatch[2]);\n  }\n  \n  // 软检查\n  const softMatch = stdout.match(/\\{[\\s\\S]*\"check\"\\s*:\\s*\"quality\"[\\s\\S]*\\}/);\n  if (softMatch) {\n    try {\n      const parsed = JSON.parse(softMatch[0]);\n      softCheck.pass = parsed.pass;\n      softCheck.issues = parsed.issues || [];\n    } catch (e) {}\n  }\n  \n  // 版本检查\n  const versionMatch = stdout.match(/VERSION_CHECK_RESULT\\|lock_ok=(\\d+)\\|nm_ok=(\\d+)/);\n  if (versionMatch) {\n    versionCheck.lock_ok = parseInt(versionMatch[1]);\n    versionCheck.nm_ok = parseInt(versionMatch[2]);\n  }\n  \n  // 安全检查\n  const securityMatch = stdout.match(/SECURITY_CHECK_RESULT\\|issues=(\\d+)/);\n  if (securityMatch) {\n    securityCheck.issues = parseInt(securityMatch[1]);\n  }\n}\n\n// 决策逻辑\nconst issues = [];\nlet decision = 'PASS';\nlet action = '质检通过，进入文档生成';\n\n// 严重问题 -> FAIL\nif (hardCheck.missing > 0) {\n  issues.push({ severity: 'critical', type: 'hardCheck', message: `缺失 ${hardCheck.missing} 个文件` });\n}\nif (securityCheck.issues > 0) {\n  issues.push({ severity: 'critical', type: 'security', message: `发现 ${securityCheck.issues} 个安全问题` });\n}\n\n// 中等问题 -> REWORK\nif (hardCheck.ts_exit !== 0) {\n  issues.push({ severity: 'high', type: 'hardCheck', message: 'TypeScript 编译错误' });\n}\nif (!softCheck.pass) {\n  issues.push({ severity: 'high', type: 'softCheck', message: `代码质量问题: ${softCheck.issues.length} 个` });\n}\n\n// 轻微问题 -> 记录但通过\nif (versionCheck.lock_ok === 0) {\n  issues.push({ severity: 'low', type: 'version', message: '缺少 lock 文件' });\n}\n\n// 决策\nconst criticalCount = issues.filter(i => i.severity === 'critical').length;\nconst highCount = issues.filter(i => i.severity === 'high').length;\n\nif (criticalCount > 0) {\n  decision = 'FAIL';\n  action = '发现严重问题，需要人工介入';\n} else if (highCount > 0) {\n  decision = 'REWORK';\n  action = '需要修复问题后重试';\n  // 记录失败的任务供返工\n}\n\n// 更新状态文件\nconst stateUpdate = {\n  status: decision.toLowerCase(),\n  decision,\n  issues,\n  completed_at: new Date().toISOString()\n};\n\nreturn [{\n  json: {\n    ...mergeResult,\n    decision,\n    action,\n    issues,\n    summary: {\n      critical: criticalCount,\n      high: highCount,\n      low: issues.filter(i => i.severity === 'low').length,\n      total: issues.length\n    },\n    checks: {\n      hardCheck,\n      softCheck: { pass: softCheck.pass, issueCount: softCheck.issues.length },\n      versionCheck,\n      securityCheck\n    }\n  }\n}];"
+      },
+      "id": "code-decision",
+      "name": "Code - 决策",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1880, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-pass",
+              "leftValue": "={{ $json.decision }}",
+              "rightValue": "PASS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-decision",
+      "name": "IF - 决策分支",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2060, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=cd {{ $json.projectPath }} && claude -p '你是技术文档工程师。为本次代码变更创建简短文档：\n\n变更摘要：\n- 成功任务: {{ $json.successCount }}\n- 失败任务: {{ $json.errorCount }}\n- 结果: {{ $json.decision }}\n\n在项目根目录的 CHANGELOG.md 添加一条记录（如果文件不存在则创建）。\n格式：\n## [Unreleased] - {{ $json.timestamp.slice(0,10) }}\n- 变更说明\n\n完成后输出：DOCS_COMPLETE' --model sonnet --allowedTools \"Read,Write,Edit\" 2>&1 | tail -30"
+      },
+      "id": "claude-d-docs",
+      "name": "SSH Claude D - 文档生成",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [2240, 200],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=echo '更新状态文件...' && echo '{{ JSON.stringify($json) }}' | jq '{status: .decision, issues: .issues, completed_at: .timestamp}' > {{ $json.state_dir }}/state.json 2>/dev/null || echo '{\"status\": \"{{ $json.decision }}\", \"completed_at\": \"{{ $json.timestamp }}\"}' > {{ $json.state_dir }}/state.json"
+      },
+      "id": "ssh-update-state",
+      "name": "SSH 更新状态",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [2240, 400],
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "vvJsQOZ95sqzemla",
+          "name": "VPS SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/bot/v2/hook/5bde68e0-9879-4a45-88ed-461a88229136",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"msg_type\": \"interactive\",\n  \"card\": {\n    \"header\": {\n      \"title\": {\n        \"tag\": \"plain_text\",\n        \"content\": \"{{ $json.decision === 'PASS' ? '基座生产完成' : ($json.decision === 'REWORK' ? '基座生产需返工' : '基座生产失败') }}\"\n      },\n      \"template\": \"{{ $json.decision === 'PASS' ? 'green' : ($json.decision === 'REWORK' ? 'orange' : 'red') }}\"\n    },\n    \"elements\": [\n      {\n        \"tag\": \"div\",\n        \"text\": {\n          \"tag\": \"lark_md\",\n          \"content\": \"**Run ID**: {{ $json.run_id }}\\n**项目**: {{ $json.projectPath }}\\n\\n**执行摘要**\\n- 总任务: {{ $json.totalTasks }}\\n- 成功: {{ $json.successCount }}\\n- 失败: {{ $json.errorCount }}\\n\\n**质检结果**\\n- 严重问题: {{ $json.summary.critical }}\\n- 高危问题: {{ $json.summary.high }}\\n- 轻微问题: {{ $json.summary.low }}\\n\\n**决策**: {{ $json.decision }}\\n**操作**: {{ $json.action }}\"\n        }\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "id": "http-feishu-notify",
+      "name": "HTTP - 飞书通知",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 返回最终结果\nconst data = $('Code - 决策').first().json;\nreturn [{\n  json: {\n    status: data.decision === 'PASS' ? 'success' : (data.decision === 'REWORK' ? 'needs_rework' : 'failed'),\n    run_id: data.run_id,\n    project: data.projectPath,\n    decision: data.decision,\n    action: data.action,\n    summary: data.summary,\n    results: data.results,\n    errors: data.errors,\n    state_dir: data.state_dir,\n    completed_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "code-response",
+      "name": "返回结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2600, 300]
+    }
+  ],
+  "connections": {
+    "接收PRD": {
+      "main": [
+        [
+          {
+            "node": "初始化Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "初始化Run": {
+      "main": [
+        [
+          {
+            "node": "SSH 初始化状态目录",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH 初始化状态目录": {
+      "main": [
+        [
+          {
+            "node": "SSH Claude A - 分解PRD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Claude A - 分解PRD": {
+      "main": [
+        [
+          {
+            "node": "Code - 拓扑排序",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - 拓扑排序": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SplitInBatches": {
+      "main": [
+        [
+          {
+            "node": "SSH Claude B - 执行任务",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code - 合并结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Claude B - 执行任务": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - 合并结果": {
+      "main": [
+        [
+          {
+            "node": "SSH Bash - 硬检查",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SSH Claude C - 软检查",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SSH Bash - 版本检查",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SSH Bash - 安全扫描",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Bash - 硬检查": {
+      "main": [
+        [
+          {
+            "node": "Code - 决策",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Claude C - 软检查": {
+      "main": [
+        [
+          {
+            "node": "Code - 决策",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Bash - 版本检查": {
+      "main": [
+        [
+          {
+            "node": "Code - 决策",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Bash - 安全扫描": {
+      "main": [
+        [
+          {
+            "node": "Code - 决策",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - 决策": {
+      "main": [
+        [
+          {
+            "node": "IF - 决策分支",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - 决策分支": {
+      "main": [
+        [
+          {
+            "node": "SSH Claude D - 文档生成",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SSH 更新状态",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Claude D - 文档生成": {
+      "main": [
+        [
+          {
+            "node": "HTTP - 飞书通知",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH 更新状态": {
+      "main": [
+        [
+          {
+            "node": "HTTP - 飞书通知",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP - 飞书通知": {
+      "main": [
+        [
+          {
+            "node": "返回结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}
