@@ -1,0 +1,56 @@
+{
+  "type": "backend",
+  "version": "1.0.0",
+  "checks": [
+    {
+      "name": "existence",
+      "required": true,
+      "description": "产出文件存在"
+    },
+    {
+      "name": "structure",
+      "required": true,
+      "description": "目录结构正确",
+      "expected_files": [
+        "api.ts",
+        "service.ts"
+      ]
+    },
+    {
+      "name": "isolation",
+      "required": true,
+      "description": "模块独立性 - 不破坏现有代码"
+    },
+    {
+      "name": "security",
+      "required": true,
+      "description": "无硬编码密钥"
+    },
+    {
+      "name": "linting",
+      "required": true,
+      "tool": "eslint",
+      "description": "ESLint 检查通过"
+    },
+    {
+      "name": "typescript",
+      "required": true,
+      "description": "TypeScript 编译通过"
+    },
+    {
+      "name": "test",
+      "required": true,
+      "tool": "jest",
+      "min_coverage": 70,
+      "description": "测试通过且覆盖率 >= 70%"
+    },
+    {
+      "name": "git",
+      "required": true,
+      "description": "无合并冲突"
+    }
+  ],
+  "project_path": "apps/dashboard/core/api",
+  "test_command": "pnpm test",
+  "lint_command": "pnpm lint"
+}

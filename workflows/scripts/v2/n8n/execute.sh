@@ -1,0 +1,326 @@
+#!/bin/bash
+#
+# n8n 执行阶段脚本
+# 负责：模板匹配、生成 Workflow JSON、调用 n8n API 创建、激活
+#
+# 用法: execute.sh <run_id> <task_info_path>
+#
+# 参数:
+#   run_id          - 运行 ID
+#   task_info_path  - task_info.json 路径
+#
+# 输出:
+#   - 结果文件: /data/runs/{run_id}/result.json
+#   - 返回值: 0=成功, 非0=失败
+#
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SHARED_DIR="$(dirname "$SCRIPT_DIR")/shared"
+WORKFLOWS_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")/.."
+
+# 加载工具函数
+source "$SHARED_DIR/utils.sh"
+
+# 加载 secrets
+load_secrets
+
+# ============================================================
+# 参数解析
+# ============================================================
+RUN_ID="${1:-}"
+TASK_INFO_PATH="${2:-}"
+
+if [[ -z "$RUN_ID" || -z "$TASK_INFO_PATH" ]]; then
+  log_error "用法: execute.sh <run_id> <task_info_path>"
+  exit 1
+fi
+
+WORK_DIR="/home/xx/data/runs/$RUN_ID"
+LOG_FILE="$WORK_DIR/logs/execute.log"
+
+# 读取任务信息
+if [[ ! -f "$TASK_INFO_PATH" ]]; then
+  log_error "任务信息文件不存在: $TASK_INFO_PATH"
+  exit 1
+fi
+
+TASK_ID=$(jq -r '.task_id' "$TASK_INFO_PATH")
+TASK_NAME=$(jq -r '.task_name' "$TASK_INFO_PATH")
+TASK_CONTENT=$(jq -r '.content' "$TASK_INFO_PATH")
+
+log_info "=========================================="
+log_info "n8n 执行阶段开始"
+log_info "Run ID: $RUN_ID"
+log_info "Task: $TASK_NAME"
+log_info "=========================================="
+
+# ============================================================
+# 模板匹配
+# ============================================================
+log_info "[1/4] 模板匹配..."
+
+# 模板索引
+TEMPLATES_INDEX="$WORKFLOWS_DIR/templates/index.json"
+
+# 从任务内容中匹配模板
+match_template() {
+  local task_name="$1"
+  local task_desc="$2"
+  local combined="${task_name} ${task_desc}"
+  local combined_lower=$(echo "$combined" | tr '[:upper:]' '[:lower:]')
+
+  # 高置信度关键词直接匹配
+  if echo "$combined_lower" | grep -qiE "github.*star|star.*github"; then
+    echo "github-api"
+    return
+  fi
+
+  if echo "$combined_lower" | grep -qiE "vps.*健康|健康.*检查.*磁盘|磁盘.*空间.*告警"; then
+    echo "vps-health-check"
+    return
+  fi
+
+  if echo "$combined_lower" | grep -qiE "ssh|远程执行|服务器命令"; then
+    echo "ssh-execution"
+    return
+  fi
+
+  if echo "$combined_lower" | grep -qiE "每天|每小时|每分钟|定时|cron|schedule"; then
+    echo "scheduled-task"
+    return
+  fi
+
+  if echo "$combined_lower" | grep -qiE "通知|飞书|告警|alert|notification"; then
+    echo "notification"
+    return
+  fi
+
+  if echo "$combined_lower" | grep -qiE "webhook|ping|pong|api端点"; then
+    echo "webhook-response"
+    return
+  fi
+
+  if echo "$combined_lower" | grep -qiE "数据处理|etl|database|postgres"; then
+    echo "data-processing"
+    return
+  fi
+
+  # 无匹配
+  echo ""
+}
+
+TEMPLATE_ID=$(match_template "$TASK_NAME" "$TASK_CONTENT")
+
+if [[ -n "$TEMPLATE_ID" ]]; then
+  log_info "匹配到模板: $TEMPLATE_ID"
+else
+  log_info "未匹配到模板，将使用 Claude 生成"
+fi
+
+# ============================================================
+# 生成 Workflow JSON
+# ============================================================
+log_info "[2/4] 生成 Workflow JSON..."
+
+WORKFLOW_JSON=""
+
+# 如果有模板，加载模板
+if [[ -n "$TEMPLATE_ID" ]]; then
+  TEMPLATE_FILE="$WORKFLOWS_DIR/templates/$TEMPLATE_ID/template.json"
+  if [[ -f "$TEMPLATE_FILE" ]]; then
+    log_info "加载模板: $TEMPLATE_FILE"
+    WORKFLOW_JSON=$(cat "$TEMPLATE_FILE")
+
+    # 根据任务内容修改模板（简化处理）
+    # 实际使用时可能需要 Claude 来调整
+    WORKFLOW_JSON=$(echo "$WORKFLOW_JSON" | jq --arg name "$TASK_NAME" '.name = $name')
+  fi
+fi
+
+# 如果没有模板或模板加载失败，使用 Claude 生成
+if [[ -z "$WORKFLOW_JSON" ]]; then
+  log_info "使用 Claude 生成 Workflow JSON..."
+
+  PROMPT="根据以下任务描述，生成一个完整的 n8n workflow JSON 结构。
+
+任务名: $TASK_NAME
+任务描述:
+$TASK_CONTENT
+
+要求：
+1. 直接输出有效的 JSON 对象
+2. 包含必要的节点：触发器、处理节点、错误处理
+3. 节点使用中文命名
+4. 确保 connections 正确连接所有节点
+
+输出格式示例：
+{
+  \"name\": \"任务名称\",
+  \"nodes\": [...],
+  \"connections\": {...},
+  \"settings\": {\"executionOrder\": \"v1\"}
+}"
+
+  # 调用 Claude
+  CLAUDE_OUTPUT=$(cd /home/xx/data/factory-workspace && timeout -k 10 300 claude -p "$PROMPT" \
+    --add-dir "$WORKFLOWS_DIR" --model "sonnet" 2>&1) || {
+    log_error "Claude 调用失败"
+    exit 1
+  }
+
+  # 提取 JSON
+  WORKFLOW_JSON=$(echo "$CLAUDE_OUTPUT" | sed 's/```json//g' | sed 's/```//g' | awk '
+    BEGIN { depth=0; started=0; }
+    {
+      for(i=1; i<=length($0); i++) {
+        c = substr($0, i, 1)
+        if (c == "{") {
+          if (!started) started = 1
+          depth++
+        }
+        if (started) {
+          printf "%s", c
+          if (c == "}") {
+            depth--
+            if (depth == 0) {
+              print ""
+              exit
+            }
+          }
+        }
+      }
+      if (started) print ""
+    }
+  ')
+
+  # 验证 JSON
+  if ! echo "$WORKFLOW_JSON" | jq empty 2>/dev/null; then
+    log_error "生成的 JSON 无效"
+    echo "$CLAUDE_OUTPUT" > "$WORK_DIR/claude_output_debug.txt"
+    exit 1
+  fi
+
+  log_info "Workflow JSON 生成成功"
+fi
+
+# 保存 Workflow JSON
+echo "$WORKFLOW_JSON" > "$WORK_DIR/workflow.json"
+log_info "Workflow JSON 已保存: $WORK_DIR/workflow.json"
+
+# ============================================================
+# 调用 n8n API 创建 Workflow
+# ============================================================
+log_info "[3/4] 创建 Workflow..."
+
+if [[ -z "$N8N_REST_API_KEY" ]]; then
+  log_error "N8N_REST_API_KEY 未设置"
+  exit 1
+fi
+
+N8N_API_URL="https://zenithjoy21xx.app.n8n.cloud/api/v1"
+
+# 过滤 JSON，只保留 API 接受的字段
+FILTERED_JSON=$(echo "$WORKFLOW_JSON" | jq '{
+  name: .name,
+  nodes: .nodes,
+  connections: .connections,
+  settings: (.settings // {executionOrder: "v1"})
+}')
+
+# 创建 Workflow
+RESPONSE=$(curl -sf -w "\n%{http_code}" -X POST "$N8N_API_URL/workflows" \
+  -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "$FILTERED_JSON" 2>&1)
+
+HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
+
+if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" ]]; then
+  log_error "n8n API 创建失败 (HTTP $HTTP_CODE)"
+  echo "$RESPONSE_BODY" > "$WORK_DIR/api_error.json"
+  exit 1
+fi
+
+WORKFLOW_ID=$(echo "$RESPONSE_BODY" | jq -r '.id')
+WORKFLOW_NAME=$(echo "$RESPONSE_BODY" | jq -r '.name')
+NODE_COUNT=$(echo "$RESPONSE_BODY" | jq '.nodes | length')
+
+log_info "Workflow 创建成功: $WORKFLOW_NAME (ID: $WORKFLOW_ID, 节点数: $NODE_COUNT)"
+
+# ============================================================
+# 激活 Workflow
+# ============================================================
+log_info "[4/4] 激活 Workflow..."
+
+ACTIVATE_RESPONSE=$(curl -sf -X PATCH "$N8N_API_URL/workflows/$WORKFLOW_ID" \
+  -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"active": true}' 2>&1)
+
+if echo "$ACTIVATE_RESPONSE" | jq -e '.active == true' > /dev/null 2>&1; then
+  log_info "Workflow 已激活"
+else
+  log_warn "Workflow 激活失败，但继续执行"
+fi
+
+# ============================================================
+# 保存结果
+# ============================================================
+RESULT_JSON=$(jq -n \
+  --arg success "true" \
+  --arg workflow_id "$WORKFLOW_ID" \
+  --arg workflow_name "$WORKFLOW_NAME" \
+  --arg template_id "${TEMPLATE_ID:-none}" \
+  --argjson node_count "$NODE_COUNT" \
+  --arg created_at "$(date -Iseconds)" \
+  '{
+    success: ($success == "true"),
+    artifacts: [
+      {
+        type: "workflow",
+        id: $workflow_id,
+        name: $workflow_name,
+        template_used: $template_id,
+        node_count: $node_count
+      }
+    ],
+    created_at: $created_at
+  }')
+
+echo "$RESULT_JSON" > "$WORK_DIR/result.json"
+
+# ============================================================
+# 保存到 exports 目录
+# ============================================================
+EXPORT_DIR="$WORKFLOWS_DIR/exports/bundles/ai-factory"
+mkdir -p "$EXPORT_DIR"
+
+# 使用任务名生成文件名（移除特殊字符）
+SAFE_NAME=$(echo "$WORKFLOW_NAME" | tr -cd '[:alnum:]_-' | tr '[:upper:]' '[:lower:]')
+EXPORT_FILE="$EXPORT_DIR/${SAFE_NAME}.json"
+
+echo "$WORKFLOW_JSON" | jq '. + {n8n_id: "'"$WORKFLOW_ID"'"}' > "$EXPORT_FILE"
+log_info "Workflow 已导出: $EXPORT_FILE"
+
+# ============================================================
+# 输出结果
+# ============================================================
+log_info "=========================================="
+log_info "n8n 执行阶段完成"
+log_info "Workflow ID: $WORKFLOW_ID"
+log_info "节点数: $NODE_COUNT"
+log_info "=========================================="
+
+cat << EOF
+{
+  "success": true,
+  "workflow_id": "$WORKFLOW_ID",
+  "workflow_name": "$WORKFLOW_NAME",
+  "node_count": $NODE_COUNT,
+  "template_used": "${TEMPLATE_ID:-none}",
+  "export_path": "$EXPORT_FILE"
+}
+EOF

@@ -1,0 +1,88 @@
+{
+  "type": "n8n",
+  "version": "1.0.0",
+  "checks": [
+    {
+      "name": "existence",
+      "required": true,
+      "description": "产出物存在性检查"
+    },
+    {
+      "name": "n8n_exists",
+      "required": true,
+      "description": "Workflow 存在于 n8n"
+    },
+    {
+      "name": "n8n_quality",
+      "required": true,
+      "threshold": 80,
+      "description": "5 维度质量评分 (完整性/错误处理/命名/参数/最佳实践)"
+    },
+    {
+      "name": "security",
+      "required": true,
+      "description": "无硬编码密钥"
+    },
+    {
+      "name": "git",
+      "required": true,
+      "description": "无合并冲突"
+    },
+    {
+      "name": "linting",
+      "required": false,
+      "description": "JSON 格式有效"
+    },
+    {
+      "name": "performance",
+      "required": false,
+      "max_nodes": 30,
+      "max_connections": 50,
+      "description": "节点数和连接数限制"
+    },
+    {
+      "name": "test_coverage",
+      "required": false,
+      "description": "测试文件存在"
+    }
+  ],
+  "quality_dimensions": {
+    "completeness": {
+      "weight": 20,
+      "criteria": [
+        "有触发器节点 (+8)",
+        "有处理节点 (+6)",
+        "有输出节点 (+6)"
+      ]
+    },
+    "error_handling": {
+      "weight": 20,
+      "criteria": [
+        "有 Error Trigger (+10)",
+        "简单 workflow 可豁免 (+10)"
+      ]
+    },
+    "naming": {
+      "weight": 20,
+      "criteria": [
+        "无默认名称 (+10~15)",
+        "使用中文命名 (+5)"
+      ]
+    },
+    "parameters": {
+      "weight": 20,
+      "criteria": [
+        "参数已配置 (+10)",
+        "无硬编码敏感信息 (+10)"
+      ]
+    },
+    "best_practices": {
+      "weight": 20,
+      "criteria": [
+        "使用凭据 (+8)",
+        "节点数合理 (+6)",
+        "有注释/说明 (+6)"
+      ]
+    }
+  }
+}

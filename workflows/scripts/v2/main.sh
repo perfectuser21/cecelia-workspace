@@ -1,0 +1,251 @@
+#!/bin/bash
+#
+# AI 工厂 v2 主入口脚本
+# 负责：协调四个阶段的执行，处理返工逻辑
+#
+# 用法: main.sh <task_id> <coding_type>
+#
+# 参数:
+#   task_id     - Notion 任务 ID
+#   coding_type - n8n / backend / frontend
+#
+# 环境变量:
+#   MAX_RETRIES - 最大返工次数（默认 2）
+#
+# 输出:
+#   - JSON 格式的执行结果
+#   - 返回值: 0=成功, 1=失败需返工, 2=失败需人工处理
+#
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SHARED_DIR="$SCRIPT_DIR/shared"
+
+# 加载工具函数
+source "$SHARED_DIR/utils.sh"
+
+# ============================================================
+# 参数解析
+# ============================================================
+TASK_ID="${1:-}"
+CODING_TYPE="${2:-}"
+MAX_RETRIES="${MAX_RETRIES:-2}"
+
+if [[ -z "$TASK_ID" ]]; then
+  echo "用法: main.sh <task_id> <coding_type>"
+  echo ""
+  echo "参数:"
+  echo "  task_id     - Notion 任务 ID"
+  echo "  coding_type - n8n / backend / frontend"
+  echo ""
+  echo "示例:"
+  echo "  main.sh abc123def456 n8n"
+  exit 1
+fi
+
+if [[ -z "$CODING_TYPE" ]]; then
+  echo "错误: 缺少 coding_type 参数"
+  exit 1
+fi
+
+# 验证 coding_type
+case "$CODING_TYPE" in
+  n8n|backend|frontend)
+    ;;
+  *)
+    echo "错误: 无效的 coding_type: $CODING_TYPE (应为: n8n/backend/frontend)"
+    exit 1
+    ;;
+esac
+
+# ============================================================
+# 初始化
+# ============================================================
+RUN_ID=$(generate_run_id)
+RETRY_COUNT=0
+FINAL_RESULT=""
+PASSED=false
+
+echo "=========================================="
+echo "AI 工厂 v2"
+echo "=========================================="
+echo "Task ID: $TASK_ID"
+echo "Coding Type: $CODING_TYPE"
+echo "Run ID: $RUN_ID"
+echo "Max Retries: $MAX_RETRIES"
+echo "=========================================="
+
+# ============================================================
+# 阶段 1: 准备
+# ============================================================
+echo ""
+echo "[阶段 1/4] 准备"
+echo "----------------------------------------"
+
+PREPARE_RESULT=$("$SHARED_DIR/prepare.sh" "$TASK_ID" "$CODING_TYPE" "$RUN_ID" 2>&1) || {
+  echo "准备阶段失败"
+  echo "$PREPARE_RESULT"
+  exit 1
+}
+
+# 解析准备结果
+WORK_DIR=$(echo "$PREPARE_RESULT" | jq -r '.work_dir // empty' 2>/dev/null)
+TASK_INFO_PATH=$(echo "$PREPARE_RESULT" | jq -r '.task_info_path // empty' 2>/dev/null)
+
+if [[ -z "$WORK_DIR" || -z "$TASK_INFO_PATH" ]]; then
+  echo "准备阶段返回数据异常"
+  echo "$PREPARE_RESULT"
+  exit 1
+fi
+
+echo "准备完成: $WORK_DIR"
+
+# ============================================================
+# 阶段 2 & 3: 执行 + 质检（带返工循环）
+# ============================================================
+while [[ $RETRY_COUNT -le $MAX_RETRIES ]]; do
+  echo ""
+  if [[ $RETRY_COUNT -gt 0 ]]; then
+    echo "[返工 $RETRY_COUNT/$MAX_RETRIES]"
+  fi
+
+  # ------------------------------------------------------------
+  # 阶段 2: 执行
+  # ------------------------------------------------------------
+  echo "[阶段 2/4] 执行 ($CODING_TYPE)"
+  echo "----------------------------------------"
+
+  EXECUTE_SCRIPT="$SCRIPT_DIR/$CODING_TYPE/execute.sh"
+
+  if [[ ! -f "$EXECUTE_SCRIPT" ]]; then
+    echo "错误: 执行脚本不存在: $EXECUTE_SCRIPT"
+    PASSED=false
+    break
+  fi
+
+  EXECUTE_RESULT=$("$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH" 2>&1) || {
+    echo "执行阶段失败"
+    echo "$EXECUTE_RESULT"
+
+    # 记录失败
+    echo '{"success": false, "error": "execute_failed"}' > "$WORK_DIR/result.json"
+
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [[ $RETRY_COUNT -le $MAX_RETRIES ]]; then
+      echo "准备返工..."
+      sleep 2
+      continue
+    else
+      PASSED=false
+      break
+    fi
+  }
+
+  echo "执行完成"
+
+  # ------------------------------------------------------------
+  # 阶段 3: 质检
+  # ------------------------------------------------------------
+  echo ""
+  echo "[阶段 3/4] 质检"
+  echo "----------------------------------------"
+
+  QUALITY_SCRIPT="$SHARED_DIR/quality-check.sh"
+
+  if [[ -f "$QUALITY_SCRIPT" ]]; then
+    QUALITY_RESULT=$("$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE" 2>&1)
+    QUALITY_EXIT=$?
+
+    case $QUALITY_EXIT in
+      0)
+        echo "质检通过"
+        PASSED=true
+        break
+        ;;
+      1)
+        echo "质检失败，需要返工"
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        if [[ $RETRY_COUNT -le $MAX_RETRIES ]]; then
+          echo "准备返工..."
+          sleep 2
+          continue
+        else
+          echo "超过最大返工次数，需要人工处理"
+          PASSED=false
+          break
+        fi
+        ;;
+      2)
+        echo "质检失败，需要人工处理"
+        PASSED=false
+        break
+        ;;
+      *)
+        echo "质检脚本异常退出: $QUALITY_EXIT"
+        PASSED=false
+        break
+        ;;
+    esac
+  else
+    # 如果质检脚本不存在，跳过质检（开发阶段）
+    echo "质检脚本不存在，跳过质检"
+    PASSED=true
+    break
+  fi
+done
+
+# ============================================================
+# 阶段 4: 收尾
+# ============================================================
+echo ""
+echo "[阶段 4/4] 收尾"
+echo "----------------------------------------"
+
+CLEANUP_RESULT=$("$SHARED_DIR/cleanup.sh" "$RUN_ID" "$TASK_ID" "$PASSED" "$RETRY_COUNT" 2>&1) || {
+  echo "收尾阶段失败"
+  echo "$CLEANUP_RESULT"
+}
+
+echo "收尾完成"
+
+# ============================================================
+# 输出最终结果
+# ============================================================
+echo ""
+echo "=========================================="
+echo "执行完成"
+echo "=========================================="
+echo "Run ID: $RUN_ID"
+echo "Task ID: $TASK_ID"
+echo "结果: $(if $PASSED; then echo '成功'; else echo '失败'; fi)"
+echo "返工次数: $RETRY_COUNT"
+echo "=========================================="
+
+# 输出 JSON 结果
+FINAL_RESULT=$(jq -n \
+  --arg run_id "$RUN_ID" \
+  --arg task_id "$TASK_ID" \
+  --arg coding_type "$CODING_TYPE" \
+  --argjson passed "$PASSED" \
+  --argjson retry_count "$RETRY_COUNT" \
+  --arg work_dir "$WORK_DIR" \
+  '{
+    run_id: $run_id,
+    task_id: $task_id,
+    coding_type: $coding_type,
+    passed: $passed,
+    retry_count: $retry_count,
+    work_dir: $work_dir
+  }')
+
+echo "$FINAL_RESULT"
+
+# 返回适当的退出码
+if $PASSED; then
+  exit 0
+elif [[ $RETRY_COUNT -gt $MAX_RETRIES ]]; then
+  exit 2  # 需要人工处理
+else
+  exit 1  # 失败
+fi
