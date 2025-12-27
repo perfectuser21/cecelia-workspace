@@ -179,8 +179,27 @@ load_secrets() {
 # 获取 Notion 任务详情
 # 参数: $1=task_id (Notion page ID)
 # 返回: JSON 字符串
+# 环境变量: TEST_MODE=1 时返回 mock 数据
 fetch_notion_task() {
   local task_id="$1"
+
+  # TEST_MODE: 返回 mock 数据用于测试
+  if [[ "${TEST_MODE:-}" == "1" ]]; then
+    log_info "[TEST_MODE] 使用 mock Notion 数据"
+    jq -n \
+      --arg task_id "$task_id" \
+      --arg fetched_at "$(date -Iseconds)" \
+      '{
+        task_id: $task_id,
+        task_name: "测试任务 - 创建监控告警 Workflow",
+        coding_type: "n8n",
+        status: "Next Action",
+        content: "创建一个 n8n workflow，实现以下功能：\n\n1. 每小时检查 VPS 磁盘空间\n2. 超过 80% 时发送飞书告警\n3. 告警内容包含：当前使用率、剩余空间、建议清理的目录",
+        fetched_at: $fetched_at
+      }'
+    return 0
+  fi
+
   load_secrets
 
   if [[ -z "$NOTION_API_KEY" ]]; then
@@ -244,9 +263,17 @@ fetch_notion_task() {
 
 # 更新 Notion 任务状态
 # 参数: $1=task_id, $2=status
+# 环境变量: TEST_MODE=1 时跳过实际更新
 update_notion_status() {
   local task_id="$1"
   local status="$2"
+
+  # TEST_MODE: 跳过实际更新
+  if [[ "${TEST_MODE:-}" == "1" ]]; then
+    log_info "[TEST_MODE] 模拟更新 Notion 状态: $status"
+    return 0
+  fi
+
   load_secrets
 
   if [[ -z "$NOTION_API_KEY" ]]; then
