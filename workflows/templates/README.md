@@ -151,10 +151,10 @@ AI 工厂会：
 
 ```bash
 # 查看所有模板
-cat /home/xx/dev/n8n-workflows/templates/index.json
+cat /home/xx/dev/zenithjoy-autopilot/workflows/templates/index.json
 
 # 查看特定模板
-cat /home/xx/dev/n8n-workflows/templates/webhook-response/template.json
+cat /home/xx/dev/zenithjoy-autopilot/workflows/templates/webhook-response/template.json
 
 # 在 n8n 中导入
 # 1. 复制 template.json 内容
@@ -177,7 +177,7 @@ cat /home/xx/dev/n8n-workflows/templates/webhook-response/template.json
 
 1. 创建模板目录
 ```bash
-mkdir -p /home/xx/dev/n8n-workflows/templates/your-template-name
+mkdir -p /home/xx/dev/zenithjoy-autopilot/workflows/templates/your-template-name
 ```
 
 2. 创建 `template.json`（完整的 n8n workflow 定义）

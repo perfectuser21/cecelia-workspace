@@ -7,12 +7,12 @@
 - `/home/xx/bin/factory-stats` - Convenience wrapper (4.6KB)
 
 ### Documentation
-- `/home/xx/dev/n8n-workflows/ANALYTICS_GUIDE.md` - Complete user guide
-- `/home/xx/dev/n8n-workflows/analytics/README.md` - Quick reference
-- `/home/xx/dev/n8n-workflows/analytics/INSTALLATION.md` - This file
+- `/home/xx/dev/zenithjoy-autopilot/workflows/ANALYTICS_GUIDE.md` - Complete user guide
+- `/home/xx/dev/zenithjoy-autopilot/workflows/analytics/README.md` - Quick reference
+- `/home/xx/dev/zenithjoy-autopilot/workflows/analytics/INSTALLATION.md` - This file
 
 ### Configuration Updated
-- `/home/xx/dev/n8n-workflows/CLAUDE.md` - Added analytics section
+- `/home/xx/dev/zenithjoy-autopilot/workflows/CLAUDE.md` - Added analytics section
 
 ## Quick Test
 
@@ -107,7 +107,7 @@ Create a workflow with:
 1. **Schedule Trigger** - Daily/Weekly
 2. **SSH Node** - Execute command:
    ```bash
-   /home/xx/bin/analyze-factory-history.sh --days 7 --format json && cat /home/xx/dev/n8n-workflows/analytics/latest.json
+   /home/xx/bin/analyze-factory-history.sh --days 7 --format json && cat /home/xx/dev/zenithjoy-autopilot/workflows/analytics/latest.json
    ```
 3. **Code Node** - Parse JSON output
 4. **Feishu/Notion Node** - Send notification
@@ -175,7 +175,7 @@ echo "4. Running test..."
 bash /home/xx/bin/analyze-factory-history.sh --days 1 --format json > /dev/null 2>&1
 if [ $? -eq 0 ]; then
   echo "✓ Analysis successful"
-  test -f /home/xx/dev/n8n-workflows/analytics/latest.json && echo "✓ Report generated" || echo "✗ Report missing"
+  test -f /home/xx/dev/zenithjoy-autopilot/workflows/analytics/latest.json && echo "✓ Report generated" || echo "✗ Report missing"
 else
   echo "✗ Analysis failed"
 fi
@@ -194,10 +194,10 @@ rm /home/xx/bin/analyze-factory-history.sh
 rm /home/xx/bin/factory-stats
 
 # Remove reports
-rm -rf /home/xx/dev/n8n-workflows/analytics/
+rm -rf /home/xx/dev/zenithjoy-autopilot/workflows/analytics/
 
 # Remove documentation
-rm /home/xx/dev/n8n-workflows/ANALYTICS_GUIDE.md
+rm /home/xx/dev/zenithjoy-autopilot/workflows/ANALYTICS_GUIDE.md
 
 # Restore CLAUDE.md
 # (manually remove the "AI 工厂分析" section)
@@ -206,7 +206,7 @@ rm /home/xx/dev/n8n-workflows/ANALYTICS_GUIDE.md
 ## Support
 
 For issues or questions:
-1. Check `/home/xx/dev/n8n-workflows/ANALYTICS_GUIDE.md`
+1. Check `/home/xx/dev/zenithjoy-autopilot/workflows/ANALYTICS_GUIDE.md`
 2. Review run logs in `/home/xx/data/runs/*/async.log`
 3. Test with minimal data: `--days 1`
 4. Enable debug mode: `bash -x /home/xx/bin/analyze-factory-history.sh`

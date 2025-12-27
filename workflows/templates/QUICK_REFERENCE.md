@@ -65,7 +65,7 @@ curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
 
 ```bash
 # 1. 查看模板
-cat /home/xx/dev/n8n-workflows/templates/webhook-response/template.json
+cat /home/xx/dev/zenithjoy-autopilot/workflows/templates/webhook-response/template.json
 
 # 2. 复制内容到剪贴板
 
@@ -150,6 +150,6 @@ templates/
 
 ## 下一步
 
-- 查看详细文档: `/home/xx/dev/n8n-workflows/templates/README.md`
-- 查看示例: `/home/xx/dev/n8n-workflows/templates/EXAMPLES.md`
-- 查看具体模板: `/home/xx/dev/n8n-workflows/templates/{template-name}/README.md`
+- 查看详细文档: `/home/xx/dev/zenithjoy-autopilot/workflows/templates/README.md`
+- 查看示例: `/home/xx/dev/zenithjoy-autopilot/workflows/templates/EXAMPLES.md`
+- 查看具体模板: `/home/xx/dev/zenithjoy-autopilot/workflows/templates/{template-name}/README.md`

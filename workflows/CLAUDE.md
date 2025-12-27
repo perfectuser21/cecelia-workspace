@@ -287,7 +287,7 @@ Headless 任务的会话记录与开发记录分开存放：
 
 | 类型 | 工作目录 | 记录位置 |
 |------|---------|---------|
-| 开发会话 | `/home/xx/dev/n8n-workflows` | `~/.claude/projects/-home-xx-dev-n8n-workflows/` |
+| 开发会话 | `/home/xx/dev/zenithjoy-autopilot/workflows` | `~/.claude/projects/-home-xx-dev-n8n-workflows/` |
 | Headless | `/home/xx/data/factory-workspace` | `~/.claude/projects/-home-xx-data-factory-workspace/` |
 
 **实现方式**：
@@ -405,7 +405,7 @@ factory-stats json      # JSON 输出（适合自动化）
 - 可靠性和效率评分
 - 优化建议
 
-**报告位置**: `/home/xx/dev/n8n-workflows/analytics/`
+**报告位置**: `/home/xx/dev/zenithjoy-autopilot/workflows/analytics/`
 
 详细文档: `ANALYTICS_GUIDE.md`
 

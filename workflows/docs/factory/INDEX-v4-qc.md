@@ -52,10 +52,10 @@
 
 ## File Locations
 
-All files located in: `/home/xx/dev/n8n-workflows/`
+All files located in: `/home/xx/dev/zenithjoy-autopilot/workflows/`
 
 ```
-/home/xx/dev/n8n-workflows/
+/home/xx/dev/zenithjoy-autopilot/workflows/
 ├── workflow-factory-v4-qc.json           # Import this to n8n
 ├── README-v4-qc.md                        # Start here
 ├── workflow-factory-v4-qc-summary.md     # Feature summary
@@ -103,7 +103,7 @@ All files located in: `/home/xx/dev/n8n-workflows/`
 
 ### Via API
 ```bash
-source /home/xx/dev/n8n-workflows/.secrets
+source /home/xx/dev/zenithjoy-autopilot/workflows/.secrets
 curl -X POST "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows" \
   -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
   -H "Content-Type: application/json" \

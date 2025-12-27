@@ -3,7 +3,7 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📅 完成时间: 2025-12-24
-📂 文件: /home/xx/dev/n8n-workflows/workflow-factory-final.json
+📂 文件: /home/xx/dev/zenithjoy-autopilot/workflows/workflow-factory-final.json
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅ 完成内容

@@ -107,4 +107,4 @@ See `ANALYTICS_GUIDE.md` in parent directory for detailed documentation.
 
 - Script location: `/home/xx/bin/analyze-factory-history.sh`
 - Data source: `/home/xx/data/runs/`
-- Full guide: `/home/xx/dev/n8n-workflows/ANALYTICS_GUIDE.md`
+- Full guide: `/home/xx/dev/zenithjoy-autopilot/workflows/ANALYTICS_GUIDE.md`

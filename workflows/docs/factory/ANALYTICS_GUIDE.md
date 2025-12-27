@@ -8,7 +8,7 @@ The Factory History Analyzer provides comprehensive analytics for AI factory run
 
 - **Script**: `/home/xx/bin/analyze-factory-history.sh`
 - **Data Source**: `/home/xx/data/runs/`
-- **Reports**: `/home/xx/dev/n8n-workflows/analytics/`
+- **Reports**: `/home/xx/dev/zenithjoy-autopilot/workflows/analytics/`
 
 ## Usage
 
@@ -225,7 +225,7 @@ Create an n8n workflow to:
 
 Example SSH command:
 ```bash
-bash /home/xx/bin/analyze-factory-history.sh --days 7 --format json && cat /home/xx/dev/n8n-workflows/analytics/latest.json
+bash /home/xx/bin/analyze-factory-history.sh --days 7 --format json && cat /home/xx/dev/zenithjoy-autopilot/workflows/analytics/latest.json
 ```
 
 ## Troubleshooting
@@ -266,8 +266,8 @@ Some runs may not have all files (summary.json, plan.json, etc.) if they were in
 
 2. **Archive Old Reports**: Keep reports organized:
    ```bash
-   mkdir -p /home/xx/dev/n8n-workflows/analytics/archive/$(date +%Y-%m)
-   mv /home/xx/dev/n8n-workflows/analytics/*.json archive/$(date +%Y-%m)/
+   mkdir -p /home/xx/dev/zenithjoy-autopilot/workflows/analytics/archive/$(date +%Y-%m)
+   mv /home/xx/dev/zenithjoy-autopilot/workflows/analytics/*.json archive/$(date +%Y-%m)/
    ```
 
 3. **Monitor Trends**: Compare weekly reports to track improvements
@@ -285,7 +285,7 @@ Some runs may not have all files (summary.json, plan.json, etc.) if they were in
 
 ```bash
 #!/bin/bash
-REPORT_JSON="/home/xx/dev/n8n-workflows/analytics/latest.json"
+REPORT_JSON="/home/xx/dev/zenithjoy-autopilot/workflows/analytics/latest.json"
 bash /home/xx/bin/analyze-factory-history.sh --days 7
 
 SUCCESS_RATE=$(jq -r '.summary.success_rate' "$REPORT_JSON")
@@ -309,7 +309,7 @@ bash /home/xx/bin/analyze-factory-history.sh --format json
 
 jq -r '["Date", "Total Runs", "Success Rate", "Avg Duration"],
        [.period, .summary.total_runs, .summary.success_rate, .performance.average_duration_seconds]
-       | @csv' /home/xx/dev/n8n-workflows/analytics/latest.json > report.csv
+       | @csv' /home/xx/dev/zenithjoy-autopilot/workflows/analytics/latest.json > report.csv
 ```
 
 ## Version History

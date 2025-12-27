@@ -202,7 +202,7 @@
 │       └── ...                                                    │
 │                                                                  │
 │ Documentation:                                                   │
-│ - Location: /home/xx/dev/n8n-workflows/docs/{run_id}.md         │
+│ - Location: /home/xx/dev/zenithjoy-autopilot/workflows/docs/{run_id}.md         │
 │ - Content: Usage guide, webhook paths, I/O formats              │
 └─────────────────────────────────────────────────────────────────┘
 

@@ -129,12 +129,12 @@ ssh xx@146.190.52.84 "cat /home/xx/data/runs/YOUR_RUN_ID/state.json"
 **解决方法**:
 ```bash
 # 检查 API Key 是否有效
-ssh xx@146.190.52.84 "source /home/xx/dev/n8n-workflows/.secrets && \
+ssh xx@146.190.52.84 "source /home/xx/dev/zenithjoy-autopilot/workflows/.secrets && \
   curl -H \"X-N8N-API-KEY: \$N8N_REST_API_KEY\" \
   https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows | jq '.data | length'"
 
 # 检查具体 workflow
-ssh xx@146.190.52.84 "source /home/xx/dev/n8n-workflows/.secrets && \
+ssh xx@146.190.52.84 "source /home/xx/dev/zenithjoy-autopilot/workflows/.secrets && \
   curl -H \"X-N8N-API-KEY: \$N8N_REST_API_KEY\" \
   https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/WORKFLOW_ID | jq '.name'"
 ```
@@ -155,7 +155,7 @@ ssh xx@146.190.52.84 << 'EOF'
 BACKUP_DIR="/home/xx/data/manual-backups/$(date +%Y%m%d-%H%M%S)"
 mkdir -p $BACKUP_DIR
 
-source /home/xx/dev/n8n-workflows/.secrets
+source /home/xx/dev/zenithjoy-autopilot/workflows/.secrets
 
 # 导出所有 workflows
 curl -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
@@ -190,7 +190,7 @@ Code - 回滚结果 (解析输出)
 
 ## 相关文件
 
-- 详细文档: `/home/xx/dev/n8n-workflows/ROLLBACK_FEATURE.md`
-- Workflow JSON: `/home/xx/dev/n8n-workflows/workflow-factory-final.json`
+- 详细文档: `/home/xx/dev/zenithjoy-autopilot/workflows/ROLLBACK_FEATURE.md`
+- Workflow JSON: `/home/xx/dev/zenithjoy-autopilot/workflows/workflow-factory-final.json`
 - 状态目录: `/home/xx/data/runs/{run_id}/`
-- API Keys: `/home/xx/dev/n8n-workflows/.secrets`
+- API Keys: `/home/xx/dev/zenithjoy-autopilot/workflows/.secrets`

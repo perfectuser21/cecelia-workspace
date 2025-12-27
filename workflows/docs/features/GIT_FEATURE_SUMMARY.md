@@ -148,7 +148,7 @@ Quality Checks:
 ## 手动合并工作分支
 
 ```bash
-cd /home/xx/dev/n8n-workflows
+cd /home/xx/dev/zenithjoy-autopilot/workflows
 
 # 查看工作分支
 git branch | grep factory/
@@ -174,8 +174,8 @@ bash /tmp/test_git_functions.sh
 
 ## 文档
 
-- 详细文档: `/home/xx/dev/n8n-workflows/GIT_BRANCH_MANAGEMENT.md`
-- 本摘要: `/home/xx/dev/n8n-workflows/GIT_FEATURE_SUMMARY.md`
+- 详细文档: `/home/xx/dev/zenithjoy-autopilot/workflows/GIT_BRANCH_MANAGEMENT.md`
+- 本摘要: `/home/xx/dev/zenithjoy-autopilot/workflows/GIT_FEATURE_SUMMARY.md`
 
 ## 痛点解决
 
@@ -200,8 +200,8 @@ bash /tmp/test_git_functions.sh
 | 备份 | `/home/xx/bin/workflow-factory.sh.backup` | 修改前的备份 |
 | Git函数 | `/tmp/git_functions.sh` | 临时文件（已集成） |
 | 测试脚本 | `/tmp/test_git_functions.sh` | 功能测试脚本 |
-| 详细文档 | `/home/xx/dev/n8n-workflows/GIT_BRANCH_MANAGEMENT.md` | 完整使用手册 |
-| 摘要文档 | `/home/xx/dev/n8n-workflows/GIT_FEATURE_SUMMARY.md` | 本文件 |
+| 详细文档 | `/home/xx/dev/zenithjoy-autopilot/workflows/GIT_BRANCH_MANAGEMENT.md` | 完整使用手册 |
+| 摘要文档 | `/home/xx/dev/zenithjoy-autopilot/workflows/GIT_FEATURE_SUMMARY.md` | 本文件 |
 
 ## 总结
 

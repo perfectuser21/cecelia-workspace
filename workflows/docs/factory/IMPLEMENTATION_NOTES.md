@@ -9,12 +9,12 @@
 ## 实施内容
 
 ### 1. 新建文件
-- `/home/xx/dev/n8n-workflows/scripts/analyze_history.sh` (1.6K, 可执行)
+- `/home/xx/dev/zenithjoy-autopilot/workflows/scripts/analyze_history.sh` (1.6K, 可执行)
   - 分析所有历史运行数据
   - 输出到 `/home/xx/data/runs/analysis.json`
 
 ### 2. 修改文件
-- `/home/xx/dev/n8n-workflows/workflow-factory-final.json`
+- `/home/xx/dev/zenithjoy-autopilot/workflows/workflow-factory-final.json`
   - 从 1254 行增加到 1479 行
   - 新增 1 个节点 (44 nodes total)
   - 修改 3 个连接

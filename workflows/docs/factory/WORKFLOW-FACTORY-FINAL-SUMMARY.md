@@ -1,7 +1,7 @@
 # AI工厂-Workflow生产线 (Final Version)
 
 ## 文件位置
-`/home/xx/dev/n8n-workflows/workflow-factory-final.json`
+`/home/xx/dev/zenithjoy-autopilot/workflows/workflow-factory-final.json`
 
 ## 版本说明
 这是合并了三个 v4 版本后的最终生产版本：

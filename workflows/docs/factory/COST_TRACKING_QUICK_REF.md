@@ -27,7 +27,7 @@ workflow-factory.sh 现在自动追踪每次 Claude 调用的成本，包括：
 
 ### 全局历史
 ```
-/home/xx/dev/n8n-workflows/cost_history.json
+/home/xx/dev/zenithjoy-autopilot/workflows/cost_history.json
 ```
 
 ## 常用命令
@@ -45,19 +45,19 @@ cat /home/xx/data/runs/$LATEST_RUN/costs.log
 
 ### 查看历史总成本
 ```bash
-cat /home/xx/dev/n8n-workflows/cost_history.json | \
+cat /home/xx/dev/zenithjoy-autopilot/workflows/cost_history.json | \
   jq '.runs | map(.cost.estimated_cost_usd) | add'
 ```
 
 ### 最贵的10次运行
 ```bash
-cat /home/xx/dev/n8n-workflows/cost_history.json | \
+cat /home/xx/dev/zenithjoy-autopilot/workflows/cost_history.json | \
   jq '.runs | sort_by(.cost.estimated_cost_usd) | reverse | .[:10] | .[] | {run_id, cost: .cost.estimated_cost_usd}'
 ```
 
 ### 按模型统计
 ```bash
-cat /home/xx/dev/n8n-workflows/cost_history.json | \
+cat /home/xx/dev/zenithjoy-autopilot/workflows/cost_history.json | \
   jq '.runs | map(.cost) | {
     opus: map(.opus_calls) | add,
     sonnet: map(.sonnet_calls) | add,

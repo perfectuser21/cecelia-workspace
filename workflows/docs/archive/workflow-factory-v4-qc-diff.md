@@ -180,5 +180,5 @@ if (criticalCount > 0) {
 | Performance | ✗ | ✓ | LOW (warning) |
 
 ## Files
-- **Input**: `/home/xx/dev/n8n-workflows/workflow-factory-v3.json`
-- **Output**: `/home/xx/dev/n8n-workflows/workflow-factory-v4-qc.json`
+- **Input**: `/home/xx/dev/zenithjoy-autopilot/workflows/workflow-factory-v3.json`
+- **Output**: `/home/xx/dev/zenithjoy-autopilot/workflows/workflow-factory-v4-qc.json`

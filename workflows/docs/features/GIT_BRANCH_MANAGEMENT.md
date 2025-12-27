@@ -126,7 +126,7 @@ Quality Checks:
 
 ```bash
 # 手动合并工作分支
-cd /home/xx/dev/n8n-workflows
+cd /home/xx/dev/zenithjoy-autopilot/workflows
 git checkout main
 git merge factory/run_1703123456
 
@@ -244,7 +244,7 @@ Git 状态检查集成到第 6 路质检（`qc/git.json`）：
 
 ```bash
 # 检查工作分支
-cd /home/xx/dev/n8n-workflows
+cd /home/xx/dev/zenithjoy-autopilot/workflows
 git branch | grep factory/
 
 # 查看分支变更
@@ -298,7 +298,7 @@ done
 |------|------|------|
 | 主脚本 | `/home/xx/bin/workflow-factory.sh` | 包含 Git 管理函数 |
 | 状态文件 | `$STATE_DIR/git_operations.json` | 记录 Git 操作状态 |
-| 工作目录 | `/home/xx/dev/n8n-workflows` | Git 仓库根目录 |
+| 工作目录 | `/home/xx/dev/zenithjoy-autopilot/workflows` | Git 仓库根目录 |
 
 ## 函数说明
 
@@ -353,7 +353,7 @@ done
    ```
 2. 检查工作区状态:
    ```bash
-   cd /home/xx/dev/n8n-workflows
+   cd /home/xx/dev/zenithjoy-autopilot/workflows
    git status
    ```
 3. 检查是否有冲突:
@@ -372,7 +372,7 @@ done
    ```
 2. 检查 Git 权限:
    ```bash
-   ls -la /home/xx/dev/n8n-workflows/.git
+   ls -la /home/xx/dev/zenithjoy-autopilot/workflows/.git
    ```
 
 ### 问题 3: Git 操作被跳过

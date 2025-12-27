@@ -3,7 +3,7 @@
 # Task ID: 2d553f41-3ec5-8188-80d1-cd0e848f71b4
 
 set -e
-cd /home/xx/dev/n8n-workflows
+cd /home/xx/dev/zenithjoy-autopilot/workflows
 
 echo "========================================="
 echo "今日头条（副号）抓取优化 - 8路质检"

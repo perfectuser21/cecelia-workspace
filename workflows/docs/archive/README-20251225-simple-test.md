@@ -14,7 +14,7 @@ The objective was to create a simple HTTP endpoint (`/webhook/ping`) that respon
 ## Project Structure
 
 ```
-/home/xx/dev/n8n-workflows/
+/home/xx/dev/zenithjoy-autopilot/workflows/
 ├── README-20251225-simple-test.md    ← You are here
 ├── DEPLOY-20251225-simple-test.md    ← Deployment guide with 3 creation options
 ├── API-20251225-simple-test.md       ← API documentation and examples

@@ -71,7 +71,7 @@ fi
 
 **Directory Structure:**
 ```
-/home/xx/dev/n8n-workflows/
+/home/xx/dev/zenithjoy-autopilot/workflows/
 ├── regression_tests/
 │   ├── README.md
 │   ├── example_webhook_test.sh.template
@@ -166,12 +166,12 @@ bash -n /home/xx/bin/workflow-factory.sh
   - Summary report already includes regression.json
 
 ### Created
-- `/home/xx/dev/n8n-workflows/regression_tests/README.md`
-- `/home/xx/dev/n8n-workflows/regression_tests/example_webhook_test.sh.template`
-- `/home/xx/dev/n8n-workflows/regression_tests/example_node_validation.sh.template`
-- `/home/xx/dev/n8n-workflows/regression_tests/example_performance_check.sh.template`
-- `/home/xx/dev/n8n-workflows/REGRESSION_TESTING_GUIDE.md`
-- `/home/xx/dev/n8n-workflows/REGRESSION_TESTING_SUMMARY.md`
+- `/home/xx/dev/zenithjoy-autopilot/workflows/regression_tests/README.md`
+- `/home/xx/dev/zenithjoy-autopilot/workflows/regression_tests/example_webhook_test.sh.template`
+- `/home/xx/dev/zenithjoy-autopilot/workflows/regression_tests/example_node_validation.sh.template`
+- `/home/xx/dev/zenithjoy-autopilot/workflows/regression_tests/example_performance_check.sh.template`
+- `/home/xx/dev/zenithjoy-autopilot/workflows/REGRESSION_TESTING_GUIDE.md`
+- `/home/xx/dev/zenithjoy-autopilot/workflows/REGRESSION_TESTING_SUMMARY.md`
 
 ## Impact
 
@@ -216,5 +216,5 @@ When workflow factory runs:
 
 - Pain Point #27: AI_FACTORY_WORKFLOW_SPEC.md (if exists)
 - Implementation: `/home/xx/bin/workflow-factory.sh`
-- Documentation: `/home/xx/dev/n8n-workflows/REGRESSION_TESTING_GUIDE.md`
-- Templates: `/home/xx/dev/n8n-workflows/regression_tests/`
+- Documentation: `/home/xx/dev/zenithjoy-autopilot/workflows/REGRESSION_TESTING_GUIDE.md`
+- Templates: `/home/xx/dev/zenithjoy-autopilot/workflows/regression_tests/`

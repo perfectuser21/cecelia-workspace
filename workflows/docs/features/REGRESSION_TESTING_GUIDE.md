@@ -76,7 +76,7 @@ Checks that workflows from the last 3 successful runs still exist.
 - One or more workflows from previous runs have been deleted or are inaccessible
 
 ### 4. Custom Regression Tests
-Executes any `.sh` scripts found in `/home/xx/dev/n8n-workflows/regression_tests/`.
+Executes any `.sh` scripts found in `/home/xx/dev/zenithjoy-autopilot/workflows/regression_tests/`.
 
 **Pass Criteria:**
 - Script exits with code 0
@@ -86,7 +86,7 @@ Executes any `.sh` scripts found in `/home/xx/dev/n8n-workflows/regression_tests
 
 ## Writing Custom Tests
 
-Create test scripts in `/home/xx/dev/n8n-workflows/regression_tests/`:
+Create test scripts in `/home/xx/dev/zenithjoy-autopilot/workflows/regression_tests/`:
 
 ```bash
 #!/bin/bash
@@ -95,7 +95,7 @@ Create test scripts in `/home/xx/dev/n8n-workflows/regression_tests/`:
 WORKFLOW_IDS="$1"
 
 # Load API credentials
-source /home/xx/dev/n8n-workflows/.secrets 2>/dev/null || exit 1
+source /home/xx/dev/zenithjoy-autopilot/workflows/.secrets 2>/dev/null || exit 1
 
 # Your test logic here
 for wid in $WORKFLOW_IDS; do
@@ -126,7 +126,7 @@ Three example test templates are provided in `regression_tests/`:
 
 To activate a template:
 ```bash
-cd /home/xx/dev/n8n-workflows/regression_tests
+cd /home/xx/dev/zenithjoy-autopilot/workflows/regression_tests
 mv example_webhook_test.sh.template test_webhooks.sh
 chmod +x test_webhooks.sh
 ```
@@ -173,7 +173,7 @@ Results are included in the final summary report under `qc.regression`.
 
 ### No regression tests found
 - Default behavior: Creates minimal passing test
-- Add custom tests to `/home/xx/dev/n8n-workflows/regression_tests/`
+- Add custom tests to `/home/xx/dev/zenithjoy-autopilot/workflows/regression_tests/`
 
 ## Future Enhancements
 
@@ -188,11 +188,11 @@ Potential improvements to regression testing:
 ## Files Modified
 
 - `/home/xx/bin/workflow-factory.sh` - Added `run_regression_tests()` function
-- `/home/xx/dev/n8n-workflows/regression_tests/` - New directory for tests
+- `/home/xx/dev/zenithjoy-autopilot/workflows/regression_tests/` - New directory for tests
 - Decision logic updated to check regression results
 
 ## See Also
 
-- [AI Factory README](/home/xx/dev/n8n-workflows/AI-FACTORY-README.md)
-- [Regression Tests Directory](/home/xx/dev/n8n-workflows/regression_tests/README.md)
-- [CLAUDE.md Project Instructions](/home/xx/dev/n8n-workflows/CLAUDE.md)
+- [AI Factory README](/home/xx/dev/zenithjoy-autopilot/workflows/AI-FACTORY-README.md)
+- [Regression Tests Directory](/home/xx/dev/zenithjoy-autopilot/workflows/regression_tests/README.md)
+- [CLAUDE.md Project Instructions](/home/xx/dev/zenithjoy-autopilot/workflows/CLAUDE.md)

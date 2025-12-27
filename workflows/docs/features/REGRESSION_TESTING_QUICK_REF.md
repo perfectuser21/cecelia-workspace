@@ -14,10 +14,10 @@ cat /home/xx/data/runs/{RUN_ID}/qc/regression.json
 ### Add Custom Test
 ```bash
 # 1. Create test script
-cat > /home/xx/dev/n8n-workflows/regression_tests/my_test.sh << 'EOF'
+cat > /home/xx/dev/zenithjoy-autopilot/workflows/regression_tests/my_test.sh << 'EOF'
 #!/bin/bash
 WORKFLOW_IDS="$1"
-source /home/xx/dev/n8n-workflows/.secrets 2>/dev/null || exit 1
+source /home/xx/dev/zenithjoy-autopilot/workflows/.secrets 2>/dev/null || exit 1
 
 # Your test logic here
 for wid in $WORKFLOW_IDS; do
@@ -29,14 +29,14 @@ exit 0
 EOF
 
 # 2. Make executable
-chmod +x /home/xx/dev/n8n-workflows/regression_tests/my_test.sh
+chmod +x /home/xx/dev/zenithjoy-autopilot/workflows/regression_tests/my_test.sh
 
 # 3. Test runs automatically on next workflow factory execution
 ```
 
 ### Use Template
 ```bash
-cd /home/xx/dev/n8n-workflows/regression_tests
+cd /home/xx/dev/zenithjoy-autopilot/workflows/regression_tests
 mv example_webhook_test.sh.template webhook_test.sh
 chmod +x webhook_test.sh
 # Edit webhook_test.sh as needed
@@ -106,7 +106,7 @@ cat /home/xx/data/runs/$(ls -t /home/xx/data/runs/ | head -1)/qc/regression.json
 ### Debug Failed Test
 ```bash
 # Run custom test manually
-bash /home/xx/dev/n8n-workflows/regression_tests/my_test.sh "workflow_id_1 workflow_id_2"
+bash /home/xx/dev/zenithjoy-autopilot/workflows/regression_tests/my_test.sh "workflow_id_1 workflow_id_2"
 ```
 
 ### Disable Specific Test
@@ -120,7 +120,7 @@ mv my_test.sh my_test.sh.disabled
 | File | Purpose |
 |------|---------|
 | `/home/xx/bin/workflow-factory.sh` | Main script with regression tests |
-| `/home/xx/dev/n8n-workflows/regression_tests/` | Test scripts directory |
+| `/home/xx/dev/zenithjoy-autopilot/workflows/regression_tests/` | Test scripts directory |
 | `$STATE_DIR/qc/regression.json` | Test results for each run |
 | `regression_tests/README.md` | Detailed test documentation |
 
@@ -133,7 +133,7 @@ mv my_test.sh my_test.sh.disabled
 WORKFLOW_IDS="$1"
 
 # Load credentials
-source /home/xx/dev/n8n-workflows/.secrets 2>/dev/null || {
+source /home/xx/dev/zenithjoy-autopilot/workflows/.secrets 2>/dev/null || {
   echo "Error: Cannot load secrets"
   exit 1
 }

@@ -56,9 +56,9 @@ Total Nodes: 19 ✓
 - All connections valid ✓
 
 ## Files Generated
-- `/home/xx/dev/n8n-workflows/workflow-factory-v4-qc.json` ✓
-- `/home/xx/dev/n8n-workflows/workflow-factory-v4-qc-summary.md` ✓
-- `/home/xx/dev/n8n-workflows/workflow-factory-v4-qc-verification.md` ✓
+- `/home/xx/dev/zenithjoy-autopilot/workflows/workflow-factory-v4-qc.json` ✓
+- `/home/xx/dev/zenithjoy-autopilot/workflows/workflow-factory-v4-qc-summary.md` ✓
+- `/home/xx/dev/zenithjoy-autopilot/workflows/workflow-factory-v4-qc-verification.md` ✓
 
 ## Ready for Deployment
 Status: READY ✓

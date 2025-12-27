@@ -4,7 +4,7 @@
 2025-12-25
 
 ## 概述
-在 `/home/xx/dev/n8n-workflows/templates/` 创建了完整的 n8n workflow 模板库系统，包含 9 个常用模板和完整的文档。
+在 `/home/xx/dev/zenithjoy-autopilot/workflows/templates/` 创建了完整的 n8n workflow 模板库系统，包含 9 个常用模板和完整的文档。
 
 ## 目录结构
 
@@ -112,7 +112,7 @@ curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
 
 ```bash
 # 查看模板
-cat /home/xx/dev/n8n-workflows/templates/webhook-response/template.json
+cat /home/xx/dev/zenithjoy-autopilot/workflows/templates/webhook-response/template.json
 
 # 在 n8n UI 中导入
 ```
@@ -189,13 +189,13 @@ fi
 
 ```bash
 # 测试模板系统
-/home/xx/dev/n8n-workflows/templates/test-templates.sh
+/home/xx/dev/zenithjoy-autopilot/workflows/templates/test-templates.sh
 
 # 查看模板列表
-cat /home/xx/dev/n8n-workflows/templates/index.json | jq '.templates[].id'
+cat /home/xx/dev/zenithjoy-autopilot/workflows/templates/index.json | jq '.templates[].id'
 
 # 查看快速参考
-cat /home/xx/dev/n8n-workflows/templates/QUICK_REFERENCE.md
+cat /home/xx/dev/zenithjoy-autopilot/workflows/templates/QUICK_REFERENCE.md
 
 # 使用模板创建 workflow
 curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \

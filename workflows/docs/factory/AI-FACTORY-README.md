@@ -109,7 +109,7 @@ HTTP - 飞书通知
 ### 9. SSH Claude D - 生成文档
 - **角色**: 文档生成者
 - **工具**: mcp__n8n__get_workflow_details, Write, Edit
-- **输出**: `/home/xx/dev/n8n-workflows/workflow-factory-output.md`
+- **输出**: `/home/xx/dev/zenithjoy-autopilot/workflows/workflow-factory-output.md`
 
 ### 10. HTTP - 飞书通知
 - **类型**: n8n-nodes-base.httpRequest
@@ -189,13 +189,13 @@ Workflow 生产完成 ✅
 4. **安全性**:
    - API Key 硬编码在 Bash 节点中，建议迁移到环境变量
    - 安全扫描会检测敏感信息泄露
-5. **工作目录**: 所有 Claude 调用在 `/home/xx/dev/n8n-workflows` 目录执行
+5. **工作目录**: 所有 Claude 调用在 `/home/xx/dev/zenithjoy-autopilot/workflows` 目录执行
 
 ## 文件
 
-- **Workflow JSON**: `/home/xx/dev/n8n-workflows/workflow-factory-v2.json`
-- **输出文档**: `/home/xx/dev/n8n-workflows/workflow-factory-output.md` (自动生成)
-- **说明文档**: `/home/xx/dev/n8n-workflows/AI-FACTORY-README.md` (本文件)
+- **Workflow JSON**: `/home/xx/dev/zenithjoy-autopilot/workflows/workflow-factory-v2.json`
+- **输出文档**: `/home/xx/dev/zenithjoy-autopilot/workflows/workflow-factory-output.md` (自动生成)
+- **说明文档**: `/home/xx/dev/zenithjoy-autopilot/workflows/AI-FACTORY-README.md` (本文件)
 
 ## 下一步优化
 

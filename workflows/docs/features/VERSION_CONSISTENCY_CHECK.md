@@ -163,7 +163,7 @@ generate_summary()
 
 ```bash
 STATE_DIR="/home/xx/data/runs/test_run_123"
-WORKFLOW_DIR="/home/xx/dev/n8n-workflows"
+WORKFLOW_DIR="/home/xx/dev/zenithjoy-autopilot/workflows"
 
 mkdir -p "$STATE_DIR/qc"
 

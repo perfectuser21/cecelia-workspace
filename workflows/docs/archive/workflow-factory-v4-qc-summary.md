@@ -83,5 +83,5 @@ HTTP飞书通知 → 返回结果
 
 ## Files
 
-- **Source**: `/home/xx/dev/n8n-workflows/workflow-factory-v3.json`
-- **Output**: `/home/xx/dev/n8n-workflows/workflow-factory-v4-qc.json`
+- **Source**: `/home/xx/dev/zenithjoy-autopilot/workflows/workflow-factory-v3.json`
+- **Output**: `/home/xx/dev/zenithjoy-autopilot/workflows/workflow-factory-v4-qc.json`

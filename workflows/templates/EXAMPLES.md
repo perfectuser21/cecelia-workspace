@@ -289,7 +289,7 @@ curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
 
 ### 2. 查看任务分解结果
 
-执行后检查 `/home/xx/dev/n8n-workflows/ai-factory-runs/{run_id}/plan.json`
+执行后检查 `/home/xx/dev/zenithjoy-autopilot/workflows/ai-factory-runs/{run_id}/plan.json`
 
 ### 3. 验证模板匹配
 
