@@ -128,11 +128,11 @@ log_info "Git 推送完成: $BRANCH_NAME"
 log_info "[3/6] 更新 Notion 状态..."
 
 if [[ "$PASSED" == "true" ]]; then
-  NEW_STATUS="Waiting"
-  log_info "质检通过，状态更新为: Waiting"
+  NEW_STATUS="Done"
+  log_info "质检通过，状态更新为: Done"
 else
-  NEW_STATUS="Waiting"  # 失败也设为 Waiting，等待人工处理
-  log_info "质检失败，状态更新为: Waiting (需人工处理)"
+  NEW_STATUS="Failed"
+  log_info "质检失败，状态更新为: Failed (需人工处理)"
 fi
 
 update_notion_status "$TASK_ID" "$NEW_STATUS" || log_warn "更新 Notion 状态失败"

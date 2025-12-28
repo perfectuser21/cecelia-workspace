@@ -7,8 +7,7 @@
 # ============================================================
 # 配置
 # ============================================================
-LOCK_DIR="/home/xx/.locks"
-LOCK_FILE="$LOCK_DIR/claude-factory.lock"
+LOCK_FILE="/tmp/workflow-factory.lock"
 LOCK_TIMEOUT=1800  # 30 分钟死锁阈值
 LOCK_RETRY_INTERVAL=60  # 重试间隔 60 秒
 LOCK_MAX_RETRIES=3  # 最大重试次数
@@ -50,7 +49,8 @@ _log() {
   echo -e "${color}[$timestamp] [$level]${NC} $message" >&2
 
   # 如果设置了日志文件，也写入文件
-  if [[ -n "$LOG_FILE" && -f "$LOG_FILE" ]]; then
+  if [[ -n "$LOG_FILE" ]]; then
+    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null
     echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
   fi
 }
@@ -63,11 +63,6 @@ log_debug() { [[ "${DEBUG:-false}" == "true" ]] && _log "DEBUG" "$1"; }
 # ============================================================
 # 锁机制
 # ============================================================
-
-# 确保锁目录存在
-ensure_lock_dir() {
-  mkdir -p "$LOCK_DIR"
-}
 
 # 检查锁是否过期（死锁检测）
 is_lock_stale() {
@@ -95,7 +90,6 @@ is_lock_stale() {
 # 获取锁
 # 返回: 0=成功, 1=失败
 acquire_lock() {
-  ensure_lock_dir
   local retries=0
 
   while [[ $retries -lt $LOCK_MAX_RETRIES ]]; do
@@ -158,7 +152,7 @@ create_run_dir() {
 # 格式: YYYYMMDD-HHMMSS-RANDOM
 generate_run_id() {
   local timestamp=$(date '+%Y%m%d-%H%M%S')
-  local random=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
+  local random=$(head -c 100 /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
   echo "${timestamp}-${random}"
 }
 

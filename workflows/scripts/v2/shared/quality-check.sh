@@ -18,7 +18,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 V2_DIR="$(dirname "$SCRIPT_DIR")"
-WORKFLOWS_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")/.."
+WORKFLOWS_DIR="/home/xx/dev/zenithjoy-autopilot/workflows"
 
 # 加载工具函数
 source "$SCRIPT_DIR/utils.sh"
@@ -181,8 +181,10 @@ check_git() {
   # 尝试模拟合并（不实际合并）
   # 支持 develop/main/master
   local base_branch=""
+  local fetch_error=""
   for branch in develop main master; do
-    if git fetch origin "$branch" 2>/dev/null; then
+    fetch_error=$(git fetch origin "$branch" 2>&1)
+    if [[ $? -eq 0 ]]; then
       base_branch="$branch"
       break
     fi
@@ -190,7 +192,8 @@ check_git() {
 
   if [[ -z "$base_branch" ]]; then
     log_warn "无法获取远程分支，跳过合并冲突检查"
-    pass_check "git" "无合并冲突（跳过远程检查）"
+    log_warn "fetch 失败原因: ${fetch_error:-未知错误}"
+    pass_check "git" "无合并冲突（跳过远程检查，原因: ${fetch_error:-未知错误}）"
     return 0
   fi
 
@@ -274,7 +277,9 @@ check_n8n_quality_score() {
   # 2. 错误处理
   local has_error=$(echo "$nodes" | jq '[.[] | select(.type | contains("errorTrigger"))] | length')
   [[ $has_error -gt 0 ]] && ((error_handling+=10))
-  [[ $node_count -le 4 ]] && ((error_handling+=10))
+  # 检查是否有节点设置了 continueOnFail
+  local has_continue_on_fail=$(echo "$nodes" | jq '[.[] | select(.continueOnFail == true)] | length')
+  [[ $has_continue_on_fail -gt 0 ]] && ((error_handling+=10))
 
   # 3. 命名
   local default_names=$(echo "$nodes" | jq '[.[] | select(.name | test("^(Code|HTTP|SSH|IF)( \\d+)?$"))] | length')
