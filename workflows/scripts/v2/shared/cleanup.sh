@@ -54,7 +54,7 @@ log_info "=========================================="
 # ============================================================
 # 步骤 1: Git 提交
 # ============================================================
-log_info "[1/5] Git 提交..."
+log_info "[1/6] Git 提交..."
 
 cd "$PROJECT_DIR"
 
@@ -108,7 +108,7 @@ fi
 # ============================================================
 # 步骤 2: Git 推送
 # ============================================================
-log_info "[2/5] Git 推送..."
+log_info "[2/6] Git 推送..."
 
 BRANCH_NAME="${BRANCH_NAME:-feature/$TASK_ID}"
 
@@ -125,7 +125,7 @@ log_info "Git 推送完成: $BRANCH_NAME"
 # ============================================================
 # 步骤 3: 更新 Notion 状态
 # ============================================================
-log_info "[3/5] 更新 Notion 状态..."
+log_info "[3/6] 更新 Notion 状态..."
 
 if [[ "$PASSED" == "true" ]]; then
   NEW_STATUS="Waiting"
@@ -140,7 +140,7 @@ update_notion_status "$TASK_ID" "$NEW_STATUS" || log_warn "更新 Notion 状态�
 # ============================================================
 # 步骤 4: 发送飞书通知
 # ============================================================
-log_info "[4/5] 发送飞书通知..."
+log_info "[4/6] 发送飞书通知..."
 
 # 读取结果信息
 RESULT_SUMMARY=""
@@ -182,9 +182,30 @@ fi
 send_feishu_card "$NOTIFY_TITLE" "$NOTIFY_STATUS" "$NOTIFY_CONTENT"
 
 # ============================================================
-# 步骤 5: 清理临时文件
+# 步骤 5: 上传截图到 Notion
 # ============================================================
-log_info "[5/5] 清理临时文件..."
+log_info "[5/6] 上传截图..."
+
+SCREENSHOTS_DIR="$WORK_DIR/screenshots"
+if [[ -d "$SCREENSHOTS_DIR" ]] && [[ -n "$(ls -A "$SCREENSHOTS_DIR" 2>/dev/null)" ]]; then
+  log_info "发现截图目录: $SCREENSHOTS_DIR"
+
+  # 上传所有截图到 Notion
+  upload_all_screenshots "$WORK_DIR" "$TASK_ID"
+
+  # 发送第一张截图到飞书（作为完成证明）
+  FIRST_SCREENSHOT=$(ls "$SCREENSHOTS_DIR"/*.png 2>/dev/null | head -1)
+  if [[ -n "$FIRST_SCREENSHOT" ]]; then
+    send_feishu_image "任务完成截图" "$FIRST_SCREENSHOT" "Task: ${TASK_NAME:-$TASK_ID}"
+  fi
+else
+  log_info "没有截图需要上传"
+fi
+
+# ============================================================
+# 步骤 6: 清理临时文件
+# ============================================================
+log_info "[6/6] 清理临时文件..."
 
 # 保留运行目录（用于调试）
 # 如果需要自动清理，可以启用以下代码：

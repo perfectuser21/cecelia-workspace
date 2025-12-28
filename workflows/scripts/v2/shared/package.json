@@ -1,0 +1,12 @@
+{
+  "name": "ai-factory-shared",
+  "version": "1.0.0",
+  "description": "AI Factory v2 shared utilities",
+  "type": "module",
+  "scripts": {
+    "screenshot": "node screenshot.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "^21.0.0"
+  }
+}

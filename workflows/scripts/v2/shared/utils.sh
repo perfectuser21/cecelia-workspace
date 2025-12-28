@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # 共享工具函数
-# 包含：日志、锁机制、通知、Notion API 等
+# 包含：日志、锁机制、通知、Notion API、截图工具等
 #
 
 # ============================================================
@@ -511,3 +511,11 @@ export -f fetch_notion_task update_notion_status
 export -f send_feishu_notification send_feishu_card
 export -f save_env load_env
 export -f check_git_clean create_feature_branch
+
+# ============================================================
+# 加载截图工具
+# ============================================================
+UTILS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$UTILS_DIR/screenshot-utils.sh" ]]; then
+  source "$UTILS_DIR/screenshot-utils.sh"
+fi
