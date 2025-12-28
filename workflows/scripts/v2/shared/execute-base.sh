@@ -210,6 +210,14 @@ call_claude() {
   CLAUDE_OUTPUT=""
 
   if [[ "${TEST_MODE:-}" == "1" ]]; then
+    local test_timeout="${TEST_TIMEOUT:-300}"
+    if [[ "$test_timeout" -lt 5 ]]; then
+      log_warn "[TEST_MODE] 模拟 Claude 超时 (TEST_TIMEOUT=$test_timeout < 5)"
+      CLAUDE_OUTPUT='{"success": false, "error": "timeout", "message": "模拟 Claude 调用超时"}'
+      CLAUDE_EXIT=124
+      return 124
+    fi
+
     log_info "[TEST_MODE] 模拟 Claude 调用"
     CLAUDE_OUTPUT='{"success": true, "message": "mock response"}'
     return 0

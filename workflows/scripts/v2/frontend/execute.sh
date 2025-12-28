@@ -353,8 +353,15 @@ TSC_RESULT="skipped"
 TSC_OUTPUT=""
 
 if [[ "${TEST_MODE:-}" == "1" ]]; then
-  log_info "[TEST_MODE] 模拟类型检查通过"
-  TSC_RESULT="passed"
+  local tsc_timeout="${TSC_TIMEOUT:-120}"
+  if [[ "$tsc_timeout" -lt 5 ]]; then
+    log_warn "[TEST_MODE] 模拟 TSC 超时 (TSC_TIMEOUT=$tsc_timeout < 5)"
+    TSC_RESULT="timeout"
+    TSC_OUTPUT="[TEST_MODE] Simulated TSC timeout"
+  else
+    log_info "[TEST_MODE] 模拟类型检查通过"
+    TSC_RESULT="passed"
+  fi
 else
   if [[ -f "$TARGET_PROJECT/tsconfig.json" ]]; then
     if command -v npx &>/dev/null; then
@@ -396,8 +403,15 @@ BUILD_RESULT="skipped"
 BUILD_OUTPUT=""
 
 if [[ "${TEST_MODE:-}" == "1" ]]; then
-  log_info "[TEST_MODE] 模拟构建通过"
-  BUILD_RESULT="passed"
+  local build_timeout="${BUILD_TIMEOUT:-300}"
+  if [[ "$build_timeout" -lt 5 ]]; then
+    log_warn "[TEST_MODE] 模拟 Build 超时 (BUILD_TIMEOUT=$build_timeout < 5)"
+    BUILD_RESULT="timeout"
+    BUILD_OUTPUT="[TEST_MODE] Simulated Build timeout"
+  else
+    log_info "[TEST_MODE] 模拟构建通过"
+    BUILD_RESULT="passed"
+  fi
 else
   # 使用已读取的 PACKAGE_JSON_CONTENT 检查 build 脚本
   if [[ -f "$TARGET_PROJECT/package.json" ]] && [[ "$PACKAGE_JSON_CONTENT" == *'"build"'* ]]; then

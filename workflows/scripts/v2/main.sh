@@ -106,8 +106,10 @@ LOCK_RELEASED=0
 CLEANUP_IN_PROGRESS=0
 
 cleanup_and_exit() {
+  local saved_exit_code=$?  # 保存进入时的退出码
+
   # 防止重复触发
-  [[ $CLEANUP_IN_PROGRESS -eq 1 ]] && return
+  [[ $CLEANUP_IN_PROGRESS -eq 1 ]] && return $saved_exit_code
   CLEANUP_IN_PROGRESS=1
 
   local sig="${1:-EXIT}"
@@ -129,8 +131,12 @@ cleanup_and_exit() {
     LOCK_RELEASED=1
   fi
 
-  # 如果是信号触发，退出码 130
-  [[ "$sig" != "EXIT" ]] && exit 130
+  # 如果是信号触发，退出码 130；否则保持原退出码
+  if [[ "$sig" != "EXIT" ]]; then
+    exit 130
+  else
+    return $saved_exit_code
+  fi
 }
 
 # 设置 trap 确保锁释放（简化逻辑，统一入口）

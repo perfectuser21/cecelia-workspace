@@ -278,6 +278,15 @@ log_info "Workflow JSON 已保存: $WORK_DIR/workflow.json"
 log_info "[3/5] 创建 Workflow..."
 
 if [[ "${TEST_MODE:-}" == "1" ]]; then
+  # 检查是否需要模拟超时
+  local test_timeout="${TEST_TIMEOUT:-300}"
+  if [[ "$test_timeout" -lt 5 ]]; then
+    log_warn "[TEST_MODE] 模拟超时 (TEST_TIMEOUT=$test_timeout < 5)"
+    # 设置超时相关的输出
+    echo '{"success": false, "error": "timeout", "message": "模拟超时"}' > "$WORK_DIR/result.json"
+    exit 124  # timeout 退出码
+  fi
+
   log_info "[TEST_MODE] 模拟 n8n API 创建"
   WORKFLOW_ID="test-workflow-$(date +%s)-$RANDOM"
 

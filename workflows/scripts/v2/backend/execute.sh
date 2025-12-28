@@ -91,6 +91,14 @@ FILES_CHANGED=()
 CODE_OUTPUT=""
 
 if [[ "${TEST_MODE:-}" == "1" ]]; then
+  # 检查是否模拟超时
+  local test_timeout="${TEST_TIMEOUT:-300}"
+  if [[ "$test_timeout" -lt 5 ]]; then
+    log_warn "[TEST_MODE] 模拟超时 (TEST_TIMEOUT=$test_timeout < 5)"
+    echo '{"success": false, "error": "timeout"}' > "$WORK_DIR/result.json"
+    exit 124
+  fi
+
   log_info "[TEST_MODE] 使用 mock 代码生成"
 
   # 创建 mock 文件 (使用 core 目录或 src 目录)
