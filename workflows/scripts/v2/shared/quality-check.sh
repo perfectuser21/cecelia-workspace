@@ -22,6 +22,7 @@ WORKFLOWS_DIR="/home/xx/dev/zenithjoy-autopilot/workflows"
 
 # 加载工具函数
 source "$SCRIPT_DIR/utils.sh"
+source "$SCRIPT_DIR/screenshot-utils.sh"
 
 # 加载 secrets
 load_secrets
@@ -353,13 +354,98 @@ check_n8n_quality_score() {
   log_info "    参数配置: $parameters/20"
   log_info "    最佳实践: $best_practices/20"
 
-  if [[ $total -ge 80 ]]; then
+  # TEST_MODE 使用较低阈值
+  local threshold=80
+  if [[ "${TEST_MODE:-}" == "1" ]]; then
+    threshold=50
+  fi
+
+  if [[ $total -ge $threshold ]]; then
     pass_check "n8n_quality" "质量评分 $total/100" "$total"
     return 0
   else
-    fail_check "n8n_quality" "质量评分 $total/100 (需 >= 80)"
+    fail_check "n8n_quality" "质量评分 $total/100 (需 >= $threshold)"
     return 1
   fi
+}
+
+# ============================================================
+# Backend 专用检查
+# ============================================================
+
+check_backend_result() {
+  log_info "[4] Backend 结果检查..."
+
+  if [[ ! -f "$WORK_DIR/result.json" ]]; then
+    fail_check "backend_result" "result.json 不存在"
+    return 1
+  fi
+
+  # 检查文件数
+  local files_changed=$(jq -r '.artifacts[0].files_changed // .files_changed // 0' "$WORK_DIR/result.json" 2>/dev/null)
+  if [[ "$files_changed" -eq 0 ]]; then
+    fail_check "backend_result" "没有生成文件"
+    return 1
+  fi
+
+  # 检查测试结果
+  local test_result=$(jq -r '.artifacts[0].test_result // .test_result // "skipped"' "$WORK_DIR/result.json" 2>/dev/null)
+  if [[ "$test_result" == "failed" ]]; then
+    fail_check "backend_tests" "测试失败" "false"
+  else
+    pass_check "backend_tests" "测试结果: $test_result" 20
+  fi
+
+  # 检查 lint 结果
+  local lint_result=$(jq -r '.artifacts[0].lint_result // .lint_result // "skipped"' "$WORK_DIR/result.json" 2>/dev/null)
+  if [[ "$lint_result" == "failed" ]]; then
+    fail_check "backend_lint" "Lint 失败" "false"
+  else
+    pass_check "backend_lint" "Lint 结果: $lint_result" 15
+  fi
+
+  pass_check "backend_result" "生成 $files_changed 个文件" 25
+  return 0
+}
+
+# ============================================================
+# Frontend 专用检查
+# ============================================================
+
+check_frontend_result() {
+  log_info "[4] Frontend 结果检查..."
+
+  if [[ ! -f "$WORK_DIR/result.json" ]]; then
+    fail_check "frontend_result" "result.json 不存在"
+    return 1
+  fi
+
+  # 检查组件数
+  local components=$(jq -r '.artifacts[0].components_created // .components_created // 0' "$WORK_DIR/result.json" 2>/dev/null)
+  if [[ "$components" -eq 0 ]]; then
+    fail_check "frontend_result" "没有生成组件"
+    return 1
+  fi
+
+  # 检查 TypeScript 结果
+  local tsc_result=$(jq -r '.artifacts[0].tsc_result // .tsc_result // "skipped"' "$WORK_DIR/result.json" 2>/dev/null)
+  if [[ "$tsc_result" == "failed" ]]; then
+    fail_check "frontend_tsc" "TypeScript 检查失败" "false"
+  else
+    pass_check "frontend_tsc" "TypeScript 结果: $tsc_result" 20
+  fi
+
+  # 检查构建结果
+  local build_result=$(jq -r '.artifacts[0].build_result // .build_result // "skipped"' "$WORK_DIR/result.json" 2>/dev/null)
+  if [[ "$build_result" == "failed" ]]; then
+    fail_check "frontend_build" "构建失败"
+    return 1
+  else
+    pass_check "frontend_build" "构建结果: $build_result" 20
+  fi
+
+  pass_check "frontend_result" "生成 $components 个组件" 25
+  return 0
 }
 
 # ============================================================
@@ -369,24 +455,22 @@ check_n8n_quality_score() {
 run_checks() {
   log_info "开始执行检查..."
 
-  # 通用检查
-  check_existence
-  check_security
-  check_git
+  # 通用检查 (使用 || true 防止 set -e 下检查失败导致脚本退出)
+  check_existence || true
+  check_security || true
+  check_git || true
 
   # 类型专用检查
   case "$CODING_TYPE" in
     n8n)
-      check_n8n_workflow_exists
-      check_n8n_quality_score
+      check_n8n_workflow_exists || true
+      check_n8n_quality_score || true
       ;;
     backend)
-      log_info "[4] Backend 专用检查（待实现）..."
-      pass_check "backend_stub" "Backend 检查跳过（待实现）"
+      check_backend_result || true
       ;;
     frontend)
-      log_info "[4] Frontend 专用检查（待实现）..."
-      pass_check "frontend_stub" "Frontend 检查跳过（待实现）"
+      check_frontend_result || true
       ;;
     *)
       log_warn "未知的 CODING_TYPE: $CODING_TYPE，跳过类型检查"

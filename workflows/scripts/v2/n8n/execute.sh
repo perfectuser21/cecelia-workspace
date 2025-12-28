@@ -1,120 +1,37 @@
 #!/bin/bash
 #
-# n8n 执行阶段脚本
+# n8n 执行器
 # 负责：模板匹配、生成 Workflow JSON、调用 n8n API 创建、激活
 #
 # 用法: execute.sh <run_id> <task_info_path>
 #
-# 参数:
-#   run_id          - 运行 ID
-#   task_info_path  - task_info.json 路径
-#
-# 输出:
-#   - 结果文件: /data/runs/{run_id}/result.json
-#   - 返回值: 0=成功, 非0=失败
-#
-
-set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SHARED_DIR="$(dirname "$SCRIPT_DIR")/shared"
-WORKFLOWS_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")/.."
 
-# 加载工具函数
-source "$SHARED_DIR/utils.sh"
+# 加载公共基础
+source "$SHARED_DIR/execute-base.sh"
 
-# 加载 secrets
-load_secrets
+# 解析参数
+parse_execute_args "$@"
 
-# HTML 转义函数：防止 XSS 和 HTML 注入
-html_escape() {
-  echo "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g'
-}
-
-# 检查磁盘空间（至少需要 100MB）
-check_disk_space() {
-  local path="$1"
-  local min_mb="${2:-100}"
-  local available
-  available=$(df -m "$path" 2>/dev/null | awk 'NR==2 {print $4}')
-  if [[ -n "$available" && "$available" -lt "$min_mb" ]]; then
-    log_error "磁盘空间不足: ${available}MB < ${min_mb}MB"
-    return 1
-  fi
-  return 0
-}
+# 打印开始日志
+log_execute_start "n8n"
 
 # ============================================================
-# 参数解析
+# 检查是否跳过执行（稳定性验证）
 # ============================================================
-RUN_ID="${1:-}"
-TASK_INFO_PATH="${2:-}"
-
-if [[ -z "$RUN_ID" || -z "$TASK_INFO_PATH" ]]; then
-  log_error "用法: execute.sh <run_id> <task_info_path>"
-  exit 1
-fi
-
-WORK_DIR="/home/xx/data/runs/$RUN_ID"
-LOG_FILE="$WORK_DIR/logs/execute.log"
-
-# 读取任务信息
-if [[ ! -f "$TASK_INFO_PATH" ]]; then
-  log_error "任务信息文件不存在: $TASK_INFO_PATH"
-  exit 1
-fi
-
-TASK_ID=$(jq -r '.task_id' "$TASK_INFO_PATH")
-TASK_NAME=$(jq -r '.task_name' "$TASK_INFO_PATH")
-TASK_CONTENT=$(jq -r '.content' "$TASK_INFO_PATH")
-
-log_info "=========================================="
-log_info "n8n 执行阶段开始"
-log_info "Run ID: $RUN_ID"
-log_info "Task: $TASK_NAME"
-log_info "=========================================="
-
-# ============================================================
-# 检查是否已有执行结果（稳定性验证时跳过重复创建）
-# ============================================================
-if [[ -f "$WORK_DIR/result.json" ]]; then
-  EXISTING_SUCCESS=$(jq -r '.success' "$WORK_DIR/result.json" 2>/dev/null)
-  EXISTING_ID=$(jq -r '.artifacts[0].id // empty' "$WORK_DIR/result.json" 2>/dev/null)
-
-  if [[ "$EXISTING_SUCCESS" == "true" && -n "$EXISTING_ID" ]]; then
-    log_info "已存在成功的执行结果 (Workflow ID: $EXISTING_ID)，跳过重复创建"
-    log_info "这是稳定性验证，只需重新验证质检"
-
-    # 重新读取结果信息用于输出
-    WORKFLOW_ID="$EXISTING_ID"
-    WORKFLOW_NAME=$(jq -r '.artifacts[0].name' "$WORK_DIR/result.json")
-    NODE_COUNT=$(jq -r '.artifacts[0].node_count // 0' "$WORK_DIR/result.json")
-    [[ ! "$NODE_COUNT" =~ ^[0-9]+$ ]] && NODE_COUNT=0
-    TEMPLATE_ID=$(jq -r '.artifacts[0].template_used' "$WORK_DIR/result.json")
-
-    # 直接输出结果并退出（使用 jq 安全构建 JSON）
-    jq -n \
-      --argjson success true \
-      --arg workflow_id "$WORKFLOW_ID" \
-      --arg workflow_name "$WORKFLOW_NAME" \
-      --argjson node_count "${NODE_COUNT:-0}" \
-      --arg template_used "${TEMPLATE_ID:-none}" \
-      --argjson skipped true \
-      --arg reason "stability_verification" \
-      '{success: $success, workflow_id: $workflow_id, workflow_name: $workflow_name, node_count: $node_count, template_used: $template_used, skipped: $skipped, reason: $reason}'
-    exit 0
-  fi
+if check_skip_execution "workflow"; then
+  output_skip_result
+  exit 0
 fi
 
 # ============================================================
-# 模板匹配
+# [1/5] 模板匹配
 # ============================================================
 log_info "[1/5] 模板匹配..."
 
-# 模板索引
-TEMPLATES_INDEX="$WORKFLOWS_DIR/templates/index.json"
-
-# 从任务内容中匹配模板
+# 模板匹配函数
 match_template() {
   local task_name="$1"
   local task_desc="$2"
@@ -170,7 +87,7 @@ else
 fi
 
 # ============================================================
-# 生成 Workflow JSON
+# [2/5] 生成 Workflow JSON
 # ============================================================
 log_info "[2/5] 生成 Workflow JSON..."
 
@@ -183,15 +100,13 @@ if [[ -n "$TEMPLATE_ID" ]]; then
     log_info "加载模板: $TEMPLATE_FILE"
     WORKFLOW_JSON=$(cat "$TEMPLATE_FILE")
 
-    # 根据任务内容修改模板（简化处理）
-    # 实际使用时可能需要 Claude 来调整
+    # 根据任务内容修改模板
     WORKFLOW_JSON=$(echo "$WORKFLOW_JSON" | jq --arg name "$TASK_NAME" '.name = $name')
   fi
 fi
 
 # 如果没有模板或模板加载失败，使用 Claude 生成
 if [[ -z "$WORKFLOW_JSON" ]]; then
-  # TEST_MODE: 使用 mock workflow JSON
   if [[ "${TEST_MODE:-}" == "1" ]]; then
     log_info "[TEST_MODE] 使用 mock Workflow JSON"
     WORKFLOW_JSON=$(jq -n \
@@ -262,37 +177,17 @@ $TASK_CONTENT
   \"settings\": {\"executionOrder\": \"v1\"}
 }"
 
-  # 调用 Claude（超时 600s，复杂 workflow 需要更多时间）
-  CLAUDE_EXIT=0
-  CLAUDE_OUTPUT=$(cd /home/xx/data/factory-workspace && timeout --foreground -k 10 600 claude -p "$PROMPT" \
-    --add-dir "$WORKFLOWS_DIR" --model "sonnet" 2>&1) || CLAUDE_EXIT=$?
+    if ! call_claude "$PROMPT" 600; then
+      exit 1
+    fi
 
-  if [[ $CLAUDE_EXIT -ne 0 ]]; then
-    log_error "Claude 调用失败 (exit: $CLAUDE_EXIT)"
-    echo "$CLAUDE_OUTPUT" > "$WORK_DIR/claude_error_debug.txt"
-    exit 1
-  fi
+    WORKFLOW_JSON=$(extract_json_from_claude "$CLAUDE_OUTPUT") || {
+      log_error "无法从 Claude 输出中提取有效 JSON"
+      echo "$CLAUDE_OUTPUT" > "$WORK_DIR/claude_output_debug.txt"
+      exit 1
+    }
 
-  # 提取 JSON - 使用 jq 验证和提取，避免 awk 括号计数问题
-  WORKFLOW_JSON=""
-  # 先尝试直接解析整个输出（Claude 有时只返回纯 JSON）
-  if echo "$CLAUDE_OUTPUT" | jq empty 2>/dev/null; then
-    WORKFLOW_JSON="$CLAUDE_OUTPUT"
-  else
-    # 否则移除 markdown 代码块后尝试解析
-    CLEANED_OUTPUT=$(echo "$CLAUDE_OUTPUT" | sed 's/```json//g; s/```//g')
-    # 使用 jq -s 'last' 提取最后一个有效 JSON 对象
-    WORKFLOW_JSON=$(echo "$CLEANED_OUTPUT" | jq -s 'last' 2>/dev/null) || true
-  fi
-
-  # 验证 JSON
-  if [[ -z "$WORKFLOW_JSON" ]] || ! echo "$WORKFLOW_JSON" | jq empty 2>/dev/null; then
-    log_error "生成的 JSON 无效"
-    echo "$CLAUDE_OUTPUT" > "$WORK_DIR/claude_output_debug.txt"
-    exit 1
-  fi
-
-  log_info "Workflow JSON 生成成功"
+    log_info "Workflow JSON 生成成功"
   fi
 fi
 
@@ -307,11 +202,10 @@ fi
 log_info "Workflow JSON 已保存: $WORK_DIR/workflow.json"
 
 # ============================================================
-# 调用 n8n API 创建 Workflow
+# [3/5] 调用 n8n API 创建 Workflow
 # ============================================================
 log_info "[3/5] 创建 Workflow..."
 
-# TEST_MODE: 使用 mock API 响应
 if [[ "${TEST_MODE:-}" == "1" ]]; then
   log_info "[TEST_MODE] 模拟 n8n API 创建"
   WORKFLOW_ID="test-workflow-$(date +%s)"
@@ -385,11 +279,11 @@ else
   log_info "Workflow 创建成功: $WORKFLOW_NAME (ID: $WORKFLOW_ID, 节点数: $NODE_COUNT)"
 
   # ============================================================
-  # 激活 Workflow（带重试）
+  # [4/5] 激活 Workflow
   # ============================================================
   log_info "[4/5] 激活 Workflow..."
 
-  local activate_ok=false
+  activate_ok=false
   for retry in 1 2 3; do
     ACTIVATE_RESPONSE=$(curl -sf --connect-timeout 10 --max-time 30 \
       -X PATCH "$N8N_API_URL/workflows/$WORKFLOW_ID" \
@@ -414,34 +308,25 @@ fi
 # ============================================================
 # 保存结果
 # ============================================================
-RESULT_JSON=$(jq -n \
-  --arg success "true" \
-  --arg workflow_id "$WORKFLOW_ID" \
-  --arg workflow_name "$WORKFLOW_NAME" \
+RESULT_SUCCESS=true
+RESULT_ARTIFACTS=$(jq -n \
+  --arg type "workflow" \
+  --arg id "$WORKFLOW_ID" \
+  --arg name "$WORKFLOW_NAME" \
   --arg template_id "${TEMPLATE_ID:-none}" \
   --argjson node_count "$NODE_COUNT" \
-  --arg created_at "$(date -Iseconds)" \
-  '{
-    success: ($success == "true"),
-    artifacts: [
-      {
-        type: "workflow",
-        id: $workflow_id,
-        name: $workflow_name,
-        template_used: $template_id,
-        node_count: $node_count
-      }
-    ],
-    created_at: $created_at
-  }')
+  '[{
+    type: $type,
+    id: $id,
+    name: $name,
+    template_used: $template_id,
+    node_count: $node_count
+  }]')
 
-if ! echo "$RESULT_JSON" > "$WORK_DIR/result.json"; then
-  log_error "无法写入 result.json"
-  exit 1
-fi
+save_result
 
 # ============================================================
-# 截图：执行结果证明
+# [5/5] 截图：执行结果证明
 # ============================================================
 log_info "[5/5] 生成执行结果截图..."
 
@@ -449,127 +334,31 @@ log_info "[5/5] 生成执行结果截图..."
 SAFE_WORKFLOW_ID=$(html_escape "$WORKFLOW_ID")
 SAFE_WORKFLOW_NAME=$(html_escape "$WORKFLOW_NAME")
 SAFE_TEMPLATE_ID=$(html_escape "${TEMPLATE_ID:-}")
-SAFE_RUN_ID=$(html_escape "$RUN_ID")
-SAFE_TASK_ID=$(html_escape "$TASK_ID")
 
-# 生成结果报告 HTML
-REPORT_HTML="<!DOCTYPE html>
-<html>
-<head>
-  <meta charset=\"UTF-8\">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Noto Sans CJK SC', 'WenQuanYi Zen Hei', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      padding: 40px;
-      color: white;
-    }
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
-    }
-    h1 {
-      font-size: 36px;
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .subtitle {
-      font-size: 18px;
-      opacity: 0.8;
-      margin-bottom: 30px;
-    }
-    .card {
-      background: rgba(255,255,255,0.15);
-      backdrop-filter: blur(10px);
-      border-radius: 16px;
-      padding: 24px;
-      margin-bottom: 20px;
-    }
-    .card-title {
-      font-size: 14px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      opacity: 0.7;
-      margin-bottom: 8px;
-    }
-    .card-value {
-      font-size: 24px;
-      font-weight: bold;
-    }
-    .card-value.success { color: #4ade80; }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 20px;
-    }
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 12px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-    }
-    .info-label { opacity: 0.7; }
-    .info-value { font-weight: 500; }
-    .footer {
-      margin-top: 30px;
-      text-align: center;
-      font-size: 14px;
-      opacity: 0.6;
-    }
-  </style>
-</head>
-<body>
-  <div class=\"container\">
-    <h1>✅ n8n Workflow 创建成功</h1>
-    <div class=\"subtitle\">AI 工厂 v2 执行报告</div>
-
-    <div class=\"grid\">
-      <div class=\"card\">
-        <div class=\"card-title\">Workflow ID</div>
-        <div class=\"card-value\">${SAFE_WORKFLOW_ID}</div>
-      </div>
-      <div class=\"card\">
-        <div class=\"card-title\">节点数量</div>
-        <div class=\"card-value\">${NODE_COUNT} 个</div>
-      </div>
-    </div>
-
-    <div class=\"card\">
-      <div class=\"card-title\">Workflow 名称</div>
-      <div class=\"card-value\" style=\"font-size: 20px;\">${SAFE_WORKFLOW_NAME}</div>
-    </div>
-
-    <div class=\"card\">
-      <div class=\"info-row\">
-        <span class=\"info-label\">使用模板</span>
-        <span class=\"info-value\">$(if [[ -n "$SAFE_TEMPLATE_ID" && "$SAFE_TEMPLATE_ID" != "none" ]]; then echo "$SAFE_TEMPLATE_ID"; else echo "无（Claude 生成）"; fi)</span>
-      </div>
-      <div class=\"info-row\">
-        <span class=\"info-label\">Run ID</span>
-        <span class=\"info-value\">${SAFE_RUN_ID}</span>
-      </div>
-      <div class=\"info-row\">
-        <span class=\"info-label\">Task ID</span>
-        <span class=\"info-value\">${SAFE_TASK_ID}</span>
-      </div>
-      <div class=\"info-row\">
-        <span class=\"info-label\">创建时间</span>
-        <span class=\"info-value\">$(date '+%Y-%m-%d %H:%M:%S')</span>
-      </div>
-    </div>
-
-    <div class=\"footer\">
-      Generated by AI Factory v2 | $(date '+%Y-%m-%d %H:%M:%S')
-    </div>
+MAIN_CONTENT="
+<div class=\"grid\">
+  <div class=\"card\">
+    <div class=\"card-title\">Workflow ID</div>
+    <div class=\"card-value\">${SAFE_WORKFLOW_ID}</div>
   </div>
-</body>
-</html>"
+  <div class=\"card\">
+    <div class=\"card-title\">节点数量</div>
+    <div class=\"card-value\">${NODE_COUNT} 个</div>
+  </div>
+</div>
+<div class=\"card\">
+  <div class=\"card-title\">Workflow 名称</div>
+  <div class=\"card-value\" style=\"font-size: 20px;\">${SAFE_WORKFLOW_NAME}</div>
+</div>
+<div class=\"card\">
+  <div class=\"info-row\">
+    <span class=\"info-label\">使用模板</span>
+    <span class=\"info-value\">$(if [[ -n "$SAFE_TEMPLATE_ID" && "$SAFE_TEMPLATE_ID" != "none" ]]; then echo "$SAFE_TEMPLATE_ID"; else echo "无（Claude 生成）"; fi)</span>
+  </div>
+</div>
+"
 
-# 保存并截图
+REPORT_HTML=$(generate_result_report_html "n8n Workflow 创建成功" "✅" "$MAIN_CONTENT")
 screenshot_html_report "$RUN_ID" "n8n-execute-result" "$REPORT_HTML" || log_warn "结果截图失败，继续执行"
 
 # 如果是真实模式且有 Workflow ID，截取 n8n 编辑器页面
@@ -594,14 +383,11 @@ fi
 
 # 使用任务名生成文件名（移除特殊字符，中文名用 run_id 作为后备）
 SAFE_NAME=$(echo "$WORKFLOW_NAME" | tr -cd '[:alnum:]_-' | tr '[:upper:]' '[:lower:]')
-# 去掉开头和结尾的连字符/下划线（中文名过滤后可能只剩 "-workflow"）
 SAFE_NAME=$(echo "$SAFE_NAME" | sed 's/^[-_]*//;s/[-_]*$//')
-# 如果只剩下连字符/下划线或太短，用 "workflow" 作为前缀
 SAFE_NAME_STRIPPED=$(echo "$SAFE_NAME" | tr -d '_' | tr -d '-')
 if [[ -z "$SAFE_NAME_STRIPPED" || ${#SAFE_NAME_STRIPPED} -lt 3 ]]; then
   SAFE_NAME="workflow"
 fi
-# 添加 RUN_ID 后缀避免文件名冲突
 EXPORT_FILE="$EXPORT_DIR/${SAFE_NAME}-${RUN_ID}.json"
 
 if ! echo "$WORKFLOW_JSON" | jq --arg id "$WORKFLOW_ID" '. + {n8n_id: $id}' > "$EXPORT_FILE"; then
@@ -611,13 +397,9 @@ else
 fi
 
 # ============================================================
-# 输出结果
+# 完成
 # ============================================================
-log_info "=========================================="
-log_info "n8n 执行阶段完成"
-log_info "Workflow ID: $WORKFLOW_ID"
-log_info "节点数: $NODE_COUNT"
-log_info "=========================================="
+log_execute_end "n8n"
 
 jq -n \
   --argjson success true \

@@ -81,17 +81,21 @@ log_info "运行目录: $WORK_DIR"
 # ============================================================
 log_info "[2/4] 检查 Git 状态..."
 
-if ! check_git_clean; then
-  log_error "Git 状态不干净，请先清理未提交的更改"
-  log_error "提示: 使用 'git status' 查看详情，'git stash' 暂存更改"
+if [[ "${TEST_MODE:-}" == "1" ]]; then
+  log_info "[TEST_MODE] 跳过 Git 状态检查"
+else
+  if ! check_git_clean; then
+    log_error "Git 状态不干净，请先清理未提交的更改"
+    log_error "提示: 使用 'git status' 查看详情，'git stash' 暂存更改"
 
-  # 记录失败原因
-  echo '{"error": "git_not_clean", "message": "Git 状态不干净"}' > "$WORK_DIR/error.json"
+    # 记录失败原因
+    echo '{"error": "git_not_clean", "message": "Git 状态不干净"}' > "$WORK_DIR/error.json"
 
-  # 发送通知
-  send_feishu_notification "AI 工厂准备失败\nTask: $TASK_ID\nRun: $RUN_ID\n原因: Git 状态不干净，需要人工清理"
+    # 发送通知
+    send_feishu_notification "AI 工厂准备失败\nTask: $TASK_ID\nRun: $RUN_ID\n原因: Git 状态不干净，需要人工清理"
 
-  exit 1
+    exit 1
+  fi
 fi
 
 # ============================================================
@@ -99,7 +103,12 @@ fi
 # ============================================================
 log_info "[3/4] 创建 feature 分支..."
 
-BRANCH_NAME=$(create_feature_branch "$TASK_ID")
+if [[ "${TEST_MODE:-}" == "1" ]]; then
+  log_info "[TEST_MODE] 跳过分支创建，使用当前分支"
+  BRANCH_NAME=$(git branch --show-current 2>/dev/null || echo "test-branch")
+else
+  BRANCH_NAME=$(create_feature_branch "$TASK_ID")
+fi
 log_info "工作分支: $BRANCH_NAME"
 
 # ============================================================
@@ -107,14 +116,29 @@ log_info "工作分支: $BRANCH_NAME"
 # ============================================================
 log_info "[4/4] 读取 Notion 任务..."
 
-TASK_INFO=$(fetch_notion_task "$TASK_ID")
+if [[ "${TEST_MODE:-}" == "1" ]]; then
+  log_info "[TEST_MODE] 使用 mock 任务信息"
+  TASK_INFO=$(jq -n \
+    --arg task_id "$TASK_ID" \
+    --arg task_name "Mock Task - $TASK_ID" \
+    --arg content "这是一个测试任务，用于验证 AI 工厂执行流程。" \
+    --arg coding_type "$CODING_TYPE" \
+    '{
+      task_id: $task_id,
+      task_name: $task_name,
+      content: $content,
+      coding_type: $coding_type
+    }')
+else
+  TASK_INFO=$(fetch_notion_task "$TASK_ID")
 
-if [[ -z "$TASK_INFO" || "$TASK_INFO" == "null" ]]; then
-  log_error "无法获取 Notion 任务: $TASK_ID"
+  if [[ -z "$TASK_INFO" || "$TASK_INFO" == "null" ]]; then
+    log_error "无法获取 Notion 任务: $TASK_ID"
 
-  echo '{"error": "notion_fetch_failed", "message": "无法获取 Notion 任务"}' > "$WORK_DIR/error.json"
+    echo '{"error": "notion_fetch_failed", "message": "无法获取 Notion 任务"}' > "$WORK_DIR/error.json"
 
-  exit 1
+    exit 1
+  fi
 fi
 
 # 保存任务详情
@@ -141,8 +165,12 @@ save_env "$WORK_DIR"
 # ============================================================
 # 更新 Notion 状态
 # ============================================================
-log_info "更新 Notion 状态: In Progress"
-update_notion_status "$TASK_ID" "In Progress" || log_warn "更新状态失败，继续执行"
+if [[ "${TEST_MODE:-}" == "1" ]]; then
+  log_info "[TEST_MODE] 跳过 Notion 状态更新"
+else
+  log_info "更新 Notion 状态: In Progress"
+  update_notion_status "$TASK_ID" "In Progress" || log_warn "更新状态失败，继续执行"
+fi
 
 # ============================================================
 # 输出结果

@@ -1,0 +1,398 @@
+#!/bin/bash
+#
+# 执行器公共基础脚本
+# 提供所有执行器共用的：参数解析、环境加载、工具函数、结果处理
+#
+# 用法: 在各执行器中 source 此文件，然后实现特定逻辑
+#
+# 示例:
+#   source "$SHARED_DIR/execute-base.sh"
+#   execute_task  # 实现自己的执行逻辑
+#   save_result   # 保存结果
+#
+
+# ============================================================
+# 基础设置
+# ============================================================
+
+set -e
+
+# 脚本目录（调用者的目录）
+CALLER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[1]}")" && pwd)"
+SHARED_DIR="$(dirname "$CALLER_SCRIPT_DIR")/shared"
+V2_DIR="$(dirname "$SHARED_DIR")"
+WORKFLOWS_DIR="$(dirname "$V2_DIR")"
+PROJECT_DIR="$(dirname "$WORKFLOWS_DIR")"
+
+# 加载工具函数
+source "$SHARED_DIR/utils.sh"
+source "$SHARED_DIR/screenshot-utils.sh"
+
+# 加载 secrets
+load_secrets
+
+# ============================================================
+# 工具函数
+# ============================================================
+
+# HTML 转义：防止 XSS 和 HTML 注入
+html_escape() {
+  echo "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g'
+}
+
+# 检查磁盘空间（至少需要指定 MB）
+check_disk_space() {
+  local path="$1"
+  local min_mb="${2:-100}"
+  local available
+  available=$(df -m "$path" 2>/dev/null | awk 'NR==2 {print $4}')
+  if [[ -n "$available" && "$available" -lt "$min_mb" ]]; then
+    log_error "磁盘空间不足: ${available}MB < ${min_mb}MB"
+    return 1
+  fi
+  return 0
+}
+
+# 安全读取 JSON 字段
+json_get() {
+  local file="$1"
+  local field="$2"
+  local default="${3:-}"
+  local value
+  value=$(jq -r "$field // empty" "$file" 2>/dev/null)
+  echo "${value:-$default}"
+}
+
+# ============================================================
+# 参数解析
+# ============================================================
+
+parse_execute_args() {
+  RUN_ID="${1:-}"
+  TASK_INFO_PATH="${2:-}"
+
+  if [[ -z "$RUN_ID" || -z "$TASK_INFO_PATH" ]]; then
+    log_error "用法: execute.sh <run_id> <task_info_path>"
+    exit 1
+  fi
+
+  WORK_DIR="/home/xx/data/runs/$RUN_ID"
+  LOG_FILE="$WORK_DIR/logs/execute.log"
+
+  # 读取任务信息
+  if [[ ! -f "$TASK_INFO_PATH" ]]; then
+    log_error "任务信息文件不存在: $TASK_INFO_PATH"
+    exit 1
+  fi
+
+  TASK_ID=$(json_get "$TASK_INFO_PATH" '.task_id')
+  TASK_NAME=$(json_get "$TASK_INFO_PATH" '.task_name')
+  TASK_CONTENT=$(json_get "$TASK_INFO_PATH" '.content')
+  CODING_TYPE=$(json_get "$TASK_INFO_PATH" '.coding_type' 'unknown')
+
+  # 导出给子脚本使用
+  export RUN_ID TASK_INFO_PATH WORK_DIR LOG_FILE
+  export TASK_ID TASK_NAME TASK_CONTENT CODING_TYPE
+  export SHARED_DIR V2_DIR WORKFLOWS_DIR PROJECT_DIR
+}
+
+# ============================================================
+# 稳定性验证跳过检查
+# ============================================================
+
+# 检查是否应该跳过执行（已有成功结果）
+# 返回: 0=应该跳过, 1=需要执行
+check_skip_execution() {
+  local artifact_type="${1:-}"  # 可选：期望的产出类型
+
+  if [[ ! -f "$WORK_DIR/result.json" ]]; then
+    return 1  # 没有结果文件，需要执行
+  fi
+
+  local existing_success
+  existing_success=$(json_get "$WORK_DIR/result.json" '.success')
+
+  if [[ "$existing_success" != "true" ]]; then
+    return 1  # 之前执行失败，需要重新执行
+  fi
+
+  # 检查产出是否存在
+  local existing_id
+  existing_id=$(json_get "$WORK_DIR/result.json" '.artifacts[0].id')
+
+  if [[ -z "$existing_id" ]]; then
+    return 1  # 没有产出 ID，需要执行
+  fi
+
+  log_info "已存在成功的执行结果 (ID: $existing_id)，跳过重复执行"
+  log_info "这是稳定性验证，只需重新验证质检"
+
+  # 设置全局变量供后续使用
+  SKIP_EXECUTION=true
+  EXISTING_ARTIFACT_ID="$existing_id"
+  EXISTING_ARTIFACT_NAME=$(json_get "$WORK_DIR/result.json" '.artifacts[0].name')
+  EXISTING_ARTIFACT_TYPE=$(json_get "$WORK_DIR/result.json" '.artifacts[0].type')
+
+  return 0  # 应该跳过
+}
+
+# 输出跳过执行的结果
+output_skip_result() {
+  jq -n \
+    --argjson success true \
+    --arg id "$EXISTING_ARTIFACT_ID" \
+    --arg name "$EXISTING_ARTIFACT_NAME" \
+    --arg type "$EXISTING_ARTIFACT_TYPE" \
+    --argjson skipped true \
+    --arg reason "stability_verification" \
+    '{
+      success: $success,
+      artifact_id: $id,
+      artifact_name: $name,
+      artifact_type: $type,
+      skipped: $skipped,
+      reason: $reason
+    }'
+}
+
+# ============================================================
+# Claude 调用
+# ============================================================
+
+# 调用 Claude 执行任务
+# 参数: $1=prompt, $2=timeout_seconds (默认 600)
+# 返回: Claude 输出存储在 CLAUDE_OUTPUT 变量
+call_claude() {
+  local prompt="$1"
+  local timeout_sec="${2:-600}"
+
+  CLAUDE_EXIT=0
+  CLAUDE_OUTPUT=""
+
+  if [[ "${TEST_MODE:-}" == "1" ]]; then
+    log_info "[TEST_MODE] 模拟 Claude 调用"
+    CLAUDE_OUTPUT='{"success": true, "message": "mock response"}'
+    return 0
+  fi
+
+  log_info "调用 Claude (timeout: ${timeout_sec}s)..."
+
+  CLAUDE_OUTPUT=$(cd /home/xx/data/factory-workspace && \
+    timeout --foreground -k 10 "$timeout_sec" claude -p "$prompt" \
+    --add-dir "$WORKFLOWS_DIR" --model "sonnet" 2>&1) || CLAUDE_EXIT=$?
+
+  if [[ $CLAUDE_EXIT -ne 0 ]]; then
+    log_error "Claude 调用失败 (exit: $CLAUDE_EXIT)"
+    echo "$CLAUDE_OUTPUT" > "$WORK_DIR/claude_error_debug.txt"
+    return 1
+  fi
+
+  log_info "Claude 调用成功"
+  return 0
+}
+
+# 从 Claude 输出中提取 JSON
+extract_json_from_claude() {
+  local output="$1"
+  local extracted=""
+
+  # 先尝试直接解析（Claude 有时只返回纯 JSON）
+  if echo "$output" | jq empty 2>/dev/null; then
+    echo "$output"
+    return 0
+  fi
+
+  # 移除 markdown 代码块后尝试解析
+  local cleaned
+  cleaned=$(echo "$output" | sed 's/```json//g; s/```//g')
+
+  # 使用 jq -s 'last' 提取最后一个有效 JSON 对象
+  extracted=$(echo "$cleaned" | jq -s 'last' 2>/dev/null) || true
+
+  if [[ -n "$extracted" ]] && echo "$extracted" | jq empty 2>/dev/null; then
+    echo "$extracted"
+    return 0
+  fi
+
+  log_error "无法从 Claude 输出中提取有效 JSON"
+  return 1
+}
+
+# ============================================================
+# 结果保存
+# ============================================================
+
+# 保存执行结果到 result.json
+# 参数: 通过环境变量传入
+#   RESULT_SUCCESS (true/false)
+#   RESULT_ARTIFACTS (JSON 数组字符串)
+#   RESULT_EXTRA (可选，额外字段 JSON 对象)
+save_result() {
+  local success="${RESULT_SUCCESS:-true}"
+  local artifacts="${RESULT_ARTIFACTS:-[]}"
+  local extra="${RESULT_EXTRA:-{}}"
+
+  local result_json
+  result_json=$(jq -n \
+    --argjson success "$success" \
+    --argjson artifacts "$artifacts" \
+    --argjson extra "$extra" \
+    --arg created_at "$(date -Iseconds)" \
+    '$extra + {
+      success: $success,
+      artifacts: $artifacts,
+      created_at: $created_at
+    }')
+
+  if ! echo "$result_json" > "$WORK_DIR/result.json"; then
+    log_error "无法写入 result.json"
+    return 1
+  fi
+
+  log_info "结果已保存: $WORK_DIR/result.json"
+  return 0
+}
+
+# ============================================================
+# 截图报告生成
+# ============================================================
+
+# 生成通用执行结果 HTML 报告
+# 参数: $1=title, $2=status_icon, $3=main_content_html
+generate_result_report_html() {
+  local title="$1"
+  local status_icon="$2"
+  local main_content="$3"
+
+  local safe_run_id safe_task_id
+  safe_run_id=$(html_escape "$RUN_ID")
+  safe_task_id=$(html_escape "$TASK_ID")
+
+  cat <<EOF
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans CJK SC', 'WenQuanYi Zen Hei', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 40px;
+      color: white;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 {
+      font-size: 36px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .subtitle {
+      font-size: 18px;
+      opacity: 0.8;
+      margin-bottom: 30px;
+    }
+    .card {
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      opacity: 0.7;
+      margin-bottom: 8px;
+    }
+    .card-value {
+      font-size: 24px;
+      font-weight: bold;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .info-label { opacity: 0.7; }
+    .info-value { font-weight: 500; }
+    .footer {
+      margin-top: 30px;
+      text-align: center;
+      font-size: 14px;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>${status_icon} ${title}</h1>
+    <div class="subtitle">AI 工厂 v2 执行报告</div>
+
+    ${main_content}
+
+    <div class="card">
+      <div class="info-row">
+        <span class="info-label">Run ID</span>
+        <span class="info-value">${safe_run_id}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Task ID</span>
+        <span class="info-value">${safe_task_id}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">执行时间</span>
+        <span class="info-value">$(date '+%Y-%m-%d %H:%M:%S')</span>
+      </div>
+    </div>
+
+    <div class="footer">
+      Generated by AI Factory v2 | $(date '+%Y-%m-%d %H:%M:%S')
+    </div>
+  </div>
+</body>
+</html>
+EOF
+}
+
+# ============================================================
+# 日志输出
+# ============================================================
+
+# 打印执行阶段开始日志
+log_execute_start() {
+  local executor_type="$1"
+  log_info "=========================================="
+  log_info "$executor_type 执行阶段开始"
+  log_info "Run ID: $RUN_ID"
+  log_info "Task: $TASK_NAME"
+  log_info "=========================================="
+}
+
+# 打印执行阶段结束日志
+log_execute_end() {
+  local executor_type="$1"
+  log_info "=========================================="
+  log_info "$executor_type 执行阶段完成"
+  log_info "=========================================="
+}
+
+# ============================================================
+# 导出函数
+# ============================================================
+export -f html_escape check_disk_space json_get
+export -f parse_execute_args
+export -f check_skip_execution output_skip_result
+export -f call_claude extract_json_from_claude
+export -f save_result generate_result_report_html
+export -f log_execute_start log_execute_end
