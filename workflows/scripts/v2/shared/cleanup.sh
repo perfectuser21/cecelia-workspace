@@ -237,7 +237,12 @@ RUNS_DIR="/home/xx/data/runs"
 # 删除 7 天前的目录，但至少保留 50 个
 # 使用可移植方式代替 head -n -50 (GNU 扩展)
 ALL_OLD=$(find "$RUNS_DIR" -maxdepth 1 -type d -name "20*" -mtime +7 2>/dev/null | sort)
-OLD_COUNT=$(echo "$ALL_OLD" | grep -c . 2>/dev/null || echo "0")
+# 安全计数：处理空字符串情况
+if [[ -z "$ALL_OLD" ]]; then
+  OLD_COUNT=0
+else
+  OLD_COUNT=$(echo "$ALL_OLD" | wc -l)
+fi
 OLD_DIRS=""
 if [[ $OLD_COUNT -gt 50 ]]; then
   OLD_DIRS=$(echo "$ALL_OLD" | head -n $((OLD_COUNT - 50)))
