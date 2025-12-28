@@ -38,6 +38,13 @@ if [[ -z "$TASK_ID" ]]; then
   exit 1
 fi
 
+# 限制 TASK_ID 长度（最大 64 字符）
+MAX_TASK_ID_LENGTH=64
+if [[ ${#TASK_ID} -gt $MAX_TASK_ID_LENGTH ]]; then
+  log_warn "TASK_ID 过长 (${#TASK_ID} 字符)，截断为 $MAX_TASK_ID_LENGTH 字符"
+  TASK_ID="${TASK_ID:0:$MAX_TASK_ID_LENGTH}"
+fi
+
 if [[ -z "$CODING_TYPE" ]]; then
   log_error "用法: prepare.sh <task_id> <coding_type> [run_id]"
   exit 1
@@ -72,6 +79,10 @@ log_info "=========================================="
 log_info "[1/4] 创建运行目录..."
 
 WORK_DIR=$(create_run_dir "$RUN_ID")
+if [[ -z "$WORK_DIR" || ! -d "$WORK_DIR" ]]; then
+  log_error "创建运行目录失败: RUN_ID=$RUN_ID"
+  exit 1
+fi
 LOG_FILE="$WORK_DIR/logs/prepare.log"
 
 log_info "运行目录: $WORK_DIR"
@@ -89,7 +100,9 @@ else
     log_error "提示: 使用 'git status' 查看详情，'git stash' 暂存更改"
 
     # 记录失败原因
-    echo '{"error": "git_not_clean", "message": "Git 状态不干净"}' > "$WORK_DIR/error.json"
+    if ! jq -n '{error: "git_not_clean", message: "Git 状态不干净"}' > "$WORK_DIR/error.json"; then
+      log_warn "无法写入 error.json"
+    fi
 
     # 发送通知
     send_feishu_notification "AI 工厂准备失败\nTask: $TASK_ID\nRun: $RUN_ID\n原因: Git 状态不干净，需要人工清理"
@@ -132,21 +145,31 @@ if [[ "${TEST_MODE:-}" == "1" ]]; then
 else
   TASK_INFO=$(fetch_notion_task "$TASK_ID")
 
-  if [[ -z "$TASK_INFO" || "$TASK_INFO" == "null" ]]; then
-    log_error "无法获取 Notion 任务: $TASK_ID"
+  # 检查是否获取失败、为空、为 null 或为空对象 {}
+  if [[ -z "$TASK_INFO" || "$TASK_INFO" == "null" || "$TASK_INFO" == "{}" ]]; then
+    log_error "无法获取 Notion 任务: $TASK_ID (结果: '$TASK_INFO')"
 
-    echo '{"error": "notion_fetch_failed", "message": "无法获取 Notion 任务"}' > "$WORK_DIR/error.json"
+    if ! jq -n '{error: "notion_fetch_failed", message: "无法获取 Notion 任务"}' > "$WORK_DIR/error.json"; then
+      log_warn "无法写入 error.json"
+    fi
 
     exit 1
   fi
 fi
 
 # 保存任务详情
-echo "$TASK_INFO" > "$WORK_DIR/task_info.json"
+if ! echo "$TASK_INFO" > "$WORK_DIR/task_info.json"; then
+  log_error "无法写入 task_info.json"
+  exit 1
+fi
 log_info "任务详情已保存: $WORK_DIR/task_info.json"
 
 # 提取任务名称
 TASK_NAME=$(echo "$TASK_INFO" | jq -r '.task_name')
+if [[ -z "$TASK_NAME" || "$TASK_NAME" == "null" ]]; then
+  log_error "任务名称为空或无效: '$TASK_NAME'"
+  exit 1
+fi
 log_info "任务名称: $TASK_NAME"
 
 # ============================================================
@@ -180,15 +203,21 @@ log_info "准备阶段完成"
 log_info "=========================================="
 
 # 输出 JSON 结果（供调用方解析）
-cat << EOF
-{
-  "success": true,
-  "run_id": "$RUN_ID",
-  "task_id": "$TASK_ID",
-  "task_name": "$TASK_NAME",
-  "coding_type": "$CODING_TYPE",
-  "branch_name": "$BRANCH_NAME",
-  "work_dir": "$WORK_DIR",
-  "task_info_path": "$WORK_DIR/task_info.json"
-}
-EOF
+jq -n \
+  --arg run_id "$RUN_ID" \
+  --arg task_id "$TASK_ID" \
+  --arg task_name "$TASK_NAME" \
+  --arg coding_type "$CODING_TYPE" \
+  --arg branch_name "$BRANCH_NAME" \
+  --arg work_dir "$WORK_DIR" \
+  --arg task_info_path "$WORK_DIR/task_info.json" \
+  '{
+    success: true,
+    run_id: $run_id,
+    task_id: $task_id,
+    task_name: $task_name,
+    coding_type: $coding_type,
+    branch_name: $branch_name,
+    work_dir: $work_dir,
+    task_info_path: $task_info_path
+  }'

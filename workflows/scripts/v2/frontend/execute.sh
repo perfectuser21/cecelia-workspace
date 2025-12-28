@@ -34,6 +34,34 @@ log_info "[1/5] 分析项目结构..."
 # 从任务信息获取目标项目路径
 TARGET_PROJECT=$(json_get "$TASK_INFO_PATH" '.project_path' "$PROJECT_DIR/apps/dashboard/frontend")
 
+# 验证 TARGET_PROJECT 路径安全性
+if [[ "$TARGET_PROJECT" == *".."* ]]; then
+  log_error "路径包含非法字符 '..': $TARGET_PROJECT"
+  exit 1
+fi
+
+# 使用 realpath 规范化路径并验证在允许目录内
+ALLOWED_DIRS=("$PROJECT_DIR" "/home/xx/dev")
+TARGET_PROJECT_REAL=$(realpath -m "$TARGET_PROJECT" 2>/dev/null) || {
+  log_error "无法解析路径: $TARGET_PROJECT"
+  exit 1
+}
+
+IN_ALLOWED_DIR=false
+for allowed_dir in "${ALLOWED_DIRS[@]}"; do
+  if [[ "$TARGET_PROJECT_REAL" == "$allowed_dir"* ]]; then
+    IN_ALLOWED_DIR=true
+    break
+  fi
+done
+
+if [[ "$IN_ALLOWED_DIR" != "true" ]]; then
+  log_error "目标项目路径不在允许目录内: $TARGET_PROJECT_REAL"
+  exit 1
+fi
+
+TARGET_PROJECT="$TARGET_PROJECT_REAL"
+
 if [[ ! -d "$TARGET_PROJECT" ]]; then
   log_error "目标项目不存在: $TARGET_PROJECT"
   exit 1
@@ -166,16 +194,45 @@ $TASK_CONTENT
   # 解析并写入文件
   COMPONENT_COUNT=$(echo "$CODE_OUTPUT" | jq '.components | length')
 
+  # 验证 COMPONENT_COUNT 是有效数字且在合理范围内
+  if ! [[ "$COMPONENT_COUNT" =~ ^[0-9]+$ ]]; then
+    log_error "COMPONENT_COUNT 不是有效数字: $COMPONENT_COUNT"
+    exit 1
+  fi
+
+  if [[ "$COMPONENT_COUNT" -lt 0 ]] || [[ "$COMPONENT_COUNT" -gt 100 ]]; then
+    log_error "COMPONENT_COUNT 超出合理范围 (0-100): $COMPONENT_COUNT"
+    exit 1
+  fi
+
   for ((i=0; i<COMPONENT_COUNT; i++)); do
     COMP_PATH=$(echo "$CODE_OUTPUT" | jq -r ".components[$i].path")
     COMP_NAME=$(echo "$CODE_OUTPUT" | jq -r ".components[$i].name")
     COMP_CONTENT=$(echo "$CODE_OUTPUT" | jq -r ".components[$i].content")
 
-    FULL_PATH="$TARGET_PROJECT/$COMP_PATH"
-    mkdir -p "$(dirname "$FULL_PATH")"
+    # 验证 COMP_PATH 不包含路径遍历字符
+    if [[ "$COMP_PATH" == *".."* ]] || [[ "$COMP_PATH" == /* ]]; then
+      log_error "组件路径包含非法字符: $COMP_PATH"
+      continue
+    fi
 
-    echo "$COMP_CONTENT" > "$FULL_PATH"
-    FILES_CHANGED+=("$FULL_PATH")
+    FULL_PATH="$TARGET_PROJECT/$COMP_PATH"
+
+    # 使用 realpath 验证最终路径在目标项目内
+    FULL_PATH_REAL=$(realpath -m "$FULL_PATH" 2>/dev/null) || {
+      log_error "无法解析组件路径: $FULL_PATH"
+      continue
+    }
+
+    if [[ "$FULL_PATH_REAL" != "$TARGET_PROJECT"* ]]; then
+      log_error "组件路径超出目标项目范围: $FULL_PATH_REAL"
+      continue
+    fi
+
+    mkdir -p "$(dirname "$FULL_PATH_REAL")"
+
+    echo "$COMP_CONTENT" > "$FULL_PATH_REAL"
+    FILES_CHANGED+=("$FULL_PATH_REAL")
     log_info "[创建] $COMP_NAME -> $COMP_PATH"
   done
 fi
@@ -184,7 +241,11 @@ fi
 check_disk_space "$WORK_DIR" 100 || exit 1
 
 # 保存变更文件列表
-printf '%s\n' "${FILES_CHANGED[@]}" > "$WORK_DIR/files_changed.txt"
+if [[ ${#FILES_CHANGED[@]} -gt 0 ]]; then
+  printf '%s\n' "${FILES_CHANGED[@]}" > "$WORK_DIR/files_changed.txt"
+else
+  : > "$WORK_DIR/files_changed.txt"
+fi
 log_info "共创建 ${#FILES_CHANGED[@]} 个组件文件"
 
 # ============================================================
@@ -199,18 +260,25 @@ if [[ "${TEST_MODE:-}" == "1" ]]; then
   log_info "[TEST_MODE] 模拟类型检查通过"
   TSC_RESULT="passed"
 else
-  cd "$TARGET_PROJECT"
-
-  if [[ -f "tsconfig.json" ]]; then
+  if [[ -f "$TARGET_PROJECT/tsconfig.json" ]]; then
     if command -v npx &>/dev/null; then
-      log_info "运行 tsc --noEmit..."
-      TSC_OUTPUT=$(npx tsc --noEmit 2>&1) && TSC_RESULT="passed" || TSC_RESULT="warning"
+      log_info "运行 tsc --noEmit (timeout 120s)..."
+      TSC_OUTPUT=$(
+        cd "$TARGET_PROJECT" && timeout 120 npx tsc --noEmit 2>&1
+      )
+      TSC_EXIT_CODE=$?
+      if [[ $TSC_EXIT_CODE -eq 0 ]]; then
+        TSC_RESULT="passed"
+      elif [[ $TSC_EXIT_CODE -eq 124 ]]; then
+        TSC_RESULT="timeout"
+        log_warn "TypeScript 类型检查超时 (120s)"
+      else
+        TSC_RESULT="warning"
+      fi
     fi
   else
     log_info "未找到 tsconfig.json，跳过类型检查"
   fi
-
-  cd - > /dev/null
 fi
 
 log_info "类型检查结果: $TSC_RESULT"
@@ -227,16 +295,23 @@ if [[ "${TEST_MODE:-}" == "1" ]]; then
   log_info "[TEST_MODE] 模拟构建通过"
   BUILD_RESULT="passed"
 else
-  cd "$TARGET_PROJECT"
-
-  if [[ -f "package.json" ]] && grep -q '"build"' package.json; then
-    log_info "运行 npm run build..."
-    BUILD_OUTPUT=$(npm run build 2>&1) && BUILD_RESULT="passed" || BUILD_RESULT="failed"
+  if [[ -f "$TARGET_PROJECT/package.json" ]] && grep -q '"build"' "$TARGET_PROJECT/package.json"; then
+    log_info "运行 npm run build (timeout 300s)..."
+    BUILD_OUTPUT=$(
+      cd "$TARGET_PROJECT" && timeout 300 npm run build 2>&1
+    )
+    BUILD_EXIT_CODE=$?
+    if [[ $BUILD_EXIT_CODE -eq 0 ]]; then
+      BUILD_RESULT="passed"
+    elif [[ $BUILD_EXIT_CODE -eq 124 ]]; then
+      BUILD_RESULT="timeout"
+      log_warn "构建超时 (300s)"
+    else
+      BUILD_RESULT="failed"
+    fi
   else
     log_info "未配置构建脚本，跳过"
   fi
-
-  cd - > /dev/null
 fi
 
 log_info "构建结果: $BUILD_RESULT"
@@ -245,7 +320,10 @@ log_info "构建结果: $BUILD_RESULT"
 # 保存结果
 # ============================================================
 RESULT_SUCCESS=true
-if [[ "$BUILD_RESULT" == "failed" ]]; then
+if [[ "$TSC_RESULT" == "failed" ]] || [[ "$TSC_RESULT" == "timeout" ]]; then
+  RESULT_SUCCESS=false
+fi
+if [[ "$BUILD_RESULT" == "failed" ]] || [[ "$BUILD_RESULT" == "timeout" ]]; then
   RESULT_SUCCESS=false
 fi
 

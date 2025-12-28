@@ -101,7 +101,13 @@ if [[ -n "$TEMPLATE_ID" ]]; then
     WORKFLOW_JSON=$(cat "$TEMPLATE_FILE")
 
     # 根据任务内容修改模板
-    WORKFLOW_JSON=$(echo "$WORKFLOW_JSON" | jq --arg name "$TASK_NAME" '.name = $name')
+    WORKFLOW_JSON=$(echo "$WORKFLOW_JSON" | jq --arg name "$TASK_NAME" '.name = $name') || {
+      log_error "jq 处理模板失败"
+      WORKFLOW_JSON=""
+    }
+    if [[ -z "$WORKFLOW_JSON" ]]; then
+      log_warn "模板处理后为空，将使用 Claude 生成"
+    fi
   fi
 fi
 
@@ -194,9 +200,16 @@ fi
 # 检查磁盘空间
 check_disk_space "$WORK_DIR" 100 || exit 1
 
-# 保存 Workflow JSON
-if ! echo "$WORKFLOW_JSON" > "$WORK_DIR/workflow.json"; then
-  log_error "无法写入 workflow.json"
+# 保存 Workflow JSON（使用临时文件 + mv 原子写入）
+WORKFLOW_JSON_TMP="$WORK_DIR/workflow.json.tmp.$$"
+if ! echo "$WORKFLOW_JSON" > "$WORKFLOW_JSON_TMP"; then
+  log_error "无法写入临时文件 workflow.json.tmp"
+  rm -f "$WORKFLOW_JSON_TMP"
+  exit 1
+fi
+if ! mv "$WORKFLOW_JSON_TMP" "$WORK_DIR/workflow.json"; then
+  log_error "无法移动临时文件到 workflow.json"
+  rm -f "$WORKFLOW_JSON_TMP"
   exit 1
 fi
 log_info "Workflow JSON 已保存: $WORK_DIR/workflow.json"
@@ -208,8 +221,9 @@ log_info "[3/5] 创建 Workflow..."
 
 if [[ "${TEST_MODE:-}" == "1" ]]; then
   log_info "[TEST_MODE] 模拟 n8n API 创建"
-  WORKFLOW_ID="test-workflow-$(date +%s)"
-  WORKFLOW_NAME=$(echo "$WORKFLOW_JSON" | jq -r '.name')
+  WORKFLOW_ID="test-workflow-$(date +%s)-$RANDOM"
+  WORKFLOW_NAME=$(echo "$WORKFLOW_JSON" | jq -r '.name // empty')
+  [[ -z "$WORKFLOW_NAME" ]] && WORKFLOW_NAME="$TASK_NAME"
   NODE_COUNT=$(echo "$WORKFLOW_JSON" | jq '.nodes | length // 0')
   [[ ! "$NODE_COUNT" =~ ^[0-9]+$ ]] && NODE_COUNT=0
   log_info "Workflow 创建成功: $WORKFLOW_NAME (ID: $WORKFLOW_ID, 节点数: $NODE_COUNT)"
@@ -233,18 +247,19 @@ else
   }')
 
   # 创建 Workflow（带重试）
-  retries=0
-  max_retries=2
-  RESPONSE=""
-  HTTP_CODE=""
+  local retries=0
+  local max_retries=2
+  local RESPONSE=""
+  local HTTP_CODE=""
 
-  while [[ $retries -le $max_retries ]]; do
+  while [[ $retries -lt $max_retries ]]; do
     RESPONSE=$(curl -sf -w "\n%{http_code}" -X POST "$N8N_API_URL/workflows" \
       -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
       -H "Content-Type: application/json" \
       -d "$FILTERED_JSON" 2>&1)
 
-    HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+    # 更健壮地提取 HTTP_CODE，处理空行情况
+    HTTP_CODE=$(echo "$RESPONSE" | grep -E '^[0-9]+$' | tail -n1)
 
     # 验证 HTTP_CODE 是否为有效数字
     if [[ ! "$HTTP_CODE" =~ ^[0-9]+$ ]]; then
@@ -257,7 +272,7 @@ else
     fi
 
     retries=$((retries + 1))
-    if [[ $retries -le $max_retries ]]; then
+    if [[ $retries -lt $max_retries ]]; then
       log_warn "n8n API 调用失败 (HTTP $HTTP_CODE)，重试 $retries/$max_retries"
       sleep 2
     fi
@@ -271,9 +286,17 @@ else
     exit 1
   fi
 
-  WORKFLOW_ID=$(echo "$RESPONSE_BODY" | jq -r '.id')
-  WORKFLOW_NAME=$(echo "$RESPONSE_BODY" | jq -r '.name')
+  WORKFLOW_ID=$(echo "$RESPONSE_BODY" | jq -r '.id // empty')
+  WORKFLOW_NAME=$(echo "$RESPONSE_BODY" | jq -r '.name // empty')
   NODE_COUNT=$(echo "$RESPONSE_BODY" | jq '.nodes | length // 0')
+
+  # 验证必要字段非空
+  if [[ -z "$WORKFLOW_ID" ]]; then
+    log_error "API 返回的 workflow id 为空"
+    echo "$RESPONSE_BODY" > "$WORK_DIR/api_error.json"
+    exit 1
+  fi
+  [[ -z "$WORKFLOW_NAME" ]] && WORKFLOW_NAME="$TASK_NAME"
   [[ ! "$NODE_COUNT" =~ ^[0-9]+$ ]] && NODE_COUNT=0
 
   log_info "Workflow 创建成功: $WORKFLOW_NAME (ID: $WORKFLOW_ID, 节点数: $NODE_COUNT)"
@@ -309,6 +332,12 @@ fi
 # 保存结果
 # ============================================================
 RESULT_SUCCESS=true
+
+# 确保 NODE_COUNT 是有效数字（用于 jq --argjson）
+if [[ ! "$NODE_COUNT" =~ ^[0-9]+$ ]]; then
+  NODE_COUNT=0
+fi
+
 RESULT_ARTIFACTS=$(jq -n \
   --arg type "workflow" \
   --arg id "$WORKFLOW_ID" \
@@ -388,12 +417,24 @@ SAFE_NAME_STRIPPED=$(echo "$SAFE_NAME" | tr -d '_' | tr -d '-')
 if [[ -z "$SAFE_NAME_STRIPPED" || ${#SAFE_NAME_STRIPPED} -lt 3 ]]; then
   SAFE_NAME="workflow"
 fi
+
+# 验证清理后的文件名长度至少为 1
+if [[ ${#SAFE_NAME} -lt 1 ]]; then
+  SAFE_NAME="workflow"
+fi
+
 EXPORT_FILE="$EXPORT_DIR/${SAFE_NAME}-${RUN_ID}.json"
 
-if ! echo "$WORKFLOW_JSON" | jq --arg id "$WORKFLOW_ID" '. + {n8n_id: $id}' > "$EXPORT_FILE"; then
-  log_warn "无法导出 workflow 到: $EXPORT_FILE"
+# 先验证 jq 输出再写文件
+EXPORT_JSON=$(echo "$WORKFLOW_JSON" | jq --arg id "$WORKFLOW_ID" '. + {n8n_id: $id}' 2>/dev/null)
+if [[ -n "$EXPORT_JSON" && "$EXPORT_JSON" != "null" ]]; then
+  if echo "$EXPORT_JSON" > "$EXPORT_FILE"; then
+    log_info "Workflow 已导出: $EXPORT_FILE"
+  else
+    log_warn "无法写入导出文件: $EXPORT_FILE"
+  fi
 else
-  log_info "Workflow 已导出: $EXPORT_FILE"
+  log_warn "jq 处理失败，无法导出 workflow"
 fi
 
 # ============================================================

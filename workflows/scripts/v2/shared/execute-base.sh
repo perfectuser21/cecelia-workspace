@@ -36,8 +36,21 @@ load_secrets
 # ============================================================
 
 # HTML 转义：防止 XSS 和 HTML 注入
+# 处理: & < > " ' \ 换行符
 html_escape() {
-  echo "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g'
+  local input="$1"
+  # 使用 printf + sed 处理特殊字符
+  # 1. 先转义反斜杠（必须第一个处理）
+  # 2. 转义 HTML 特殊字符
+  # 3. 转义换行符为 <br>
+  printf '%s' "$input" | sed \
+    -e 's/\\/\&#92;/g' \
+    -e 's/&/\&amp;/g' \
+    -e 's/</\&lt;/g' \
+    -e 's/>/\&gt;/g' \
+    -e 's/"/\&quot;/g' \
+    -e "s/'/\&#39;/g" \
+    -e ':a;N;$!ba;s/\n/<br>/g'
 }
 
 # 检查磁盘空间（至少需要指定 MB）
@@ -54,11 +67,22 @@ check_disk_space() {
 }
 
 # 安全读取 JSON 字段
+# 验证 field 格式防止 jq 注入
 json_get() {
   local file="$1"
   local field="$2"
   local default="${3:-}"
   local value
+
+  # 验证 field 格式：只允许以 . 开头的安全 jq 表达式
+  # 允许的格式: .key, .key.subkey, .key[0], .key[0].subkey
+  # 禁止: 函数调用、管道、分号、括号表达式等
+  if [[ ! "$field" =~ ^(\.[a-zA-Z_][a-zA-Z0-9_]*(\[[0-9]+\])?)+$ ]]; then
+    log_error "json_get: 非法的字段表达式: $field"
+    echo "$default"
+    return 1
+  fi
+
   value=$(jq -r "$field // empty" "$file" 2>/dev/null)
   echo "${value:-$default}"
 }
@@ -73,6 +97,13 @@ parse_execute_args() {
 
   if [[ -z "$RUN_ID" || -z "$TASK_INFO_PATH" ]]; then
     log_error "用法: execute.sh <run_id> <task_info_path>"
+    exit 1
+  fi
+
+  # 验证 RUN_ID 不包含路径遍历字符
+  # 只允许：字母、数字、下划线、连字符
+  if [[ "$RUN_ID" =~ \.\./ ]] || [[ "$RUN_ID" =~ / ]] || [[ ! "$RUN_ID" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    log_error "非法的 RUN_ID (包含路径遍历字符或非法字符): $RUN_ID"
     exit 1
   fi
 
@@ -162,9 +193,11 @@ output_skip_result() {
 # 调用 Claude 执行任务
 # 参数: $1=prompt, $2=timeout_seconds (默认 600)
 # 返回: Claude 输出存储在 CLAUDE_OUTPUT 变量
+# 安全性: 使用临时文件传递 prompt，防止命令注入
 call_claude() {
   local prompt="$1"
   local timeout_sec="${2:-600}"
+  local prompt_file=""
 
   CLAUDE_EXIT=0
   CLAUDE_OUTPUT=""
@@ -177,9 +210,20 @@ call_claude() {
 
   log_info "调用 Claude (timeout: ${timeout_sec}s)..."
 
+  # 使用临时文件传递 prompt，防止命令注入
+  prompt_file=$(mktemp "${TMPDIR:-/tmp}/claude_prompt.XXXXXX")
+
+  # 确保临时文件在函数退出时清理
+  trap 'rm -f "$prompt_file" 2>/dev/null' RETURN
+
+  # 写入 prompt 到临时文件
+  printf '%s' "$prompt" > "$prompt_file"
+
+  # 使用 cat 从文件读取 prompt，避免命令行参数注入
   CLAUDE_OUTPUT=$(cd /home/xx/data/factory-workspace && \
-    timeout --foreground -k 10 "$timeout_sec" claude -p "$prompt" \
-    --add-dir "$WORKFLOWS_DIR" --model "sonnet" 2>&1) || CLAUDE_EXIT=$?
+    timeout --foreground -k 10 "$timeout_sec" \
+    bash -c 'claude -p "$(cat "$1")" --add-dir "$2" --model "sonnet" 2>&1' \
+    _ "$prompt_file" "$WORKFLOWS_DIR") || CLAUDE_EXIT=$?
 
   if [[ $CLAUDE_EXIT -ne 0 ]]; then
     log_error "Claude 调用失败 (exit: $CLAUDE_EXIT)"
@@ -227,10 +271,19 @@ extract_json_from_claude() {
 #   RESULT_SUCCESS (true/false)
 #   RESULT_ARTIFACTS (JSON 数组字符串)
 #   RESULT_EXTRA (可选，额外字段 JSON 对象)
+# 安全性:
+#   - 验证 RESULT_SUCCESS 是合法布尔值
+#   - 使用临时文件 + 原子 mv 写入
 save_result() {
   local success="${RESULT_SUCCESS:-true}"
   local artifacts="${RESULT_ARTIFACTS:-[]}"
   local extra="${RESULT_EXTRA:-{}}"
+
+  # 验证 success 是合法的布尔值
+  if [[ "$success" != "true" && "$success" != "false" ]]; then
+    log_error "RESULT_SUCCESS 必须是 'true' 或 'false'，当前值: $success"
+    return 1
+  fi
 
   local result_json
   result_json=$(jq -n \
@@ -244,8 +297,19 @@ save_result() {
       created_at: $created_at
     }')
 
-  if ! echo "$result_json" > "$WORK_DIR/result.json"; then
-    log_error "无法写入 result.json"
+  # 使用临时文件 + 原子 mv 写入，防止写入中断导致文件损坏
+  local temp_file
+  temp_file=$(mktemp "$WORK_DIR/result.json.XXXXXX")
+
+  if ! printf '%s\n' "$result_json" > "$temp_file"; then
+    log_error "无法写入临时文件"
+    rm -f "$temp_file"
+    return 1
+  fi
+
+  if ! mv "$temp_file" "$WORK_DIR/result.json"; then
+    log_error "无法原子移动到 result.json"
+    rm -f "$temp_file"
     return 1
   fi
 
@@ -258,11 +322,21 @@ save_result() {
 # ============================================================
 
 # 生成通用执行结果 HTML 报告
-# 参数: $1=title, $2=status_icon, $3=main_content_html
+# 参数:
+#   $1=title - 报告标题（会自动转义）
+#   $2=status_icon - 状态图标（会自动转义）
+#   $3=main_content_html - 主体内容 HTML
+#      注意: 此参数应该是已经过 html_escape 处理的安全 HTML 内容
+#      调用者负责确保此内容安全，函数会原样插入
 generate_result_report_html() {
   local title="$1"
   local status_icon="$2"
   local main_content="$3"
+
+  # 转义 title 和 status_icon 防止 XSS
+  local safe_title safe_status_icon
+  safe_title=$(html_escape "$title")
+  safe_status_icon=$(html_escape "$status_icon")
 
   local safe_run_id safe_task_id
   safe_run_id=$(html_escape "$RUN_ID")
@@ -336,7 +410,7 @@ generate_result_report_html() {
 </head>
 <body>
   <div class="container">
-    <h1>${status_icon} ${title}</h1>
+    <h1>${safe_status_icon} ${safe_title}</h1>
     <div class="subtitle">AI 工厂 v2 执行报告</div>
 
     ${main_content}

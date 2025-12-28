@@ -34,6 +34,33 @@ log_info "[1/5] 分析项目结构..."
 # 从任务信息获取目标项目路径
 TARGET_PROJECT=$(json_get "$TASK_INFO_PATH" '.project_path' "$PROJECT_DIR/apps/dashboard")
 
+# 安全检查：禁止路径遍历
+if [[ "$TARGET_PROJECT" == *".."* ]]; then
+  log_error "安全错误: 路径包含非法字符 (..): $TARGET_PROJECT"
+  exit 1
+fi
+
+# 使用 realpath 获取规范化路径
+TARGET_PROJECT=$(realpath -m "$TARGET_PROJECT" 2>/dev/null) || {
+  log_error "无法解析路径: $TARGET_PROJECT"
+  exit 1
+}
+
+# 验证路径在允许的目录内
+ALLOWED_DIRS=("/home/xx/dev" "/home/xx/data")
+PATH_ALLOWED=false
+for allowed in "${ALLOWED_DIRS[@]}"; do
+  if [[ "$TARGET_PROJECT" == "$allowed"* ]]; then
+    PATH_ALLOWED=true
+    break
+  fi
+done
+
+if [[ "$PATH_ALLOWED" != "true" ]]; then
+  log_error "安全错误: 路径不在允许目录内: $TARGET_PROJECT"
+  exit 1
+fi
+
 if [[ ! -d "$TARGET_PROJECT" ]]; then
   log_error "目标项目不存在: $TARGET_PROJECT"
   exit 1
@@ -146,16 +173,43 @@ $TASK_CONTENT
   # 解析并写入文件
   FILE_COUNT=$(echo "$CODE_OUTPUT" | jq '.files | length')
 
+  # 验证 FILE_COUNT 是有效数字且在合理范围
+  if ! [[ "$FILE_COUNT" =~ ^[0-9]+$ ]]; then
+    log_error "FILE_COUNT 不是有效数字: $FILE_COUNT"
+    exit 1
+  fi
+  if [[ "$FILE_COUNT" -gt 100 ]]; then
+    log_error "FILE_COUNT 超出限制 (最大 100): $FILE_COUNT"
+    exit 1
+  fi
+
   for ((i=0; i<FILE_COUNT; i++)); do
     FILE_PATH=$(echo "$CODE_OUTPUT" | jq -r ".files[$i].path")
     FILE_ACTION=$(echo "$CODE_OUTPUT" | jq -r ".files[$i].action")
     FILE_CONTENT=$(echo "$CODE_OUTPUT" | jq -r ".files[$i].content")
 
-    FULL_PATH="$TARGET_PROJECT/$FILE_PATH"
-    mkdir -p "$(dirname "$FULL_PATH")"
+    # 安全检查：禁止路径遍历
+    if [[ "$FILE_PATH" == *".."* ]]; then
+      log_error "安全错误: 文件路径包含非法字符 (..): $FILE_PATH"
+      exit 1
+    fi
 
-    echo "$FILE_CONTENT" > "$FULL_PATH"
-    FILES_CHANGED+=("$FULL_PATH")
+    FULL_PATH="$TARGET_PROJECT/$FILE_PATH"
+
+    # 使用 realpath 验证最终路径在 TARGET_PROJECT 内
+    RESOLVED_PATH=$(realpath -m "$FULL_PATH" 2>/dev/null) || {
+      log_error "无法解析文件路径: $FULL_PATH"
+      exit 1
+    }
+    if [[ "$RESOLVED_PATH" != "$TARGET_PROJECT"* ]]; then
+      log_error "安全错误: 文件路径逃逸出项目目录: $FILE_PATH -> $RESOLVED_PATH"
+      exit 1
+    fi
+
+    mkdir -p "$(dirname "$RESOLVED_PATH")"
+
+    echo "$FILE_CONTENT" > "$RESOLVED_PATH"
+    FILES_CHANGED+=("$RESOLVED_PATH")
     log_info "[$FILE_ACTION] $FILE_PATH"
   done
 fi
@@ -164,7 +218,11 @@ fi
 check_disk_space "$WORK_DIR" 100 || exit 1
 
 # 保存变更文件列表
-printf '%s\n' "${FILES_CHANGED[@]}" > "$WORK_DIR/files_changed.txt"
+if [[ ${#FILES_CHANGED[@]} -gt 0 ]]; then
+  printf '%s\n' "${FILES_CHANGED[@]}" > "$WORK_DIR/files_changed.txt"
+else
+  : > "$WORK_DIR/files_changed.txt"
+fi
 log_info "共变更 ${#FILES_CHANGED[@]} 个文件"
 
 # ============================================================
@@ -175,30 +233,43 @@ log_info "[3/5] 运行测试..."
 TEST_RESULT="skipped"
 TEST_OUTPUT=""
 
+TEST_TIMEOUT=${TEST_TIMEOUT:-300}  # 默认 5 分钟超时
+
 if [[ "${TEST_MODE:-}" == "1" ]]; then
   log_info "[TEST_MODE] 模拟测试通过"
   TEST_RESULT="passed"
   TEST_OUTPUT="All tests passed (mock)"
 else
-  cd "$TARGET_PROJECT"
-
+  # 使用子 shell 避免改变全局目录
   if [[ "$PROJECT_TYPE" == "typescript" || "$PROJECT_TYPE" == "javascript" ]]; then
-    if [[ -f "package.json" ]] && grep -q '"test"' package.json; then
-      log_info "运行 npm test..."
-      TEST_OUTPUT=$(npm test 2>&1) && TEST_RESULT="passed" || TEST_RESULT="failed"
+    if [[ -f "$TARGET_PROJECT/package.json" ]] && grep -q '"test"' "$TARGET_PROJECT/package.json"; then
+      log_info "运行 npm test (timeout: ${TEST_TIMEOUT}s)..."
+      TEST_OUTPUT=$(cd "$TARGET_PROJECT" && timeout "$TEST_TIMEOUT" npm test 2>&1) && TEST_RESULT="passed" || {
+        if [[ $? -eq 124 ]]; then
+          TEST_RESULT="timeout"
+          log_warn "npm test 超时 (${TEST_TIMEOUT}s)"
+        else
+          TEST_RESULT="failed"
+        fi
+      }
     else
       log_info "未配置测试脚本，跳过"
     fi
   elif [[ "$PROJECT_TYPE" == "python" ]]; then
     if command -v pytest &>/dev/null; then
-      log_info "运行 pytest..."
-      TEST_OUTPUT=$(pytest --tb=short 2>&1) && TEST_RESULT="passed" || TEST_RESULT="failed"
+      log_info "运行 pytest (timeout: ${TEST_TIMEOUT}s)..."
+      TEST_OUTPUT=$(cd "$TARGET_PROJECT" && timeout "$TEST_TIMEOUT" pytest --tb=short 2>&1) && TEST_RESULT="passed" || {
+        if [[ $? -eq 124 ]]; then
+          TEST_RESULT="timeout"
+          log_warn "pytest 超时 (${TEST_TIMEOUT}s)"
+        else
+          TEST_RESULT="failed"
+        fi
+      }
     else
       log_info "pytest 未安装，跳过测试"
     fi
   fi
-
-  cd - > /dev/null
 fi
 
 log_info "测试结果: $TEST_RESULT"
@@ -211,32 +282,59 @@ log_info "[4/5] 运行 Lint 检查..."
 LINT_RESULT="skipped"
 LINT_OUTPUT=""
 
+LINT_TIMEOUT=${LINT_TIMEOUT:-120}  # 默认 2 分钟超时
+
 if [[ "${TEST_MODE:-}" == "1" ]]; then
   log_info "[TEST_MODE] 模拟 lint 通过"
   LINT_RESULT="passed"
   LINT_OUTPUT="No lint errors (mock)"
 else
-  cd "$TARGET_PROJECT"
-
+  # 使用子 shell 避免改变全局目录
   if [[ "$PROJECT_TYPE" == "typescript" || "$PROJECT_TYPE" == "javascript" ]]; then
-    if [[ -f "package.json" ]] && grep -q '"lint"' package.json; then
-      log_info "运行 npm run lint..."
-      LINT_OUTPUT=$(npm run lint 2>&1) && LINT_RESULT="passed" || LINT_RESULT="warning"
+    if [[ -f "$TARGET_PROJECT/package.json" ]] && grep -q '"lint"' "$TARGET_PROJECT/package.json"; then
+      log_info "运行 npm run lint (timeout: ${LINT_TIMEOUT}s)..."
+      LINT_OUTPUT=$(cd "$TARGET_PROJECT" && timeout "$LINT_TIMEOUT" npm run lint 2>&1) && LINT_RESULT="passed" || {
+        if [[ $? -eq 124 ]]; then
+          LINT_RESULT="timeout"
+          log_warn "npm run lint 超时 (${LINT_TIMEOUT}s)"
+        else
+          LINT_RESULT="warning"
+        fi
+      }
     elif command -v eslint &>/dev/null; then
-      log_info "运行 eslint..."
-      LINT_OUTPUT=$(eslint --ext .ts,.js src/ 2>&1) && LINT_RESULT="passed" || LINT_RESULT="warning"
+      log_info "运行 eslint (timeout: ${LINT_TIMEOUT}s)..."
+      LINT_OUTPUT=$(cd "$TARGET_PROJECT" && timeout "$LINT_TIMEOUT" eslint --ext .ts,.js src/ 2>&1) && LINT_RESULT="passed" || {
+        if [[ $? -eq 124 ]]; then
+          LINT_RESULT="timeout"
+          log_warn "eslint 超时 (${LINT_TIMEOUT}s)"
+        else
+          LINT_RESULT="warning"
+        fi
+      }
     fi
   elif [[ "$PROJECT_TYPE" == "python" ]]; then
     if command -v ruff &>/dev/null; then
-      log_info "运行 ruff..."
-      LINT_OUTPUT=$(ruff check . 2>&1) && LINT_RESULT="passed" || LINT_RESULT="warning"
+      log_info "运行 ruff (timeout: ${LINT_TIMEOUT}s)..."
+      LINT_OUTPUT=$(cd "$TARGET_PROJECT" && timeout "$LINT_TIMEOUT" ruff check . 2>&1) && LINT_RESULT="passed" || {
+        if [[ $? -eq 124 ]]; then
+          LINT_RESULT="timeout"
+          log_warn "ruff 超时 (${LINT_TIMEOUT}s)"
+        else
+          LINT_RESULT="warning"
+        fi
+      }
     elif command -v flake8 &>/dev/null; then
-      log_info "运行 flake8..."
-      LINT_OUTPUT=$(flake8 . 2>&1) && LINT_RESULT="passed" || LINT_RESULT="warning"
+      log_info "运行 flake8 (timeout: ${LINT_TIMEOUT}s)..."
+      LINT_OUTPUT=$(cd "$TARGET_PROJECT" && timeout "$LINT_TIMEOUT" flake8 . 2>&1) && LINT_RESULT="passed" || {
+        if [[ $? -eq 124 ]]; then
+          LINT_RESULT="timeout"
+          log_warn "flake8 超时 (${LINT_TIMEOUT}s)"
+        else
+          LINT_RESULT="warning"
+        fi
+      }
     fi
   fi
-
-  cd - > /dev/null
 fi
 
 log_info "Lint 结果: $LINT_RESULT"
@@ -245,7 +343,12 @@ log_info "Lint 结果: $LINT_RESULT"
 # 保存结果
 # ============================================================
 RESULT_SUCCESS=true
-if [[ "$TEST_RESULT" == "failed" ]]; then
+# 检查测试结果（failed 或 timeout 均视为失败）
+if [[ "$TEST_RESULT" == "failed" || "$TEST_RESULT" == "timeout" ]]; then
+  RESULT_SUCCESS=false
+fi
+# 检查 lint 结果（只有 failed 视为失败，warning 不影响成功状态）
+if [[ "$LINT_RESULT" == "failed" || "$LINT_RESULT" == "timeout" ]]; then
   RESULT_SUCCESS=false
 fi
 

@@ -49,7 +49,17 @@ LOG_FILE="$WORK_DIR/logs/quality.log"
 
 # 加载环境变量
 if [[ -f "$WORK_DIR/env.sh" ]]; then
-  source "$WORK_DIR/env.sh" || log_warn "env.sh 加载失败"
+  # 验证文件权限：不允许其他用户可写
+  _env_perms=$(stat -c "%a" "$WORK_DIR/env.sh" 2>/dev/null || echo "000")
+  if [[ "${_env_perms: -1}" =~ [2367] ]]; then
+    log_warn "env.sh 权限不安全 ($_env_perms)，跳过加载"
+  # 验证内容安全：只允许简单的变量赋值，禁止命令替换和危险字符
+  elif grep -qE '\$\(|`|;|\||&|>|<' "$WORK_DIR/env.sh" 2>/dev/null; then
+    log_warn "env.sh 包含不安全内容（命令替换或特殊字符），跳过加载"
+  else
+    source "$WORK_DIR/env.sh" || log_warn "env.sh 加载失败"
+  fi
+  unset _env_perms
 fi
 
 # 验证关键变量
@@ -84,6 +94,11 @@ html_escape() {
   str="${str//>/&gt;}"
   str="${str//\"/&quot;}"
   str="${str//\'/&#39;}"
+  # 处理换行符和回车符
+  str="${str//$'\n'/&#10;}"
+  str="${str//$'\r'/&#13;}"
+  # 处理制表符
+  str="${str//$'\t'/&#9;}"
   echo "$str"
 }
 
@@ -102,6 +117,12 @@ pass_check() {
   local name="$1"
   local message="${2:-通过}"
   local score="${3:-0}"
+
+  # 验证 score 参数是数字
+  if ! [[ "$score" =~ ^[0-9]+$ ]]; then
+    log_warn "pass_check: score 参数不是数字 ($score)，使用默认值 0"
+    score=0
+  fi
 
   # 使用 jq 构建 JSON 确保正确转义
   local json_item
@@ -123,6 +144,12 @@ fail_check() {
   local name="$1"
   local message="${2:-失败}"
   local required="${3:-true}"
+
+  # 验证 required 参数是布尔值
+  if [[ "$required" != "true" && "$required" != "false" ]]; then
+    log_warn "fail_check: required 参数不是布尔值 ($required)，使用默认值 true"
+    required="true"
+  fi
 
   # 使用 jq 构建 JSON 确保正确转义
   local json_item
@@ -178,7 +205,9 @@ check_security() {
   local issues=()
 
   # 检查工作目录下的文件
+  # 使用 trap 确保 shopt -u nullglob 总是执行
   shopt -s nullglob
+  trap 'shopt -u nullglob' RETURN
   for file in "$WORK_DIR"/*.json; do
     if [[ -f "$file" ]]; then
       # 检查硬编码密码
@@ -197,7 +226,6 @@ check_security() {
       fi
     fi
   done
-  shopt -u nullglob
 
   if [[ ${#issues[@]} -gt 0 ]]; then
     fail_check "security" "${issues[*]}"
@@ -213,46 +241,90 @@ check_security() {
 check_git() {
   log_info "[3] Git 状态检查..."
 
-  cd "$PROJECT_DIR" || {
-    fail_check "git" "无法进入项目目录"
-    return 1
-  }
+  # 使用子 shell 避免改变全局目录
+  local git_result
+  git_result=$(
+    cd "$PROJECT_DIR" 2>/dev/null || {
+      echo "FAIL:无法进入项目目录"
+      exit 1
+    }
 
-  # 检查合并冲突标记 (git diff --check 只检查空白问题，不检测冲突标记)
-  local conflict_files=""
-  conflict_files=$(grep -rl "^<<<<<<< " --include="*.sh" --include="*.json" --include="*.ts" --include="*.js" --include="*.py" . 2>/dev/null || true)
-  if [[ -n "$conflict_files" ]]; then
-    fail_check "git" "存在合并冲突标记: $(echo "$conflict_files" | head -3 | tr '\n' ' ')"
-    NEEDS_MANUAL=true
-    return 1
-  fi
-
-  # 尝试模拟合并（不实际合并）
-  # 支持 develop/main/master
-  local base_branch=""
-  local fetch_error=""
-  for branch in develop main master; do
-    if fetch_error=$(git fetch origin "$branch" 2>&1); then
-      base_branch="$branch"
-      break
+    # 检查合并冲突标记 (git diff --check 只检查空白问题，不检测冲突标记)
+    # 排除 node_modules 和 .git 目录
+    local conflict_files=""
+    conflict_files=$(grep -rl "^<<<<<<< " \
+      --include="*.sh" --include="*.json" --include="*.ts" --include="*.js" --include="*.py" \
+      --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude-dir=build \
+      . 2>/dev/null || true)
+    if [[ -n "$conflict_files" ]]; then
+      echo "FAIL:存在合并冲突标记: $(echo "$conflict_files" | head -3 | tr '\n' ' ')"
+      echo "NEEDS_MANUAL"
+      exit 1
     fi
-  done
 
-  if [[ -z "$base_branch" ]]; then
-    log_warn "无法获取远程分支，跳过合并冲突检查"
-    log_warn "fetch 失败原因: ${fetch_error:-未知错误}"
-    pass_check "git" "无合并冲突（跳过远程检查，原因: ${fetch_error:-未知错误}）"
-    return 0
-  fi
+    # 尝试模拟合并（不实际合并）
+    # 支持 develop/main/master
+    local base_branch=""
+    local fetch_error=""
+    for branch in develop main master; do
+      if fetch_error=$(git fetch origin "$branch" 2>&1); then
+        base_branch="$branch"
+        break
+      fi
+    done
 
-  if ! git merge --no-commit --no-ff "origin/$base_branch" 2>/dev/null; then
-    git merge --abort 2>/dev/null || true
-    fail_check "git" "与 $base_branch 存在冲突"
+    if [[ -z "$base_branch" ]]; then
+      echo "PASS:无合并冲突（跳过远程检查，原因: ${fetch_error:-未知错误}）"
+      echo "WARN:无法获取远程分支，跳过合并冲突检查"
+      echo "WARN:fetch 失败原因: ${fetch_error:-未知错误}"
+      exit 0
+    fi
+
+    if ! git merge --no-commit --no-ff "origin/$base_branch" 2>/dev/null; then
+      # 加强 git merge --abort 错误处理
+      local abort_result
+      if ! abort_result=$(git merge --abort 2>&1); then
+        echo "WARN:git merge --abort 失败: $abort_result"
+        # 尝试使用 reset 作为后备
+        git reset --hard HEAD 2>/dev/null || true
+      fi
+      echo "FAIL:与 $base_branch 存在冲突"
+      exit 1
+    fi
+    # 加强 git merge --abort 错误处理
+    local abort_result
+    if ! abort_result=$(git merge --abort 2>&1); then
+      echo "WARN:git merge --abort 失败: $abort_result"
+      git reset --hard HEAD 2>/dev/null || true
+    fi
+
+    echo "PASS:无合并冲突"
+    exit 0
+  )
+
+  # 解析子 shell 结果
+  local line
+  while IFS= read -r line; do
+    case "$line" in
+      PASS:*)
+        pass_check "git" "${line#PASS:}"
+        ;;
+      FAIL:*)
+        fail_check "git" "${line#FAIL:}"
+        ;;
+      WARN:*)
+        log_warn "${line#WARN:}"
+        ;;
+      NEEDS_MANUAL)
+        NEEDS_MANUAL=true
+        ;;
+    esac
+  done <<< "$git_result"
+
+  # 检查子 shell 是否失败
+  if [[ "$git_result" == *"FAIL:"* ]]; then
     return 1
   fi
-  git merge --abort 2>/dev/null || true
-
-  pass_check "git" "无合并冲突"
   return 0
 }
 
@@ -304,10 +376,36 @@ check_n8n_quality_score() {
     return 0  # 非必需检查
   fi
 
+  # 限制文件大小检查 (< 10MB)
+  local file_size
+  file_size=$(stat -c%s "$WORK_DIR/workflow.json" 2>/dev/null || echo 0)
+  local max_size=$((10 * 1024 * 1024))  # 10MB
+  if [[ "$file_size" -gt "$max_size" ]]; then
+    fail_check "n8n_quality" "workflow.json 文件过大 ($(numfmt --to=iec "$file_size") > 10MB)" "false"
+    return 0  # 非必需检查
+  fi
+
   local workflow=$(cat "$WORK_DIR/workflow.json")
   local nodes=$(echo "$workflow" | jq '.nodes // []')
   local connections=$(echo "$workflow" | jq '.connections // {}')
   local node_count=$(echo "$nodes" | jq 'length')
+
+  # 验证 node_count 是数字
+  if ! [[ "$node_count" =~ ^[0-9]+$ ]]; then
+    log_warn "node_count 不是数字: $node_count，使用默认值 0"
+    node_count=0
+  fi
+
+  # 辅助函数：验证 jq 返回值是数字，否则返回默认值
+  _validate_numeric() {
+    local value="$1"
+    local default="${2:-0}"
+    if [[ "$value" =~ ^[0-9]+$ ]]; then
+      echo "$value"
+    else
+      echo "$default"
+    fi
+  }
 
   # 评分维度
   local completeness=0
@@ -317,30 +415,36 @@ check_n8n_quality_score() {
   local best_practices=0
 
   # 1. 完整性 (使用 $((var + N)) 避免 set -e 下 ((var+=N)) 返回 0 导致退出)
-  local has_trigger=$(echo "$nodes" | jq '[.[] | select(.type | contains("Trigger"))] | length')
+  local has_trigger
+  has_trigger=$(_validate_numeric "$(echo "$nodes" | jq '[.[] | select(.type | contains("Trigger"))] | length' 2>/dev/null)")
   [[ ${has_trigger:-0} -gt 0 ]] && completeness=$((completeness + 8))
   [[ ${node_count:-0} -ge 2 ]] && completeness=$((completeness + 6))
   [[ ${node_count:-0} -ge 3 ]] && completeness=$((completeness + 6))
 
   # 2. 错误处理
-  local has_error=$(echo "$nodes" | jq '[.[] | select(.type | contains("errorTrigger"))] | length')
+  local has_error
+  has_error=$(_validate_numeric "$(echo "$nodes" | jq '[.[] | select(.type | contains("errorTrigger"))] | length' 2>/dev/null)")
   [[ ${has_error:-0} -gt 0 ]] && error_handling=$((error_handling + 10))
   # 检查是否有节点设置了 continueOnFail
-  local has_continue_on_fail=$(echo "$nodes" | jq '[.[] | select(.continueOnFail == true)] | length')
+  local has_continue_on_fail
+  has_continue_on_fail=$(_validate_numeric "$(echo "$nodes" | jq '[.[] | select(.continueOnFail == true)] | length' 2>/dev/null)")
   [[ ${has_continue_on_fail:-0} -gt 0 ]] && error_handling=$((error_handling + 10))
 
   # 3. 命名
-  local default_names=$(echo "$nodes" | jq '[.[] | select(.name != null) | select(.name | test("^(Code|HTTP|SSH|IF)( \\d+)?$"))] | length')
+  local default_names
+  default_names=$(_validate_numeric "$(echo "$nodes" | jq '[.[] | select(.name != null) | select(.name | test("^(Code|HTTP|SSH|IF)( \\d+)?$"))] | length' 2>/dev/null)")
   [[ ${default_names:-0} -eq 0 ]] && naming=$((naming + 15)) || naming=$((naming + 5))
   naming=$((naming + 5))
 
   # 4. 参数配置
-  local has_params=$(echo "$nodes" | jq '[.[] | select(.parameters != null)] | length')
+  local has_params
+  has_params=$(_validate_numeric "$(echo "$nodes" | jq '[.[] | select(.parameters != null)] | length' 2>/dev/null)")
   [[ ${has_params:-0} -gt 0 ]] && parameters=$((parameters + 10))
   parameters=$((parameters + 10))
 
   # 5. 最佳实践
-  local uses_credentials=$(echo "$nodes" | jq '[.[] | select(.credentials != null)] | length')
+  local uses_credentials
+  uses_credentials=$(_validate_numeric "$(echo "$nodes" | jq '[.[] | select(.credentials != null)] | length' 2>/dev/null)")
   [[ ${uses_credentials:-0} -gt 0 ]] && best_practices=$((best_practices + 8))
   [[ ${node_count:-0} -le 15 ]] && best_practices=$((best_practices + 6))
   best_practices=$((best_practices + 6))
@@ -528,6 +632,18 @@ generate_report
 # 生成质检报告截图
 # ============================================================
 log_info "生成质检报告截图..."
+
+# 验证 TOTAL_SCORE 范围 0-100
+if ! [[ "$TOTAL_SCORE" =~ ^[0-9]+$ ]]; then
+  log_warn "TOTAL_SCORE 不是数字 ($TOTAL_SCORE)，设为 0"
+  TOTAL_SCORE=0
+elif [[ "$TOTAL_SCORE" -lt 0 ]]; then
+  log_warn "TOTAL_SCORE 小于 0 ($TOTAL_SCORE)，设为 0"
+  TOTAL_SCORE=0
+elif [[ "$TOTAL_SCORE" -gt 100 ]]; then
+  log_warn "TOTAL_SCORE 大于 100 ($TOTAL_SCORE)，设为 100"
+  TOTAL_SCORE=100
+fi
 
 # 根据结果设置颜色和图标
 if [[ $FAILED_CHECKS -eq 0 ]]; then
