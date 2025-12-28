@@ -527,8 +527,8 @@ mkdir -p "$EXPORT_DIR"
 
 # 使用任务名生成文件名（移除特殊字符，中文名用 run_id 作为后备）
 SAFE_NAME=$(echo "$WORKFLOW_NAME" | tr -cd '[:alnum:]_-' | tr '[:upper:]' '[:lower:]')
-# 如果只剩下连字符或太短，用 run_id 作为后备
-SAFE_NAME_STRIPPED=$(echo "$SAFE_NAME" | tr -d '-_')
+# 如果只剩下连字符/下划线或太短，用 run_id 作为后备
+SAFE_NAME_STRIPPED=$(echo "$SAFE_NAME" | tr -d '_' | tr -d '-')
 if [[ -z "$SAFE_NAME_STRIPPED" || ${#SAFE_NAME_STRIPPED} -lt 3 ]]; then
   SAFE_NAME="workflow-${RUN_ID}"
 fi
