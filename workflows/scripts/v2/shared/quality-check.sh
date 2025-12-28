@@ -49,9 +49,10 @@ LOG_FILE="$WORK_DIR/logs/quality.log"
 
 # 加载环境变量
 if [[ -f "$WORK_DIR/env.sh" ]]; then
-  # 验证文件权限：不允许其他用户可写
+  # 验证文件权限：不允许组和其他用户可写
   _env_perms=$(stat -c "%a" "$WORK_DIR/env.sh" 2>/dev/null || echo "000")
-  if [[ "${_env_perms: -1}" =~ [2367] ]]; then
+  # 检查最后一位（其他用户权限）和倒数第二位（组权限）是否包含写权限
+  if [[ "${_env_perms: -1}" =~ [2367] ]] || [[ "${_env_perms: -2:1}" =~ [2367] ]]; then
     log_warn "env.sh 权限不安全 ($_env_perms)，跳过加载"
   # 验证内容安全：只允许简单的变量赋值，禁止命令替换和危险字符
   elif grep -qE '\$\(|`|;|\||&|>|<' "$WORK_DIR/env.sh" 2>/dev/null; then
@@ -89,6 +90,8 @@ fi
 # ============================================================
 html_escape() {
   local str="$1"
+  # 过滤 null byte（防止安全问题）
+  str="${str//$'\x00'/}"
   str="${str//&/&amp;}"
   str="${str//</&lt;}"
   str="${str//>/&gt;}"
@@ -118,10 +121,13 @@ pass_check() {
   local message="${2:-通过}"
   local score="${3:-0}"
 
-  # 验证 score 参数是数字
+  # 验证 score 参数是数字且在 0-100 范围内
   if ! [[ "$score" =~ ^[0-9]+$ ]]; then
     log_warn "pass_check: score 参数不是数字 ($score)，使用默认值 0"
     score=0
+  elif [[ "$score" -gt 100 ]]; then
+    log_warn "pass_check: score 参数超出范围 ($score > 100)，使用最大值 100"
+    score=100
   fi
 
   # 使用 jq 构建 JSON 确保正确转义
@@ -205,10 +211,8 @@ check_security() {
   local issues=()
 
   # 检查工作目录下的文件
-  # 使用 trap 确保 shopt -u nullglob 总是执行
-  shopt -s nullglob
-  trap 'shopt -u nullglob' RETURN
-  for file in "$WORK_DIR"/*.json; do
+  # 使用 subshell 隔离 shopt 设置，避免污染外部环境
+  while IFS= read -r -d '' file; do
     if [[ -f "$file" ]]; then
       # 检查硬编码密码
       if grep -qiE '"password"\s*:\s*"[^"]{8,}"' "$file" 2>/dev/null; then
@@ -225,7 +229,7 @@ check_security() {
         issues+=("发现私钥内容: $(basename "$file")")
       fi
     fi
-  done
+  done < <(find "$WORK_DIR" -maxdepth 1 -name "*.json" -print0 2>/dev/null)
 
   if [[ ${#issues[@]} -gt 0 ]]; then
     fail_check "security" "${issues[*]}"

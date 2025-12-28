@@ -210,8 +210,9 @@ call_claude() {
 
   log_info "调用 Claude (timeout: ${timeout_sec}s)..."
 
-  # 使用临时文件传递 prompt，防止命令注入
-  prompt_file=$(mktemp "${TMPDIR:-/tmp}/claude_prompt.XXXXXX")
+  # 使用 WORK_DIR 存储临时文件，防止 TMPDIR 被注入
+  # WORK_DIR 由 parse_execute_args 设置，是可信的安全路径
+  prompt_file=$(mktemp "$WORK_DIR/claude_prompt.XXXXXX")
 
   # 确保临时文件在函数退出时清理
   trap 'rm -f "$prompt_file" 2>/dev/null' RETURN
@@ -227,7 +228,18 @@ call_claude() {
 
   if [[ $CLAUDE_EXIT -ne 0 ]]; then
     log_error "Claude 调用失败 (exit: $CLAUDE_EXIT)"
-    echo "$CLAUDE_OUTPUT" > "$WORK_DIR/claude_error_debug.txt"
+    # 清理敏感信息后保存错误日志
+    # 移除可能的 API 密钥、token、密码等敏感信息
+    local sanitized_output
+    sanitized_output=$(printf '%s' "$CLAUDE_OUTPUT" | sed \
+      -e 's/\(api[_-]*key["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[a-zA-Z0-9_-]\{20,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(token["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[a-zA-Z0-9_-]\{20,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(password["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[^"\x27[:space:]]\{1,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(secret["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[a-zA-Z0-9_-]\{20,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/Bearer [a-zA-Z0-9._-]\{20,\}/Bearer [REDACTED]/gi')
+    printf '%s\n' "$sanitized_output" > "$WORK_DIR/claude_error_debug.txt"
+    # 设置文件权限为仅所有者可读写
+    chmod 600 "$WORK_DIR/claude_error_debug.txt"
     return 1
   fi
 
@@ -285,6 +297,18 @@ save_result() {
     return 1
   fi
 
+  # 验证 extra 是有效的 JSON 对象
+  if ! echo "$extra" | jq -e 'type == "object"' >/dev/null 2>&1; then
+    log_error "RESULT_EXTRA 必须是有效的 JSON 对象，当前值: $extra"
+    return 1
+  fi
+
+  # 验证 artifacts 是有效的 JSON 数组
+  if ! echo "$artifacts" | jq -e 'type == "array"' >/dev/null 2>&1; then
+    log_error "RESULT_ARTIFACTS 必须是有效的 JSON 数组，当前值: $artifacts"
+    return 1
+  fi
+
   local result_json
   result_json=$(jq -n \
     --argjson success "$success" \
@@ -312,6 +336,9 @@ save_result() {
     rm -f "$temp_file"
     return 1
   fi
+
+  # 设置文件权限为仅所有者可读写
+  chmod 600 "$WORK_DIR/result.json"
 
   log_info "结果已保存: $WORK_DIR/result.json"
   return 0

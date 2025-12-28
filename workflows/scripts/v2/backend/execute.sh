@@ -99,7 +99,10 @@ if [[ "${TEST_MODE:-}" == "1" ]]; then
   else
     MOCK_FILE="$TARGET_PROJECT/src/mock-feature-${RUN_ID}.ts"
   fi
-  mkdir -p "$(dirname "$MOCK_FILE")"
+  mkdir -p "$(dirname "$MOCK_FILE")" || {
+    log_error "无法创建目录: $(dirname "$MOCK_FILE")"
+    exit 1
+  }
 
   cat > "$MOCK_FILE" <<'EOF'
 /**
@@ -225,7 +228,10 @@ $TASK_CONTENT
         ;;
     esac
 
-    mkdir -p "$(dirname "$RESOLVED_PATH")"
+    mkdir -p "$(dirname "$RESOLVED_PATH")" || {
+      log_error "无法创建目录: $(dirname "$RESOLVED_PATH")"
+      exit 1
+    }
 
     # 使用 printf 避免 echo 的 -e/-n 问题和换行符处理
     printf '%s\n' "$FILE_CONTENT" > "$RESOLVED_PATH" || {
@@ -267,28 +273,42 @@ else
   if [[ "$PROJECT_TYPE" == "typescript" || "$PROJECT_TYPE" == "javascript" ]]; then
     if [[ -f "$TARGET_PROJECT/package.json" ]] && grep -q '"test"' "$TARGET_PROJECT/package.json"; then
       log_info "运行 npm test (timeout: ${TEST_TIMEOUT}s)..."
-      TEST_OUTPUT=$(cd "$TARGET_PROJECT" && timeout "$TEST_TIMEOUT" npm test 2>&1) && TEST_RESULT="passed" || {
-        if [[ $? -eq 124 ]]; then
-          TEST_RESULT="timeout"
-          log_warn "npm test 超时 (${TEST_TIMEOUT}s)"
-        else
-          TEST_RESULT="failed"
-        fi
-      }
+      if ! cd "$TARGET_PROJECT" 2>/dev/null; then
+        log_error "无法切换到项目目录: $TARGET_PROJECT"
+        TEST_RESULT="failed"
+        TEST_OUTPUT="Failed to cd to project directory"
+      else
+        TEST_OUTPUT=$(timeout "$TEST_TIMEOUT" npm test 2>&1) && TEST_RESULT="passed" || {
+          if [[ $? -eq 124 ]]; then
+            TEST_RESULT="timeout"
+            log_warn "npm test 超时 (${TEST_TIMEOUT}s)"
+          else
+            TEST_RESULT="failed"
+          fi
+        }
+        cd - >/dev/null 2>&1 || true
+      fi
     else
       log_info "未配置测试脚本，跳过"
     fi
   elif [[ "$PROJECT_TYPE" == "python" ]]; then
     if command -v pytest &>/dev/null; then
       log_info "运行 pytest (timeout: ${TEST_TIMEOUT}s)..."
-      TEST_OUTPUT=$(cd "$TARGET_PROJECT" && timeout "$TEST_TIMEOUT" pytest --tb=short 2>&1) && TEST_RESULT="passed" || {
-        if [[ $? -eq 124 ]]; then
-          TEST_RESULT="timeout"
-          log_warn "pytest 超时 (${TEST_TIMEOUT}s)"
-        else
-          TEST_RESULT="failed"
-        fi
-      }
+      if ! cd "$TARGET_PROJECT" 2>/dev/null; then
+        log_error "无法切换到项目目录: $TARGET_PROJECT"
+        TEST_RESULT="failed"
+        TEST_OUTPUT="Failed to cd to project directory"
+      else
+        TEST_OUTPUT=$(timeout "$TEST_TIMEOUT" pytest --tb=short 2>&1) && TEST_RESULT="passed" || {
+          if [[ $? -eq 124 ]]; then
+            TEST_RESULT="timeout"
+            log_warn "pytest 超时 (${TEST_TIMEOUT}s)"
+          else
+            TEST_RESULT="failed"
+          fi
+        }
+        cd - >/dev/null 2>&1 || true
+      fi
     else
       log_info "pytest 未安装，跳过测试"
     fi
@@ -316,46 +336,74 @@ else
   if [[ "$PROJECT_TYPE" == "typescript" || "$PROJECT_TYPE" == "javascript" ]]; then
     if [[ -f "$TARGET_PROJECT/package.json" ]] && grep -q '"lint"' "$TARGET_PROJECT/package.json"; then
       log_info "运行 npm run lint (timeout: ${LINT_TIMEOUT}s)..."
-      LINT_OUTPUT=$(cd "$TARGET_PROJECT" && timeout "$LINT_TIMEOUT" npm run lint 2>&1) && LINT_RESULT="passed" || {
-        if [[ $? -eq 124 ]]; then
-          LINT_RESULT="timeout"
-          log_warn "npm run lint 超时 (${LINT_TIMEOUT}s)"
-        else
-          LINT_RESULT="warning"
-        fi
-      }
+      if ! cd "$TARGET_PROJECT" 2>/dev/null; then
+        log_error "无法切换到项目目录: $TARGET_PROJECT"
+        LINT_RESULT="failed"
+        LINT_OUTPUT="Failed to cd to project directory"
+      else
+        LINT_OUTPUT=$(timeout "$LINT_TIMEOUT" npm run lint 2>&1) && LINT_RESULT="passed" || {
+          if [[ $? -eq 124 ]]; then
+            LINT_RESULT="timeout"
+            log_warn "npm run lint 超时 (${LINT_TIMEOUT}s)"
+          else
+            LINT_RESULT="warning"
+          fi
+        }
+        cd - >/dev/null 2>&1 || true
+      fi
     elif command -v eslint &>/dev/null; then
       log_info "运行 eslint (timeout: ${LINT_TIMEOUT}s)..."
-      LINT_OUTPUT=$(cd "$TARGET_PROJECT" && timeout "$LINT_TIMEOUT" eslint --ext .ts,.js src/ 2>&1) && LINT_RESULT="passed" || {
-        if [[ $? -eq 124 ]]; then
-          LINT_RESULT="timeout"
-          log_warn "eslint 超时 (${LINT_TIMEOUT}s)"
-        else
-          LINT_RESULT="warning"
-        fi
-      }
+      if ! cd "$TARGET_PROJECT" 2>/dev/null; then
+        log_error "无法切换到项目目录: $TARGET_PROJECT"
+        LINT_RESULT="failed"
+        LINT_OUTPUT="Failed to cd to project directory"
+      else
+        LINT_OUTPUT=$(timeout "$LINT_TIMEOUT" eslint --ext .ts,.js src/ 2>&1) && LINT_RESULT="passed" || {
+          if [[ $? -eq 124 ]]; then
+            LINT_RESULT="timeout"
+            log_warn "eslint 超时 (${LINT_TIMEOUT}s)"
+          else
+            LINT_RESULT="warning"
+          fi
+        }
+        cd - >/dev/null 2>&1 || true
+      fi
     fi
   elif [[ "$PROJECT_TYPE" == "python" ]]; then
     if command -v ruff &>/dev/null; then
       log_info "运行 ruff (timeout: ${LINT_TIMEOUT}s)..."
-      LINT_OUTPUT=$(cd "$TARGET_PROJECT" && timeout "$LINT_TIMEOUT" ruff check . 2>&1) && LINT_RESULT="passed" || {
-        if [[ $? -eq 124 ]]; then
-          LINT_RESULT="timeout"
-          log_warn "ruff 超时 (${LINT_TIMEOUT}s)"
-        else
-          LINT_RESULT="warning"
-        fi
-      }
+      if ! cd "$TARGET_PROJECT" 2>/dev/null; then
+        log_error "无法切换到项目目录: $TARGET_PROJECT"
+        LINT_RESULT="failed"
+        LINT_OUTPUT="Failed to cd to project directory"
+      else
+        LINT_OUTPUT=$(timeout "$LINT_TIMEOUT" ruff check . 2>&1) && LINT_RESULT="passed" || {
+          if [[ $? -eq 124 ]]; then
+            LINT_RESULT="timeout"
+            log_warn "ruff 超时 (${LINT_TIMEOUT}s)"
+          else
+            LINT_RESULT="warning"
+          fi
+        }
+        cd - >/dev/null 2>&1 || true
+      fi
     elif command -v flake8 &>/dev/null; then
       log_info "运行 flake8 (timeout: ${LINT_TIMEOUT}s)..."
-      LINT_OUTPUT=$(cd "$TARGET_PROJECT" && timeout "$LINT_TIMEOUT" flake8 . 2>&1) && LINT_RESULT="passed" || {
-        if [[ $? -eq 124 ]]; then
-          LINT_RESULT="timeout"
-          log_warn "flake8 超时 (${LINT_TIMEOUT}s)"
-        else
-          LINT_RESULT="warning"
-        fi
-      }
+      if ! cd "$TARGET_PROJECT" 2>/dev/null; then
+        log_error "无法切换到项目目录: $TARGET_PROJECT"
+        LINT_RESULT="failed"
+        LINT_OUTPUT="Failed to cd to project directory"
+      else
+        LINT_OUTPUT=$(timeout "$LINT_TIMEOUT" flake8 . 2>&1) && LINT_RESULT="passed" || {
+          if [[ $? -eq 124 ]]; then
+            LINT_RESULT="timeout"
+            log_warn "flake8 超时 (${LINT_TIMEOUT}s)"
+          else
+            LINT_RESULT="warning"
+          fi
+        }
+        cd - >/dev/null 2>&1 || true
+      fi
     fi
   fi
 fi

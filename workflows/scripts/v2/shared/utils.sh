@@ -7,17 +7,47 @@
 # ============================================================
 # 配置
 # ============================================================
-LOCK_FILE="/tmp/workflow-factory.lock"
+
+# P2 修复: 使用环境变量替代硬编码路径
+DATA_DIR="${DATA_DIR:-/home/xx/data}"
+RUNS_DIR="${RUNS_DIR:-$DATA_DIR/runs}"
+LOGS_DIR="${LOGS_DIR:-$DATA_DIR/logs}"
+
+PROJECT_DIR="${PROJECT_DIR:-/home/xx/dev/zenithjoy-autopilot}"
+WORKFLOWS_DIR="${WORKFLOWS_DIR:-$PROJECT_DIR/workflows}"
+
+# P1 修复: 锁文件移到 $DATA_DIR/.locks/ 目录，验证目录权限
+LOCKS_DIR="$DATA_DIR/.locks"
+
+# 初始化锁目录（仅当前用户可访问）
+_init_locks_dir() {
+  if [[ ! -d "$LOCKS_DIR" ]]; then
+    mkdir -p "$LOCKS_DIR" 2>/dev/null || {
+      log_error "无法创建锁目录: $LOCKS_DIR"
+      return 1
+    }
+    chmod 700 "$LOCKS_DIR"
+  fi
+  # 验证目录权限（必须是 700 或 750）
+  local perms
+  perms=$(stat -c %a "$LOCKS_DIR" 2>/dev/null || stat -f %Lp "$LOCKS_DIR" 2>/dev/null)
+  if [[ "$perms" != "700" && "$perms" != "750" ]]; then
+    log_warn "锁目录权限不安全 ($perms)，正在修复为 700"
+    chmod 700 "$LOCKS_DIR" || {
+      log_error "无法修复锁目录权限"
+      return 1
+    }
+  fi
+  return 0
+}
+
+# 调用初始化（静默失败，让后续锁操作报错）
+_init_locks_dir 2>/dev/null || true
+
+LOCK_FILE="$LOCKS_DIR/workflow-factory.lock"
 LOCK_TIMEOUT=1800  # 30 分钟死锁阈值
 LOCK_RETRY_INTERVAL=60  # 重试间隔 60 秒
 LOCK_MAX_RETRIES=3  # 最大重试次数
-
-DATA_DIR="/home/xx/data"
-RUNS_DIR="$DATA_DIR/runs"
-LOGS_DIR="$DATA_DIR/logs"
-
-PROJECT_DIR="/home/xx/dev/zenithjoy-autopilot"
-WORKFLOWS_DIR="$PROJECT_DIR/workflows"
 
 # ============================================================
 # 日志函数
@@ -139,15 +169,58 @@ release_lock() {
 # 目录管理
 # ============================================================
 
+# P2: 检查磁盘空间
+# 参数: $1=路径, $2=最小空间(MB，默认100)
+# 返回: 0=足够, 1=不足
+check_disk_space() {
+  local path="$1"
+  local min_mb="${2:-100}"
+  local available
+
+  available=$(df -m "$path" 2>/dev/null | awk 'NR==2 {print $4}')
+  if [[ -z "$available" ]]; then
+    log_warn "无法获取 $path 的磁盘空间信息"
+    return 0  # 无法获取时不阻塞
+  fi
+
+  if [[ "$available" -lt "$min_mb" ]]; then
+    log_error "磁盘空间不足: ${available}MB < ${min_mb}MB (路径: $path)"
+    return 1
+  fi
+
+  log_debug "磁盘空间充足: ${available}MB (路径: $path)"
+  return 0
+}
+
 # 创建运行目录
 # 参数: $1=run_id
-# 返回: 运行目录路径
+# 返回: 运行目录路径（失败时返回空字符串并返回非零状态）
 create_run_dir() {
   local run_id="$1"
   local run_dir="$RUNS_DIR/$run_id"
 
-  mkdir -p "$run_dir/logs"
-  mkdir -p "$run_dir/screenshots"
+  # P2 修复: 添加返回值检查和权限验证
+  if ! mkdir -p "$run_dir/logs" 2>/dev/null; then
+    log_error "无法创建目录: $run_dir/logs"
+    return 1
+  fi
+
+  if ! mkdir -p "$run_dir/screenshots" 2>/dev/null; then
+    log_error "无法创建目录: $run_dir/screenshots"
+    return 1
+  fi
+
+  # 验证目录可写
+  if [[ ! -w "$run_dir" ]]; then
+    log_error "目录不可写: $run_dir"
+    return 1
+  fi
+
+  # 设置安全权限（仅当前用户可访问）
+  chmod 700 "$run_dir" 2>/dev/null || {
+    log_warn "无法设置目录权限: $run_dir"
+  }
+
   echo "$run_dir"
 }
 
@@ -209,6 +282,11 @@ fetch_notion_task() {
     return 1
   fi
 
+  # P2 修复: 保存 curl stderr 到临时文件用于诊断
+  local curl_err_file
+  curl_err_file=$(mktemp -t notion-curl-err.XXXXXX 2>/dev/null || echo "/tmp/notion-curl-err.$$")
+  trap "rm -f '$curl_err_file'" RETURN
+
   # 获取页面属性（带重试）
   local response=""
   local retries=0
@@ -217,13 +295,20 @@ fetch_notion_task() {
     response=$(curl -sf --connect-timeout 10 --max-time 30 "https://api.notion.com/v1/pages/$task_id" \
       -H "Authorization: Bearer $NOTION_API_KEY" \
       -H "Notion-Version: 2022-06-28" \
-      -H "Content-Type: application/json" 2>/dev/null) && break
+      -H "Content-Type: application/json" 2>"$curl_err_file") && break
     retries=$((retries + 1))
-    [[ $retries -lt $max_retries ]] && { log_warn "获取 Notion 页面失败，重试 $retries/$max_retries..."; sleep 2; }
+    if [[ $retries -lt $max_retries ]]; then
+      local curl_err
+      curl_err=$(cat "$curl_err_file" 2>/dev/null | head -c 200)
+      log_warn "获取 Notion 页面失败，重试 $retries/$max_retries... (错误: ${curl_err:-unknown})"
+      sleep 2
+    fi
   done
 
   if [[ -z "$response" ]]; then
-    log_error "无法获取 Notion 任务: $task_id"
+    local curl_err
+    curl_err=$(cat "$curl_err_file" 2>/dev/null | head -c 500)
+    log_error "无法获取 Notion 任务: $task_id (错误: ${curl_err:-unknown})"
     return 1
   fi
 
@@ -233,9 +318,14 @@ fetch_notion_task() {
   while [[ $retries -lt $max_retries ]]; do
     blocks=$(curl -sf --connect-timeout 10 --max-time 30 "https://api.notion.com/v1/blocks/$task_id/children" \
       -H "Authorization: Bearer $NOTION_API_KEY" \
-      -H "Notion-Version: 2022-06-28" 2>/dev/null) && break
+      -H "Notion-Version: 2022-06-28" 2>"$curl_err_file") && break
     retries=$((retries + 1))
-    [[ $retries -lt $max_retries ]] && { log_warn "获取 Notion blocks 失败，重试 $retries/$max_retries..."; sleep 2; }
+    if [[ $retries -lt $max_retries ]]; then
+      local curl_err
+      curl_err=$(cat "$curl_err_file" 2>/dev/null | head -c 200)
+      log_warn "获取 Notion blocks 失败，重试 $retries/$max_retries... (错误: ${curl_err:-unknown})"
+      sleep 2
+    fi
   done
 
   # 提取内容（简化处理，只取 paragraph 类型的文本）
@@ -515,7 +605,7 @@ create_feature_branch() {
 # main.sh 中有完整的进程管理和清理逻辑，避免重复定义
 export -f _log log_info log_warn log_error log_debug
 export -f is_lock_stale acquire_lock release_lock
-export -f create_run_dir generate_run_id
+export -f check_disk_space create_run_dir generate_run_id
 export -f load_secrets fetch_notion_task update_notion_status
 export -f send_feishu_notification send_feishu_card
 export -f save_env load_env

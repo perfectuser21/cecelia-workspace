@@ -236,7 +236,7 @@ else
     exit 1
   fi
 
-  N8N_API_URL="https://zenithjoy21xx.app.n8n.cloud/api/v1"
+  N8N_API_URL="${N8N_API_URL:-https://zenithjoy21xx.app.n8n.cloud/api/v1}"
 
   # 过滤 JSON，只保留 API 接受的字段
   FILTERED_JSON=$(echo "$WORKFLOW_JSON" | jq '{
@@ -246,11 +246,18 @@ else
     settings: (.settings // {executionOrder: "v1"})
   }')
 
+  # 验证过滤后的 JSON 有效性
+  if ! echo "$FILTERED_JSON" | jq empty 2>/dev/null; then
+    log_error "FILTERED_JSON 不是有效的 JSON"
+    echo "$FILTERED_JSON" > "$WORK_DIR/filtered_json_error.txt"
+    exit 1
+  fi
+
   # 创建 Workflow（带重试）
-  local retries=0
-  local max_retries=2
-  local RESPONSE=""
-  local HTTP_CODE=""
+  retries=0
+  max_retries=2
+  RESPONSE=""
+  HTTP_CODE=""
 
   while [[ $retries -lt $max_retries ]]; do
     # 添加连接超时和最大时间限制，防止无限挂起
@@ -278,7 +285,8 @@ else
     retries=$((retries + 1))
     if [[ $retries -lt $max_retries ]]; then
       log_warn "n8n API 调用失败 (HTTP $HTTP_CODE)，重试 $retries/$max_retries"
-      sleep 2
+      # 指数退避: 2^retries 秒 (2, 4, 8...)
+      sleep $((2 ** retries))
     fi
   done
 
@@ -346,14 +354,20 @@ else
   if [[ "$activate_ok" == "true" ]]; then
     log_info "Workflow 已激活"
   else
-    log_warn "Workflow 激活失败，但继续执行"
+    log_warn "Workflow 激活失败"
+    ACTIVATION_FAILED=true
   fi
 fi
 
 # ============================================================
 # 保存结果
 # ============================================================
-RESULT_SUCCESS=true
+# 如果激活失败，设置 RESULT_SUCCESS=false
+if [[ "${ACTIVATION_FAILED:-}" == "true" ]]; then
+  RESULT_SUCCESS=false
+else
+  RESULT_SUCCESS=true
+fi
 
 # 确保 NODE_COUNT 是有效数字（用于 jq --argjson）
 if [[ ! "$NODE_COUNT" =~ ^[0-9]+$ ]]; then

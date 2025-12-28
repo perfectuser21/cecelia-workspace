@@ -39,10 +39,15 @@ if [[ -z "$TASK_ID" ]]; then
 fi
 
 # 限制 TASK_ID 长度（最大 64 字符）
+# P2: 截断时添加哈希后缀确保唯一性
 MAX_TASK_ID_LENGTH=64
 if [[ ${#TASK_ID} -gt $MAX_TASK_ID_LENGTH ]]; then
-  log_warn "TASK_ID 过长 (${#TASK_ID} 字符)，截断为 $MAX_TASK_ID_LENGTH 字符"
-  TASK_ID="${TASK_ID:0:$MAX_TASK_ID_LENGTH}"
+  # 计算原始 TASK_ID 的短哈希（8 字符）
+  HASH_SUFFIX=$(echo -n "$TASK_ID" | md5sum | cut -c1-8)
+  # 截断长度 = 最大长度 - 1(连字符) - 8(哈希)
+  TRUNCATE_LENGTH=$((MAX_TASK_ID_LENGTH - 9))
+  log_warn "TASK_ID 过长 (${#TASK_ID} 字符)，截断为 ${TRUNCATE_LENGTH}+hash 字符"
+  TASK_ID="${TASK_ID:0:$TRUNCATE_LENGTH}-${HASH_SUFFIX}"
 fi
 
 if [[ -z "$CODING_TYPE" ]]; then
@@ -77,6 +82,13 @@ log_info "=========================================="
 # ============================================================
 # 注意：锁由 main.sh 统一管理，prepare.sh 不再处理锁
 log_info "[1/4] 创建运行目录..."
+
+# P2: 检查磁盘空间（至少需要 100MB）
+if ! check_disk_space "${RUNS_DIR:-/home/xx/data/runs}" 100; then
+  log_error "磁盘空间不足，无法创建运行目录"
+  send_feishu_notification "AI 工厂准备失败\nTask: $TASK_ID\n原因: 磁盘空间不足"
+  exit 1
+fi
 
 WORK_DIR=$(create_run_dir "$RUN_ID")
 if [[ -z "$WORK_DIR" || ! -d "$WORK_DIR" ]]; then
@@ -150,6 +162,18 @@ else
     log_error "无法获取 Notion 任务: $TASK_ID (结果: '$TASK_INFO')"
 
     if ! jq -n '{error: "notion_fetch_failed", message: "无法获取 Notion 任务"}' > "$WORK_DIR/error.json"; then
+      log_warn "无法写入 error.json"
+    fi
+
+    exit 1
+  fi
+
+  # P1: 验证 JSON 格式有效性
+  if ! echo "$TASK_INFO" | jq empty 2>/dev/null; then
+    log_error "Notion 任务返回无效 JSON: $TASK_ID"
+    log_error "返回内容: ${TASK_INFO:0:200}..."
+
+    if ! jq -n '{error: "invalid_json", message: "Notion 任务返回无效 JSON"}' > "$WORK_DIR/error.json"; then
       log_warn "无法写入 error.json"
     fi
 

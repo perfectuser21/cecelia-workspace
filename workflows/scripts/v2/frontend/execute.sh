@@ -69,26 +69,29 @@ fi
 
 log_info "目标项目: $TARGET_PROJECT"
 
-# 检测前端框架
+# 检测前端框架和样式方案 - 一次读取 package.json，避免重复 grep
 FRAMEWORK="unknown"
+STYLING="css"
 if [[ -f "$TARGET_PROJECT/package.json" ]]; then
-  if grep -q '"react"' "$TARGET_PROJECT/package.json" 2>/dev/null; then
+  PACKAGE_JSON_CONTENT=$(cat "$TARGET_PROJECT/package.json" 2>/dev/null) || PACKAGE_JSON_CONTENT=""
+
+  # 检测前端框架
+  if [[ "$PACKAGE_JSON_CONTENT" == *'"react"'* ]]; then
     FRAMEWORK="react"
-  elif grep -q '"vue"' "$TARGET_PROJECT/package.json" 2>/dev/null; then
+  elif [[ "$PACKAGE_JSON_CONTENT" == *'"vue"'* ]]; then
     FRAMEWORK="vue"
-  elif grep -q '"svelte"' "$TARGET_PROJECT/package.json" 2>/dev/null; then
+  elif [[ "$PACKAGE_JSON_CONTENT" == *'"svelte"'* ]]; then
     FRAMEWORK="svelte"
   fi
-fi
 
-# 检测样式方案
-STYLING="css"
-if grep -q '"tailwindcss"' "$TARGET_PROJECT/package.json" 2>/dev/null; then
-  STYLING="tailwind"
-elif grep -q '"styled-components"' "$TARGET_PROJECT/package.json" 2>/dev/null; then
-  STYLING="styled-components"
-elif grep -q '"@emotion"' "$TARGET_PROJECT/package.json" 2>/dev/null; then
-  STYLING="emotion"
+  # 检测样式方案
+  if [[ "$PACKAGE_JSON_CONTENT" == *'"tailwindcss"'* ]]; then
+    STYLING="tailwind"
+  elif [[ "$PACKAGE_JSON_CONTENT" == *'"styled-components"'* ]]; then
+    STYLING="styled-components"
+  elif [[ "$PACKAGE_JSON_CONTENT" == *'"@emotion"'* ]]; then
+    STYLING="emotion"
+  fi
 fi
 
 log_info "框架: $FRAMEWORK, 样式: $STYLING"
@@ -98,6 +101,9 @@ log_info "框架: $FRAMEWORK, 样式: $STYLING"
 # ============================================================
 log_info "[2/5] 调用 Claude 生成组件..."
 
+# 提前检查磁盘空间，避免文件创建后才发现空间不足
+check_disk_space "$WORK_DIR" 100 || exit 1
+
 FILES_CHANGED=()
 COMPONENT_COUNT=0
 
@@ -106,7 +112,10 @@ if [[ "${TEST_MODE:-}" == "1" ]]; then
 
   # 创建 mock 组件文件
   MOCK_COMPONENT="$TARGET_PROJECT/src/components/MockFeature-${RUN_ID}.tsx"
-  mkdir -p "$(dirname "$MOCK_COMPONENT")"
+  mkdir -p "$(dirname "$MOCK_COMPONENT")" || {
+    log_error "无法创建目录: $(dirname "$MOCK_COMPONENT")"
+    exit 1
+  }
 
   cat > "$MOCK_COMPONENT" <<'EOF'
 /**
@@ -252,7 +261,10 @@ $TASK_CONTENT
         ;;
     esac
 
-    mkdir -p "$(dirname "$FULL_PATH_REAL")"
+    mkdir -p "$(dirname "$FULL_PATH_REAL")" || {
+      log_error "无法创建目录: $(dirname "$FULL_PATH_REAL")"
+      continue
+    }
 
     # 使用 printf 避免 echo 的 -e/-n 问题
     printf '%s\n' "$COMP_CONTENT" > "$FULL_PATH_REAL" || {
@@ -263,9 +275,6 @@ $TASK_CONTENT
     log_info "[创建] $COMP_NAME -> $COMP_PATH"
   done
 fi
-
-# 检查磁盘空间
-check_disk_space "$WORK_DIR" 100 || exit 1
 
 # 保存变更文件列表
 if [[ ${#FILES_CHANGED[@]} -gt 0 ]]; then
@@ -290,17 +299,22 @@ else
   if [[ -f "$TARGET_PROJECT/tsconfig.json" ]]; then
     if command -v npx &>/dev/null; then
       log_info "运行 tsc --noEmit (timeout 120s)..."
-      TSC_OUTPUT=$(
-        cd "$TARGET_PROJECT" && timeout 120 npx tsc --noEmit 2>&1
-      )
-      TSC_EXIT_CODE=$?
-      if [[ $TSC_EXIT_CODE -eq 0 ]]; then
-        TSC_RESULT="passed"
-      elif [[ $TSC_EXIT_CODE -eq 124 ]]; then
-        TSC_RESULT="timeout"
-        log_warn "TypeScript 类型检查超时 (120s)"
+      if ! cd "$TARGET_PROJECT" 2>/dev/null; then
+        log_error "无法切换到项目目录: $TARGET_PROJECT"
+        TSC_RESULT="failed"
+        TSC_OUTPUT="Failed to cd to project directory"
       else
-        TSC_RESULT="warning"
+        TSC_OUTPUT=$(timeout 120 npx tsc --noEmit 2>&1)
+        TSC_EXIT_CODE=$?
+        if [[ $TSC_EXIT_CODE -eq 0 ]]; then
+          TSC_RESULT="passed"
+        elif [[ $TSC_EXIT_CODE -eq 124 ]]; then
+          TSC_RESULT="timeout"
+          log_warn "TypeScript 类型检查超时 (120s)"
+        else
+          TSC_RESULT="warning"
+        fi
+        cd - >/dev/null 2>&1 || true
       fi
     fi
   else
@@ -322,19 +336,25 @@ if [[ "${TEST_MODE:-}" == "1" ]]; then
   log_info "[TEST_MODE] 模拟构建通过"
   BUILD_RESULT="passed"
 else
-  if [[ -f "$TARGET_PROJECT/package.json" ]] && grep -q '"build"' "$TARGET_PROJECT/package.json"; then
+  # 使用已读取的 PACKAGE_JSON_CONTENT 检查 build 脚本
+  if [[ -f "$TARGET_PROJECT/package.json" ]] && [[ "$PACKAGE_JSON_CONTENT" == *'"build"'* ]]; then
     log_info "运行 npm run build (timeout 300s)..."
-    BUILD_OUTPUT=$(
-      cd "$TARGET_PROJECT" && timeout 300 npm run build 2>&1
-    )
-    BUILD_EXIT_CODE=$?
-    if [[ $BUILD_EXIT_CODE -eq 0 ]]; then
-      BUILD_RESULT="passed"
-    elif [[ $BUILD_EXIT_CODE -eq 124 ]]; then
-      BUILD_RESULT="timeout"
-      log_warn "构建超时 (300s)"
-    else
+    if ! cd "$TARGET_PROJECT" 2>/dev/null; then
+      log_error "无法切换到项目目录: $TARGET_PROJECT"
       BUILD_RESULT="failed"
+      BUILD_OUTPUT="Failed to cd to project directory"
+    else
+      BUILD_OUTPUT=$(timeout 300 npm run build 2>&1)
+      BUILD_EXIT_CODE=$?
+      if [[ $BUILD_EXIT_CODE -eq 0 ]]; then
+        BUILD_RESULT="passed"
+      elif [[ $BUILD_EXIT_CODE -eq 124 ]]; then
+        BUILD_RESULT="timeout"
+        log_warn "构建超时 (300s)"
+      else
+        BUILD_RESULT="failed"
+      fi
+      cd - >/dev/null 2>&1 || true
     fi
   else
     log_info "未配置构建脚本，跳过"
