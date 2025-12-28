@@ -206,9 +206,23 @@ $TASK_CONTENT
   fi
 
   for ((i=0; i<COMPONENT_COUNT; i++)); do
-    COMP_PATH=$(echo "$CODE_OUTPUT" | jq -r ".components[$i].path")
-    COMP_NAME=$(echo "$CODE_OUTPUT" | jq -r ".components[$i].name")
-    COMP_CONTENT=$(echo "$CODE_OUTPUT" | jq -r ".components[$i].content")
+    COMP_PATH=$(echo "$CODE_OUTPUT" | jq -r ".components[$i].path // empty")
+    COMP_NAME=$(echo "$CODE_OUTPUT" | jq -r ".components[$i].name // empty")
+    COMP_CONTENT=$(echo "$CODE_OUTPUT" | jq -r ".components[$i].content // empty")
+
+    # 验证必要字段非空
+    if [[ -z "$COMP_PATH" ]]; then
+      log_error "组件路径为空 (索引 $i)，跳过"
+      continue
+    fi
+    if [[ -z "$COMP_NAME" ]]; then
+      log_warn "组件名为空 (索引 $i): $COMP_PATH，使用路径作为名称"
+      COMP_NAME=$(basename "$COMP_PATH")
+    fi
+    if [[ -z "$COMP_CONTENT" ]]; then
+      log_warn "组件内容为空 (索引 $i): $COMP_PATH，跳过"
+      continue
+    fi
 
     # 验证 COMP_PATH 不包含路径遍历字符
     if [[ "$COMP_PATH" == *".."* ]] || [[ "$COMP_PATH" == /* ]]; then
@@ -224,14 +238,27 @@ $TASK_CONTENT
       continue
     }
 
-    if [[ "$FULL_PATH_REAL" != "$TARGET_PROJECT"* ]]; then
-      log_error "组件路径超出目标项目范围: $FULL_PATH_REAL"
-      continue
-    fi
+    # 路径安全验证：必须在 TARGET_PROJECT 目录内（添加 / 后缀防止前缀匹配绕过）
+    case "$FULL_PATH_REAL" in
+      "$TARGET_PROJECT"/*)
+        ;;  # 在允许范围内
+      "$TARGET_PROJECT")
+        log_error "安全错误: 不能写入项目根目录本身"
+        continue
+        ;;
+      *)
+        log_error "组件路径超出目标项目范围: $FULL_PATH_REAL"
+        continue
+        ;;
+    esac
 
     mkdir -p "$(dirname "$FULL_PATH_REAL")"
 
-    echo "$COMP_CONTENT" > "$FULL_PATH_REAL"
+    # 使用 printf 避免 echo 的 -e/-n 问题
+    printf '%s\n' "$COMP_CONTENT" > "$FULL_PATH_REAL" || {
+      log_error "无法写入文件: $FULL_PATH_REAL"
+      continue
+    }
     FILES_CHANGED+=("$FULL_PATH_REAL")
     log_info "[创建] $COMP_NAME -> $COMP_PATH"
   done

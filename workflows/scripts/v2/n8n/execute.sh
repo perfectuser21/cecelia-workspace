@@ -253,7 +253,11 @@ else
   local HTTP_CODE=""
 
   while [[ $retries -lt $max_retries ]]; do
-    RESPONSE=$(curl -sf -w "\n%{http_code}" -X POST "$N8N_API_URL/workflows" \
+    # 添加连接超时和最大时间限制，防止无限挂起
+    RESPONSE=$(curl -sf -w "\n%{http_code}" \
+      --connect-timeout 10 \
+      --max-time 60 \
+      -X POST "$N8N_API_URL/workflows" \
       -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
       -H "Content-Type: application/json" \
       -d "$FILTERED_JSON" 2>&1)
@@ -286,9 +290,21 @@ else
     exit 1
   fi
 
+  # 验证响应是有效 JSON
+  if ! echo "$RESPONSE_BODY" | jq empty 2>/dev/null; then
+    log_error "API 返回的不是有效 JSON"
+    echo "$RESPONSE_BODY" > "$WORK_DIR/api_error.json"
+    exit 1
+  fi
+
   WORKFLOW_ID=$(echo "$RESPONSE_BODY" | jq -r '.id // empty')
   WORKFLOW_NAME=$(echo "$RESPONSE_BODY" | jq -r '.name // empty')
-  NODE_COUNT=$(echo "$RESPONSE_BODY" | jq '.nodes | length // 0')
+  NODE_COUNT=$(echo "$RESPONSE_BODY" | jq '.nodes | length' 2>/dev/null)
+
+  # 验证 NODE_COUNT 是有效数字
+  if [[ -z "$NODE_COUNT" ]] || [[ ! "$NODE_COUNT" =~ ^[0-9]+$ ]]; then
+    NODE_COUNT=0
+  fi
 
   # 验证必要字段非空
   if [[ -z "$WORKFLOW_ID" ]]; then
@@ -296,8 +312,14 @@ else
     echo "$RESPONSE_BODY" > "$WORK_DIR/api_error.json"
     exit 1
   fi
+
+  # 验证 workflow ID 格式
+  if [[ ! "$WORKFLOW_ID" =~ ^[a-zA-Z0-9]+$ ]]; then
+    log_error "API 返回的 workflow id 格式无效: $WORKFLOW_ID"
+    exit 1
+  fi
+
   [[ -z "$WORKFLOW_NAME" ]] && WORKFLOW_NAME="$TASK_NAME"
-  [[ ! "$NODE_COUNT" =~ ^[0-9]+$ ]] && NODE_COUNT=0
 
   log_info "Workflow 创建成功: $WORKFLOW_NAME (ID: $WORKFLOW_ID, 节点数: $NODE_COUNT)"
 

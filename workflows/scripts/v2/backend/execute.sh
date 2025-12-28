@@ -184,9 +184,19 @@ $TASK_CONTENT
   fi
 
   for ((i=0; i<FILE_COUNT; i++)); do
-    FILE_PATH=$(echo "$CODE_OUTPUT" | jq -r ".files[$i].path")
-    FILE_ACTION=$(echo "$CODE_OUTPUT" | jq -r ".files[$i].action")
-    FILE_CONTENT=$(echo "$CODE_OUTPUT" | jq -r ".files[$i].content")
+    FILE_PATH=$(echo "$CODE_OUTPUT" | jq -r ".files[$i].path // empty")
+    FILE_ACTION=$(echo "$CODE_OUTPUT" | jq -r ".files[$i].action // empty")
+    FILE_CONTENT=$(echo "$CODE_OUTPUT" | jq -r ".files[$i].content // empty")
+
+    # 验证必要字段非空
+    if [[ -z "$FILE_PATH" ]]; then
+      log_error "文件路径为空 (索引 $i)，跳过"
+      continue
+    fi
+    if [[ -z "$FILE_CONTENT" ]]; then
+      log_warn "文件内容为空 (索引 $i): $FILE_PATH，跳过"
+      continue
+    fi
 
     # 安全检查：禁止路径遍历
     if [[ "$FILE_PATH" == *".."* ]]; then
@@ -201,14 +211,27 @@ $TASK_CONTENT
       log_error "无法解析文件路径: $FULL_PATH"
       exit 1
     }
-    if [[ "$RESOLVED_PATH" != "$TARGET_PROJECT"* ]]; then
-      log_error "安全错误: 文件路径逃逸出项目目录: $FILE_PATH -> $RESOLVED_PATH"
-      exit 1
-    fi
+    # 路径安全验证：必须在 TARGET_PROJECT 目录内（添加 / 后缀防止前缀匹配绕过）
+    case "$RESOLVED_PATH" in
+      "$TARGET_PROJECT"/*)
+        ;;  # 在允许范围内
+      "$TARGET_PROJECT")
+        log_error "安全错误: 不能写入项目根目录本身"
+        exit 1
+        ;;
+      *)
+        log_error "安全错误: 文件路径逃逸出项目目录: $FILE_PATH -> $RESOLVED_PATH"
+        exit 1
+        ;;
+    esac
 
     mkdir -p "$(dirname "$RESOLVED_PATH")"
 
-    echo "$FILE_CONTENT" > "$RESOLVED_PATH"
+    # 使用 printf 避免 echo 的 -e/-n 问题和换行符处理
+    printf '%s\n' "$FILE_CONTENT" > "$RESOLVED_PATH" || {
+      log_error "无法写入文件: $RESOLVED_PATH"
+      exit 1
+    }
     FILES_CHANGED+=("$RESOLVED_PATH")
     log_info "[$FILE_ACTION] $FILE_PATH"
   done

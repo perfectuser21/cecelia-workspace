@@ -430,24 +430,45 @@ check_n8n_quality_score() {
   has_continue_on_fail=$(_validate_numeric "$(echo "$nodes" | jq '[.[] | select(.continueOnFail == true)] | length' 2>/dev/null)")
   [[ ${has_continue_on_fail:-0} -gt 0 ]] && error_handling=$((error_handling + 10))
 
-  # 3. 命名
+  # 3. 命名规范 (20分)
+  # - 无默认命名（所有节点都有自定义名称）: +15
+  # - 有默认命名但不多: +5
+  # - 有描述性命名（名称长度 > 10）: +5
   local default_names
   default_names=$(_validate_numeric "$(echo "$nodes" | jq '[.[] | select(.name != null) | select(.name | test("^(Code|HTTP|SSH|IF)( \\d+)?$"))] | length' 2>/dev/null)")
-  [[ ${default_names:-0} -eq 0 ]] && naming=$((naming + 15)) || naming=$((naming + 5))
-  naming=$((naming + 5))
+  if [[ ${default_names:-0} -eq 0 ]]; then
+    naming=$((naming + 15))
+  else
+    naming=$((naming + 5))
+  fi
+  # 检查是否有描述性命名（名称长度 > 10 的节点）
+  local descriptive_names
+  descriptive_names=$(_validate_numeric "$(echo "$nodes" | jq '[.[] | select(.name != null) | select(.name | length > 10)] | length' 2>/dev/null)")
+  [[ ${descriptive_names:-0} -gt 0 ]] && naming=$((naming + 5))
 
-  # 4. 参数配置
+  # 4. 参数配置 (20分)
+  # - 有节点配置了参数: +10
+  # - 参数配置比例高 (>= 50% 节点有参数): +10
   local has_params
-  has_params=$(_validate_numeric "$(echo "$nodes" | jq '[.[] | select(.parameters != null)] | length' 2>/dev/null)")
+  has_params=$(_validate_numeric "$(echo "$nodes" | jq '[.[] | select(.parameters != null and (.parameters | length) > 0)] | length' 2>/dev/null)")
   [[ ${has_params:-0} -gt 0 ]] && parameters=$((parameters + 10))
-  parameters=$((parameters + 10))
+  # 参数配置比例检查
+  if [[ ${node_count:-0} -gt 0 ]] && [[ $((has_params * 100 / node_count)) -ge 50 ]]; then
+    parameters=$((parameters + 10))
+  fi
 
-  # 5. 最佳实践
+  # 5. 最佳实践 (20分)
+  # - 使用凭据管理: +8
+  # - 节点数合理 (<= 15): +6
+  # - 有注释或描述: +6
   local uses_credentials
   uses_credentials=$(_validate_numeric "$(echo "$nodes" | jq '[.[] | select(.credentials != null)] | length' 2>/dev/null)")
   [[ ${uses_credentials:-0} -gt 0 ]] && best_practices=$((best_practices + 8))
   [[ ${node_count:-0} -le 15 ]] && best_practices=$((best_practices + 6))
-  best_practices=$((best_practices + 6))
+  # 检查是否有节点包含 notes 或描述
+  local has_notes
+  has_notes=$(_validate_numeric "$(echo "$nodes" | jq '[.[] | select(.notes != null and .notes != "")] | length' 2>/dev/null)")
+  [[ ${has_notes:-0} -gt 0 ]] && best_practices=$((best_practices + 6))
 
   # 计算总分
   local total=$((completeness + error_handling + naming + parameters + best_practices))
