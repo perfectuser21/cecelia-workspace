@@ -381,6 +381,218 @@ run_checks
 generate_report
 
 # ============================================================
+# 生成质检报告截图
+# ============================================================
+log_info "生成质检报告截图..."
+
+# 根据结果设置颜色和图标
+if [[ $FAILED_CHECKS -eq 0 ]]; then
+  STATUS_COLOR="#4ade80"
+  STATUS_ICON="✅"
+  STATUS_TEXT="质检通过"
+  BG_GRADIENT="linear-gradient(135deg, #10b981 0%, #059669 100%)"
+elif [[ "$NEEDS_MANUAL" == "true" ]]; then
+  STATUS_COLOR="#ef4444"
+  STATUS_ICON="❌"
+  STATUS_TEXT="需人工处理"
+  BG_GRADIENT="linear-gradient(135deg, #ef4444 0%, #dc2626 100%)"
+else
+  STATUS_COLOR="#f59e0b"
+  STATUS_ICON="⚠️"
+  STATUS_TEXT="需返工"
+  BG_GRADIENT="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+fi
+
+# 生成检查项列表 HTML
+CHECKS_HTML=""
+for result in "${CHECK_RESULTS[@]}"; do
+  check_name=$(echo "$result" | jq -r '.name')
+  check_passed=$(echo "$result" | jq -r '.passed')
+  check_message=$(echo "$result" | jq -r '.message')
+
+  if [[ "$check_passed" == "true" ]]; then
+    CHECKS_HTML+="<div class=\"check-item pass\"><span class=\"icon\">✅</span><span class=\"name\">$check_name</span><span class=\"msg\">$check_message</span></div>"
+  else
+    CHECKS_HTML+="<div class=\"check-item fail\"><span class=\"icon\">❌</span><span class=\"name\">$check_name</span><span class=\"msg\">$check_message</span></div>"
+  fi
+done
+
+# 生成 HTML 报告
+REPORT_HTML="<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=\"UTF-8\">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans CJK SC', 'WenQuanYi Zen Hei', sans-serif;
+      background: $BG_GRADIENT;
+      min-height: 100vh;
+      padding: 40px;
+      color: white;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 {
+      font-size: 36px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .subtitle {
+      font-size: 18px;
+      opacity: 0.8;
+      margin-bottom: 30px;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat {
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+    }
+    .stat-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      opacity: 0.7;
+      margin-top: 4px;
+    }
+    .card {
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      opacity: 0.7;
+      margin-bottom: 16px;
+    }
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .check-item:last-child { border-bottom: none; }
+    .check-item .icon { font-size: 18px; }
+    .check-item .name {
+      font-weight: 600;
+      min-width: 120px;
+    }
+    .check-item .msg { opacity: 0.8; }
+    .check-item.fail { opacity: 0.9; }
+    .score-ring {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: conic-gradient($STATUS_COLOR ${TOTAL_SCORE}%, rgba(255,255,255,0.2) 0);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+    }
+    .score-inner {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.3);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .score-value { font-size: 28px; font-weight: bold; }
+    .score-label { font-size: 12px; opacity: 0.7; }
+    .footer {
+      margin-top: 30px;
+      text-align: center;
+      font-size: 14px;
+      opacity: 0.6;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .info-row:last-child { border-bottom: none; }
+  </style>
+</head>
+<body>
+  <div class=\"container\">
+    <h1>$STATUS_ICON $STATUS_TEXT</h1>
+    <div class=\"subtitle\">AI 工厂 v2 质检报告 · $CODING_TYPE</div>
+
+    <div class=\"stats\">
+      <div class=\"stat\">
+        <div class=\"stat-value\">$TOTAL_CHECKS</div>
+        <div class=\"stat-label\">总检查数</div>
+      </div>
+      <div class=\"stat\">
+        <div class=\"stat-value\" style=\"color: #4ade80;\">$PASSED_CHECKS</div>
+        <div class=\"stat-label\">通过</div>
+      </div>
+      <div class=\"stat\">
+        <div class=\"stat-value\" style=\"color: #ef4444;\">$FAILED_CHECKS</div>
+        <div class=\"stat-label\">失败</div>
+      </div>
+      <div class=\"stat\">
+        <div class=\"score-ring\">
+          <div class=\"score-inner\">
+            <div class=\"score-value\">$TOTAL_SCORE</div>
+            <div class=\"score-label\">分数</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class=\"card\">
+      <div class=\"card-title\">检查详情</div>
+      $CHECKS_HTML
+    </div>
+
+    <div class=\"card\">
+      <div class=\"info-row\">
+        <span>Run ID</span>
+        <span>$RUN_ID</span>
+      </div>
+      <div class=\"info-row\">
+        <span>Coding Type</span>
+        <span>$CODING_TYPE</span>
+      </div>
+      <div class=\"info-row\">
+        <span>检查时间</span>
+        <span>$(date '+%Y-%m-%d %H:%M:%S')</span>
+      </div>
+    </div>
+
+    <div class=\"footer\">
+      Generated by AI Factory v2 | $(date '+%Y-%m-%d %H:%M:%S')
+    </div>
+  </div>
+</body>
+</html>"
+
+# 生成截图
+screenshot_html_report "$RUN_ID" "quality-report" "$REPORT_HTML" || log_warn "质检报告截图失败"
+
+# ============================================================
 # 输出结果
 # ============================================================
 log_info "=========================================="
