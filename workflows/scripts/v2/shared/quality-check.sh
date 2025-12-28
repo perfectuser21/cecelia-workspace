@@ -183,8 +183,7 @@ check_git() {
   local base_branch=""
   local fetch_error=""
   for branch in develop main master; do
-    fetch_error=$(git fetch origin "$branch" 2>&1)
-    if [[ $? -eq 0 ]]; then
+    if fetch_error=$(git fetch origin "$branch" 2>&1); then
       base_branch="$branch"
       break
     fi
