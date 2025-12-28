@@ -30,14 +30,14 @@ take_screenshot_url() {
   # 确保 node_modules 存在
   if [[ ! -d "$SCREENSHOT_SCRIPT_DIR/node_modules" ]]; then
     log_warn "截图依赖未安装，尝试安装..."
-    (cd "$SCREENSHOT_SCRIPT_DIR" && npm install --silent) || {
+    (cd "$SCREENSHOT_SCRIPT_DIR" && timeout -k 10 120 npm install --silent) || {
       echo '{"success": false, "error": "无法安装截图依赖"}'
       return 1
     }
   fi
 
   # 执行截图
-  node "$SCREENSHOT_NODE_SCRIPT" "$url" "$output" $options
+  timeout -k 10 60 node "$SCREENSHOT_NODE_SCRIPT" "$url" "$output" $options
 }
 
 # 对本地 HTML 文件截图
@@ -55,14 +55,14 @@ take_screenshot_file() {
   # 确保 node_modules 存在
   if [[ ! -d "$SCREENSHOT_SCRIPT_DIR/node_modules" ]]; then
     log_warn "截图依赖未安装，尝试安装..."
-    (cd "$SCREENSHOT_SCRIPT_DIR" && npm install --silent) || {
+    (cd "$SCREENSHOT_SCRIPT_DIR" && timeout -k 10 120 npm install --silent) || {
       echo '{"success": false, "error": "无法安装截图依赖"}'
       return 1
     }
   fi
 
   # 执行截图
-  node "$SCREENSHOT_NODE_SCRIPT" --file "$html_path" "$output" $options
+  timeout -k 10 60 node "$SCREENSHOT_NODE_SCRIPT" --file "$html_path" "$output" $options
 }
 
 # ============================================================

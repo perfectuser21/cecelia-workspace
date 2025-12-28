@@ -99,8 +99,8 @@ acquire_lock() {
       rm -f "$LOCK_FILE"
     fi
 
-    # 尝试获取锁（原子操作）
-    if (set -C; echo "PID: $$
+    # 尝试获取锁（原子操作，限制权限）
+    if (umask 077; set -C; echo "PID: $$
 TASK_ID: ${TASK_ID:-unknown}
 STARTED_AT: $(date -Iseconds)" > "$LOCK_FILE") 2>/dev/null; then
       log_info "获取锁成功 (PID: $$)"
@@ -425,6 +425,9 @@ export PROJECT_DIR="$PROJECT_DIR"
 export BRANCH_NAME="$BRANCH_NAME"
 export LOG_FILE="$run_dir/logs/main.log"
 EOF
+
+  # 限制 env.sh 文件权限（可能包含敏感信息）
+  chmod 600 "$env_file"
 
   log_info "环境变量已保存到: $env_file"
 }

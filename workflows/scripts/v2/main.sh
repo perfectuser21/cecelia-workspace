@@ -22,11 +22,31 @@
 
 set -e
 
+# 环境变量安全设置
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+IFS=$' \t\n'
+export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SHARED_DIR="$SCRIPT_DIR/shared"
 
 # 加载工具函数
 source "$SHARED_DIR/utils.sh"
+
+# 检查必需的命令
+for cmd in jq curl git; do
+  command -v "$cmd" >/dev/null 2>&1 || {
+    echo "错误: $cmd 未安装"
+    exit 1
+  }
+done
+
+# 检查 bash 版本
+if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
+  echo "错误: 需要 bash 4.0 或更高版本 (当前: $BASH_VERSION)"
+  exit 1
+fi
 
 # ============================================================
 # 参数解析
@@ -73,7 +93,18 @@ if ! acquire_lock; then
   exit 1
 fi
 
+# 信号处理函数
+cleanup_and_exit() {
+  local sig="$1"
+  log_warn "收到信号 $sig，开始清理..."
+  release_lock
+  exit 130
+}
+
 # 设置 trap 确保锁释放（Ctrl+C、正常退出、异常退出）
+trap 'cleanup_and_exit SIGINT' SIGINT
+trap 'cleanup_and_exit SIGTERM' SIGTERM
+trap 'cleanup_and_exit SIGHUP' SIGHUP
 trap 'release_lock' EXIT
 
 # ============================================================

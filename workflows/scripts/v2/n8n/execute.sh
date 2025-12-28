@@ -31,6 +31,19 @@ html_escape() {
   echo "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g'
 }
 
+# 检查磁盘空间（至少需要 100MB）
+check_disk_space() {
+  local path="$1"
+  local min_mb="${2:-100}"
+  local available
+  available=$(df -m "$path" 2>/dev/null | awk 'NR==2 {print $4}')
+  if [[ -n "$available" && "$available" -lt "$min_mb" ]]; then
+    log_error "磁盘空间不足: ${available}MB < ${min_mb}MB"
+    return 1
+  fi
+  return 0
+}
+
 # ============================================================
 # 参数解析
 # ============================================================
@@ -250,7 +263,7 @@ $TASK_CONTENT
 
   # 调用 Claude（超时 600s，复杂 workflow 需要更多时间）
   CLAUDE_EXIT=0
-  CLAUDE_OUTPUT=$(cd /home/xx/data/factory-workspace && timeout -k 10 600 claude -p "$PROMPT" \
+  CLAUDE_OUTPUT=$(cd /home/xx/data/factory-workspace && timeout --foreground -k 10 600 claude -p "$PROMPT" \
     --add-dir "$WORKFLOWS_DIR" --model "sonnet" 2>&1) || CLAUDE_EXIT=$?
 
   if [[ $CLAUDE_EXIT -ne 0 ]]; then
@@ -281,6 +294,9 @@ $TASK_CONTENT
   log_info "Workflow JSON 生成成功"
   fi
 fi
+
+# 检查磁盘空间
+check_disk_space "$WORK_DIR" 100 || exit 1
 
 # 保存 Workflow JSON
 if ! echo "$WORKFLOW_JSON" > "$WORK_DIR/workflow.json"; then
@@ -320,17 +336,35 @@ else
     settings: (.settings // {executionOrder: "v1"})
   }')
 
-  # 创建 Workflow
-  RESPONSE=$(curl -sf -w "\n%{http_code}" -X POST "$N8N_API_URL/workflows" \
-    -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-    -H "Content-Type: application/json" \
-    -d "$FILTERED_JSON" 2>&1)
+  # 创建 Workflow（带重试）
+  retries=0
+  max_retries=2
+  RESPONSE=""
+  HTTP_CODE=""
 
-  HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+  while [[ $retries -le $max_retries ]]; do
+    RESPONSE=$(curl -sf -w "\n%{http_code}" -X POST "$N8N_API_URL/workflows" \
+      -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d "$FILTERED_JSON" 2>&1)
+
+    HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+
+    if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "201" ]]; then
+      break
+    fi
+
+    retries=$((retries + 1))
+    if [[ $retries -le $max_retries ]]; then
+      log_warn "n8n API 调用失败 (HTTP $HTTP_CODE)，重试 $retries/$max_retries"
+      sleep 2
+    fi
+  done
+
   RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
 
   if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" ]]; then
-    log_error "n8n API 创建失败 (HTTP $HTTP_CODE)"
+    log_error "n8n API 创建失败 (HTTP $HTTP_CODE)，已重试 $max_retries 次"
     echo "$RESPONSE_BODY" > "$WORK_DIR/api_error.json"
     exit 1
   fi
