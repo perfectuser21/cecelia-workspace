@@ -525,8 +525,11 @@ fi
 EXPORT_DIR="$WORKFLOWS_DIR/exports/bundles/ai-factory"
 mkdir -p "$EXPORT_DIR"
 
-# 使用任务名生成文件名（移除特殊字符）
+# 使用任务名生成文件名（移除特殊字符，中文名用 run_id 作为后备）
 SAFE_NAME=$(echo "$WORKFLOW_NAME" | tr -cd '[:alnum:]_-' | tr '[:upper:]' '[:lower:]')
+if [[ -z "$SAFE_NAME" || "$SAFE_NAME" == "-" ]]; then
+  SAFE_NAME="workflow-${RUN_ID}"
+fi
 EXPORT_FILE="$EXPORT_DIR/${SAFE_NAME}.json"
 
 echo "$WORKFLOW_JSON" | jq '. + {n8n_id: "'"$WORKFLOW_ID"'"}' > "$EXPORT_FILE"
