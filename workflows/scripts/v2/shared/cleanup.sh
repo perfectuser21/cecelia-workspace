@@ -218,6 +218,18 @@ log_info "[6/6] 清理临时文件..."
 
 log_info "运行目录保留: $WORK_DIR"
 
+# 清理超过 7 天的旧运行目录（保留最近 50 个）
+log_info "清理旧运行目录..."
+RUNS_DIR="/home/xx/data/runs"
+# 删除 7 天前的目录，但至少保留 50 个
+OLD_DIRS=$(find "$RUNS_DIR" -maxdepth 1 -type d -name "20*" -mtime +7 2>/dev/null | sort | head -n -50)
+if [[ -n "$OLD_DIRS" ]]; then
+  echo "$OLD_DIRS" | xargs rm -rf 2>/dev/null || true
+  log_info "已清理 $(echo "$OLD_DIRS" | wc -l) 个旧目录"
+else
+  log_info "没有需要清理的旧目录"
+fi
+
 # ============================================================
 # 释放锁
 # ============================================================

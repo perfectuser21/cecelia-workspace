@@ -114,12 +114,15 @@ echo "准备完成: $WORK_DIR"
 # 阶段 2 & 3 & 3.5: 执行 + 质检 + 稳定性验证（带整体重试）
 # ============================================================
 while [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; do
-  # 如果是整体重试，显示提示
+  # 如果是整体重试，显示提示并清理上次结果
   if [[ $FULL_RETRY_COUNT -gt 0 ]]; then
     echo ""
     echo "=========================================="
     echo "[整体重试 $FULL_RETRY_COUNT/$FULL_RETRY_MAX]"
     echo "=========================================="
+    # 删除上次结果，强制重新开始
+    rm -f "$WORK_DIR/result.json"
+    rm -f "$WORK_DIR/quality_report.json"
     RETRY_COUNT=0  # 重置返工计数
   fi
 
@@ -130,6 +133,8 @@ while [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; do
   echo ""
   if [[ $RETRY_COUNT -gt 0 ]]; then
     echo "[返工 $RETRY_COUNT/$MAX_RETRIES]"
+    # 删除上次结果，强制重新执行
+    rm -f "$WORK_DIR/result.json"
   fi
 
   # ------------------------------------------------------------
@@ -239,7 +244,7 @@ if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
 
     # 重新执行
     echo "  执行中..."
-    EXECUTE_RESULT=$("$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH") 2>/dev/null
+    EXECUTE_RESULT=$("$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH" 2>>"$WORK_DIR/logs/stability.log")
     EXECUTE_EXIT=$?
 
     if [[ $EXECUTE_EXIT -ne 0 ]]; then
@@ -250,7 +255,7 @@ if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
 
     # 重新质检
     echo "  质检中..."
-    QUALITY_RESULT=$("$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE") 2>/dev/null
+    QUALITY_RESULT=$("$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE" 2>>"$WORK_DIR/logs/stability.log")
     QUALITY_EXIT=$?
 
     if [[ $QUALITY_EXIT -ne 0 ]]; then

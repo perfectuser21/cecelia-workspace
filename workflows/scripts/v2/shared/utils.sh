@@ -121,14 +121,16 @@ STARTED_AT: $(date -Iseconds)" > "$LOCK_FILE") 2>/dev/null; then
 }
 
 # 释放锁
+# 只有锁持有者进程才能释放锁，防止子进程误释放
 release_lock() {
   if [[ -f "$LOCK_FILE" ]]; then
     local holder_pid=$(grep -oP 'PID: \K\d+' "$LOCK_FILE" 2>/dev/null)
+    # 只有锁持有者才能释放
     if [[ "$holder_pid" == "$$" ]]; then
       rm -f "$LOCK_FILE"
-      log_info "释放锁成功"
+      log_info "释放锁成功 (PID: $$)"
     else
-      log_warn "锁不属于当前进程，不释放"
+      log_debug "锁不属于当前进程 (holder: $holder_pid, current: $$)，不释放"
     fi
   fi
 }
@@ -203,7 +205,7 @@ fetch_notion_task() {
 
   # 获取页面属性
   local response
-  response=$(curl -sf "https://api.notion.com/v1/pages/$task_id" \
+  response=$(curl -sf --max-time 30 "https://api.notion.com/v1/pages/$task_id" \
     -H "Authorization: Bearer $NOTION_API_KEY" \
     -H "Notion-Version: 2022-06-28" \
     -H "Content-Type: application/json" 2>/dev/null)
@@ -215,7 +217,7 @@ fetch_notion_task() {
 
   # 获取页面内容（blocks）
   local blocks
-  blocks=$(curl -sf "https://api.notion.com/v1/blocks/$task_id/children" \
+  blocks=$(curl -sf --max-time 30 "https://api.notion.com/v1/blocks/$task_id/children" \
     -H "Authorization: Bearer $NOTION_API_KEY" \
     -H "Notion-Version: 2022-06-28" 2>/dev/null)
 
@@ -275,7 +277,7 @@ update_notion_status() {
     return 1
   fi
 
-  curl -sf -X PATCH "https://api.notion.com/v1/pages/$task_id" \
+  curl -sf --max-time 30 -X PATCH "https://api.notion.com/v1/pages/$task_id" \
     -H "Authorization: Bearer $NOTION_API_KEY" \
     -H "Notion-Version: 2022-06-28" \
     -H "Content-Type: application/json" \
@@ -313,7 +315,7 @@ send_feishu_notification() {
     return 0
   fi
 
-  curl -sf -X POST "$FEISHU_BOT_WEBHOOK" \
+  curl -sf --max-time 30 -X POST "$FEISHU_BOT_WEBHOOK" \
     -H "Content-Type: application/json" \
     -d "{
       \"msg_type\": \"text\",
@@ -360,7 +362,7 @@ send_feishu_card() {
     warning) color="orange"; icon="⚠️" ;;
   esac
 
-  curl -sf -X POST "$FEISHU_BOT_WEBHOOK" \
+  curl -sf --max-time 30 -X POST "$FEISHU_BOT_WEBHOOK" \
     -H "Content-Type: application/json" \
     -d "{
       \"msg_type\": \"interactive\",
@@ -455,10 +457,22 @@ create_feature_branch() {
   git checkout develop >/dev/null 2>&1 || git checkout main >/dev/null 2>&1 || git checkout master >/dev/null 2>&1
   git pull origin "$(git branch --show-current)" >/dev/null 2>&1 || true
 
+  # 记录当前基础分支
+  local base_branch=$(git branch --show-current)
+
   # 检查分支是否已存在
   if git show-ref --verify --quiet "refs/heads/$branch_name"; then
-    log_info "分支已存在，切换到: $branch_name"
+    log_info "分支已存在，切换并更新: $branch_name"
     git checkout "$branch_name" >/dev/null 2>&1
+    # 尝试 rebase 到最新基础分支（失败不影响继续）
+    if [[ -n "$base_branch" ]]; then
+      if git rebase "origin/$base_branch" >/dev/null 2>&1; then
+        log_info "已 rebase 到 origin/$base_branch"
+      else
+        git rebase --abort >/dev/null 2>&1 || true
+        log_warn "Rebase 失败，使用当前分支状态"
+      fi
+    fi
   else
     log_info "创建新分支: $branch_name"
     git checkout -b "$branch_name" >/dev/null 2>&1

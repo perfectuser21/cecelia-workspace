@@ -30,6 +30,13 @@ TASK_ID="${1:-}"
 CODING_TYPE="${2:-}"
 RUN_ID="${3:-}"
 
+# 清理 TASK_ID 中的特殊字符（只保留字母数字和连字符）
+TASK_ID=$(echo "$TASK_ID" | tr -cd '[:alnum:]-')
+if [[ -z "$TASK_ID" ]]; then
+  log_error "TASK_ID 无效"
+  exit 1
+fi
+
 if [[ -z "$TASK_ID" ]]; then
   log_error "用法: prepare.sh <task_id> <coding_type> [run_id]"
   exit 1
