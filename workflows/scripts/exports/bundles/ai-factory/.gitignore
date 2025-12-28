@@ -1,0 +1,3 @@
+# 自动生成的导出文件
+*.json
+!bundle.json
