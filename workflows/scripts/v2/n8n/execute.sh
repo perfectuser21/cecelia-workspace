@@ -139,7 +139,7 @@ if [[ -z "$WORKFLOW_JSON" ]]; then
             typeVersion: 1,
             position: [450, 300],
             parameters: {
-              command: "df -h / | tail -1 | awk '\"'\"'{print $5}'\"'\"'"
+              command: "df -h /"
             }
           },
           {
