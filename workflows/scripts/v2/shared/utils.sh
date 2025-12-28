@@ -315,16 +315,12 @@ send_feishu_notification() {
     return 0
   fi
 
-  curl -sf --max-time 30 -X POST "$FEISHU_BOT_WEBHOOK" \
-    -H "Content-Type: application/json" \
-    -d "{
-      \"msg_type\": \"text\",
-      \"content\": {
-        \"text\": \"$message\"
-      }
-    }" > /dev/null 2>&1
+  local json_payload
+  json_payload=$(jq -n --arg msg "$message" '{msg_type: "text", content: {text: $msg}}')
 
-  if [[ $? -eq 0 ]]; then
+  if curl -sf --max-time 30 -X POST "$FEISHU_BOT_WEBHOOK" \
+    -H "Content-Type: application/json" \
+    -d "$json_payload" > /dev/null 2>&1; then
     log_info "飞书通知已发送"
     return 0
   else
@@ -362,29 +358,28 @@ send_feishu_card() {
     warning) color="orange"; icon="⚠️" ;;
   esac
 
+  local json_payload
+  json_payload=$(jq -n \
+    --arg title "$icon $title" \
+    --arg color "$color" \
+    --arg content "$content" \
+    '{
+      msg_type: "interactive",
+      card: {
+        header: {
+          title: {tag: "plain_text", content: $title},
+          template: $color
+        },
+        elements: [{
+          tag: "div",
+          text: {tag: "lark_md", content: $content}
+        }]
+      }
+    }')
+
   curl -sf --max-time 30 -X POST "$FEISHU_BOT_WEBHOOK" \
     -H "Content-Type: application/json" \
-    -d "{
-      \"msg_type\": \"interactive\",
-      \"card\": {
-        \"header\": {
-          \"title\": {
-            \"tag\": \"plain_text\",
-            \"content\": \"$icon $title\"
-          },
-          \"template\": \"$color\"
-        },
-        \"elements\": [
-          {
-            \"tag\": \"div\",
-            \"text\": {
-              \"tag\": \"lark_md\",
-              \"content\": \"$content\"
-            }
-          }
-        ]
-      }
-    }" > /dev/null 2>&1
+    -d "$json_payload" > /dev/null 2>&1
 }
 
 # ============================================================

@@ -40,7 +40,13 @@ LOG_FILE="$WORK_DIR/logs/cleanup.log"
 
 # 加载环境变量
 if [[ -f "$WORK_DIR/env.sh" ]]; then
-  source "$WORK_DIR/env.sh"
+  source "$WORK_DIR/env.sh" || log_warn "env.sh 加载失败"
+fi
+
+# 验证关键变量
+if [[ -z "$PROJECT_DIR" ]]; then
+  PROJECT_DIR="/home/xx/dev/zenithjoy-autopilot"
+  log_warn "PROJECT_DIR 未定义，使用默认值: $PROJECT_DIR"
 fi
 
 log_info "=========================================="

@@ -168,7 +168,7 @@ while [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; do
     break
   fi
 
-  EXECUTE_RESULT=$("$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH")
+  EXECUTE_RESULT=$("$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH") || true
   EXECUTE_EXIT=$?
 
   if [[ $EXECUTE_EXIT -ne 0 ]]; then
@@ -200,7 +200,7 @@ while [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; do
   QUALITY_SCRIPT="$SHARED_DIR/quality-check.sh"
 
   if [[ -f "$QUALITY_SCRIPT" ]]; then
-    QUALITY_RESULT=$("$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE")
+    QUALITY_RESULT=$("$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE") || true
     QUALITY_EXIT=$?
 
     case $QUALITY_EXIT in
@@ -261,7 +261,7 @@ if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
 
     # 重新执行
     echo "  执行中..."
-    EXECUTE_RESULT=$("$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH" 2>>"$WORK_DIR/logs/stability.log")
+    EXECUTE_RESULT=$("$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH" 2>>"$WORK_DIR/logs/stability.log") || true
     EXECUTE_EXIT=$?
 
     if [[ $EXECUTE_EXIT -ne 0 ]]; then
@@ -272,7 +272,7 @@ if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
 
     # 重新质检
     echo "  质检中..."
-    QUALITY_RESULT=$("$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE" 2>>"$WORK_DIR/logs/stability.log")
+    QUALITY_RESULT=$("$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE" 2>>"$WORK_DIR/logs/stability.log") || true
     QUALITY_EXIT=$?
 
     if [[ $QUALITY_EXIT -ne 0 ]]; then

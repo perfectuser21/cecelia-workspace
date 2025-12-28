@@ -40,6 +40,17 @@ fi
 WORK_DIR="/home/xx/data/runs/$RUN_ID"
 LOG_FILE="$WORK_DIR/logs/quality.log"
 
+# 加载环境变量
+if [[ -f "$WORK_DIR/env.sh" ]]; then
+  source "$WORK_DIR/env.sh" || log_warn "env.sh 加载失败"
+fi
+
+# 验证关键变量
+if [[ -z "$PROJECT_DIR" ]]; then
+  PROJECT_DIR="/home/xx/dev/zenithjoy-autopilot"
+  log_warn "PROJECT_DIR 未定义，使用默认值: $PROJECT_DIR"
+fi
+
 log_info "=========================================="
 log_info "质检阶段开始"
 log_info "Run ID: $RUN_ID"

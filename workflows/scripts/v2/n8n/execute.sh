@@ -73,18 +73,16 @@ if [[ -f "$WORK_DIR/result.json" ]]; then
     NODE_COUNT=$(jq -r '.artifacts[0].node_count' "$WORK_DIR/result.json")
     TEMPLATE_ID=$(jq -r '.artifacts[0].template_used' "$WORK_DIR/result.json")
 
-    # 直接输出结果并退出
-    cat << EOF
-{
-  "success": true,
-  "workflow_id": "$WORKFLOW_ID",
-  "workflow_name": "$WORKFLOW_NAME",
-  "node_count": ${NODE_COUNT:-0},
-  "template_used": "${TEMPLATE_ID:-none}",
-  "skipped": true,
-  "reason": "stability_verification"
-}
-EOF
+    # 直接输出结果并退出（使用 jq 安全构建 JSON）
+    jq -n \
+      --argjson success true \
+      --arg workflow_id "$WORKFLOW_ID" \
+      --arg workflow_name "$WORKFLOW_NAME" \
+      --argjson node_count "${NODE_COUNT:-0}" \
+      --arg template_used "${TEMPLATE_ID:-none}" \
+      --argjson skipped true \
+      --arg reason "stability_verification" \
+      '{success: $success, workflow_id: $workflow_id, workflow_name: $workflow_name, node_count: $node_count, template_used: $template_used, skipped: $skipped, reason: $reason}'
     exit 0
   fi
 fi
@@ -544,7 +542,7 @@ fi
 # 添加 RUN_ID 后缀避免文件名冲突
 EXPORT_FILE="$EXPORT_DIR/${SAFE_NAME}-${RUN_ID}.json"
 
-echo "$WORKFLOW_JSON" | jq '. + {n8n_id: "'"$WORKFLOW_ID"'"}' > "$EXPORT_FILE"
+echo "$WORKFLOW_JSON" | jq --arg id "$WORKFLOW_ID" '. + {n8n_id: $id}' > "$EXPORT_FILE"
 log_info "Workflow 已导出: $EXPORT_FILE"
 
 # ============================================================
@@ -556,13 +554,11 @@ log_info "Workflow ID: $WORKFLOW_ID"
 log_info "节点数: $NODE_COUNT"
 log_info "=========================================="
 
-cat << EOF
-{
-  "success": true,
-  "workflow_id": "$WORKFLOW_ID",
-  "workflow_name": "$WORKFLOW_NAME",
-  "node_count": $NODE_COUNT,
-  "template_used": "${TEMPLATE_ID:-none}",
-  "export_path": "$EXPORT_FILE"
-}
-EOF
+jq -n \
+  --argjson success true \
+  --arg workflow_id "$WORKFLOW_ID" \
+  --arg workflow_name "$WORKFLOW_NAME" \
+  --argjson node_count "$NODE_COUNT" \
+  --arg template_used "${TEMPLATE_ID:-none}" \
+  --arg export_path "$EXPORT_FILE" \
+  '{success: $success, workflow_id: $workflow_id, workflow_name: $workflow_name, node_count: $node_count, template_used: $template_used, export_path: $export_path}'
