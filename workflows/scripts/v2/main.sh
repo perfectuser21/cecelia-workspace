@@ -13,6 +13,7 @@
 #   MAX_RETRIES    - 最大返工次数（默认 2）
 #   STABILITY_RUNS - 稳定性验证次数（默认 3，质检通过后再跑N次确认）
 #   FULL_RETRY_MAX - 稳定性验证失败后整体重试次数（默认 1）
+#   RETRY_DELAY    - 返工/重试前的等待时间秒数（默认 2）
 #
 # 输出:
 #   - JSON 格式的执行结果
@@ -35,6 +36,7 @@ CODING_TYPE="${2:-}"
 MAX_RETRIES="${MAX_RETRIES:-2}"
 STABILITY_RUNS="${STABILITY_RUNS:-3}"
 FULL_RETRY_MAX="${FULL_RETRY_MAX:-1}"
+RETRY_DELAY="${RETRY_DELAY:-2}"
 
 if [[ -z "$TASK_ID" ]]; then
   echo "用法: main.sh <task_id> <coding_type>"
@@ -113,7 +115,7 @@ PREPARE_RESULT=$("$SHARED_DIR/prepare.sh" "$TASK_ID" "$CODING_TYPE" "$RUN_ID") |
 # 使用 grep -n 找到最后一个以 { 开头的行号，然后从该行开始提取
 LAST_JSON_LINE=$(echo "$PREPARE_RESULT" | grep -n '^{' | tail -1 | cut -d: -f1)
 if [[ -n "$LAST_JSON_LINE" ]]; then
-  PREPARE_JSON=$(echo "$PREPARE_RESULT" | tail -n +"$LAST_JSON_LINE" | head -20)
+  PREPARE_JSON=$(echo "$PREPARE_RESULT" | tail -n +"$LAST_JSON_LINE" | head -100)
 else
   PREPARE_JSON=""
 fi
@@ -142,6 +144,7 @@ while [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; do
     rm -f "$WORK_DIR/result.json"
     rm -f "$WORK_DIR/quality_report.json"
     RETRY_COUNT=0  # 重置返工计数
+    STABILITY_COUNT=0  # 重置稳定性验证计数
   fi
 
   # ------------------------------------------------------------
@@ -170,8 +173,7 @@ while [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; do
     break
   fi
 
-  EXECUTE_RESULT=$("$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH") || true
-  EXECUTE_EXIT=$?
+  EXECUTE_RESULT=$("$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH" 2>&1) && EXECUTE_EXIT=0 || EXECUTE_EXIT=$?
 
   if [[ $EXECUTE_EXIT -ne 0 ]]; then
     echo "执行阶段失败 (exit code: $EXECUTE_EXIT)"
@@ -182,7 +184,7 @@ while [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; do
     RETRY_COUNT=$((RETRY_COUNT + 1))
     if [[ $RETRY_COUNT -le $MAX_RETRIES ]]; then
       echo "准备返工..."
-      sleep 2
+      sleep $RETRY_DELAY
       continue
     else
       PASSED=false
@@ -202,8 +204,7 @@ while [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; do
   QUALITY_SCRIPT="$SHARED_DIR/quality-check.sh"
 
   if [[ -f "$QUALITY_SCRIPT" ]]; then
-    QUALITY_RESULT=$("$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE") || true
-    QUALITY_EXIT=$?
+    QUALITY_RESULT=$("$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE" 2>&1) && QUALITY_EXIT=0 || QUALITY_EXIT=$?
 
     case $QUALITY_EXIT in
       0)
@@ -217,7 +218,7 @@ while [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; do
         RETRY_COUNT=$((RETRY_COUNT + 1))
         if [[ $RETRY_COUNT -le $MAX_RETRIES ]]; then
           echo "准备返工..."
-          sleep 2
+          sleep $RETRY_DELAY
           continue
         else
           echo "超过最大返工次数，需要人工处理"
@@ -266,8 +267,7 @@ if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
 
     # 重新执行
     echo "  执行中..."
-    EXECUTE_RESULT=$("$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH" 2>>"$WORK_DIR/logs/stability.log") || true
-    EXECUTE_EXIT=$?
+    EXECUTE_RESULT=$("$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH" 2>>"$WORK_DIR/logs/stability.log") && EXECUTE_EXIT=0 || EXECUTE_EXIT=$?
 
     if [[ $EXECUTE_EXIT -ne 0 ]]; then
       echo "  ❌ 执行失败 (第 $STABILITY_COUNT 次)"
@@ -277,8 +277,7 @@ if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
 
     # 重新质检
     echo "  质检中..."
-    QUALITY_RESULT=$("$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE" 2>>"$WORK_DIR/logs/stability.log") || true
-    QUALITY_EXIT=$?
+    QUALITY_RESULT=$("$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE" 2>>"$WORK_DIR/logs/stability.log") && QUALITY_EXIT=0 || QUALITY_EXIT=$?
 
     if [[ $QUALITY_EXIT -ne 0 ]]; then
       echo "  ❌ 质检失败 (第 $STABILITY_COUNT 次)"
@@ -297,7 +296,7 @@ if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
     FULL_RETRY_COUNT=$((FULL_RETRY_COUNT + 1))
     if [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; then
       echo "将进行整体重试 ($FULL_RETRY_COUNT/$FULL_RETRY_MAX)..."
-      sleep 2
+      sleep $RETRY_DELAY
       PASSED=false
       continue  # 继续外层循环，整体重试
     else
@@ -347,7 +346,7 @@ echo "执行完成"
 echo "=========================================="
 echo "Run ID: $RUN_ID"
 echo "Task ID: $TASK_ID"
-echo "结果: $(if $PASSED; then echo '成功'; else echo '失败'; fi)"
+echo "结果: $(if [[ "$PASSED" == "true" ]]; then echo '成功'; else echo '失败'; fi)"
 echo "返工次数: $RETRY_COUNT"
 if [[ "$PASSED" == "true" ]]; then
   echo "稳定性验证: $STABILITY_COUNT/$STABILITY_RUNS 次通过"
@@ -385,7 +384,7 @@ FINAL_RESULT=$(jq -n \
 echo "$FINAL_RESULT"
 
 # 返回适当的退出码
-if $PASSED; then
+if [[ "$PASSED" == "true" ]]; then
   exit 0
 elif [[ $RETRY_COUNT -gt $MAX_RETRIES ]]; then
   exit 2  # 需要人工处理

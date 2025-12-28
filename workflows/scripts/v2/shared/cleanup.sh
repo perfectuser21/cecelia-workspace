@@ -102,11 +102,18 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
   # 提交（排除敏感文件）
   git add . -- ':!.env*' ':!*.key' ':!*credentials*' ':!*secret*'
-  git commit -m "$COMMIT_MSG" || {
-    log_warn "Git commit 失败，可能没有实际更改"
-  }
 
-  log_info "Git 提交完成"
+  # 区分"没有更改"和真正的错误
+  if ! git diff --cached --quiet; then
+    # 有暂存的更改，尝试提交
+    if ! git commit -m "$COMMIT_MSG"; then
+      log_error "Git commit 失败"
+    else
+      log_info "Git 提交完成"
+    fi
+  else
+    log_info "没有更改需要提交"
+  fi
 else
   log_info "没有更改需要提交"
 fi

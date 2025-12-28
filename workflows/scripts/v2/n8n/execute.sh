@@ -249,11 +249,15 @@ $TASK_CONTENT
 }"
 
   # 调用 Claude（超时 600s，复杂 workflow 需要更多时间）
+  CLAUDE_EXIT=0
   CLAUDE_OUTPUT=$(cd /home/xx/data/factory-workspace && timeout -k 10 600 claude -p "$PROMPT" \
-    --add-dir "$WORKFLOWS_DIR" --model "sonnet" 2>&1) || {
-    log_error "Claude 调用失败"
+    --add-dir "$WORKFLOWS_DIR" --model "sonnet" 2>&1) || CLAUDE_EXIT=$?
+
+  if [[ $CLAUDE_EXIT -ne 0 ]]; then
+    log_error "Claude 调用失败 (exit: $CLAUDE_EXIT)"
+    echo "$CLAUDE_OUTPUT" > "$WORK_DIR/claude_error_debug.txt"
     exit 1
-  }
+  fi
 
   # 提取 JSON - 使用 jq 验证和提取，避免 awk 括号计数问题
   WORKFLOW_JSON=""

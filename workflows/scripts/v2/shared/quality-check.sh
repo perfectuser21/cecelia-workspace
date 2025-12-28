@@ -68,6 +68,31 @@ if [[ ! -f "$CHECKS_CONFIG" ]]; then
 fi
 
 # ============================================================
+# HTML 转义函数
+# ============================================================
+html_escape() {
+  local str="$1"
+  str="${str//&/&amp;}"
+  str="${str//</&lt;}"
+  str="${str//>/&gt;}"
+  str="${str//\"/&quot;}"
+  echo "$str"
+}
+
+# ============================================================
+# JSON 字符串转义函数
+# ============================================================
+json_escape() {
+  local str="$1"
+  # 转义反斜杠、双引号、换行符、制表符
+  str="${str//\\/\\\\}"
+  str="${str//\"/\\\"}"
+  str="${str//$'\n'/\\n}"
+  str="${str//$'\t'/\\t}"
+  echo "$str"
+}
+
+# ============================================================
 # 检查结果变量
 # ============================================================
 TOTAL_CHECKS=0
@@ -83,7 +108,14 @@ pass_check() {
   local message="${2:-通过}"
   local score="${3:-0}"
 
-  CHECK_RESULTS+=("{\"name\": \"$name\", \"passed\": true, \"message\": \"$message\", \"score\": $score}")
+  # 使用 jq 构建 JSON 确保正确转义
+  local json_item
+  json_item=$(jq -n \
+    --arg name "$name" \
+    --arg message "$message" \
+    --argjson score "$score" \
+    '{name: $name, passed: true, message: $message, score: $score}')
+  CHECK_RESULTS+=("$json_item")
   PASSED_CHECKS=$((PASSED_CHECKS + 1))
   TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
   TOTAL_SCORE=$((TOTAL_SCORE + score))
@@ -97,7 +129,14 @@ fail_check() {
   local message="${2:-失败}"
   local required="${3:-true}"
 
-  CHECK_RESULTS+=("{\"name\": \"$name\", \"passed\": false, \"message\": \"$message\", \"required\": $required}")
+  # 使用 jq 构建 JSON 确保正确转义
+  local json_item
+  json_item=$(jq -n \
+    --arg name "$name" \
+    --arg message "$message" \
+    --argjson required "$required" \
+    '{name: $name, passed: false, message: $message, required: $required}')
+  CHECK_RESULTS+=("$json_item")
   FAILED_CHECKS=$((FAILED_CHECKS + 1))
   TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
@@ -282,34 +321,34 @@ check_n8n_quality_score() {
   local parameters=0
   local best_practices=0
 
-  # 1. 完整性 (使用 ${VAR:-0} 确保变量有默认值，避免算术错误)
+  # 1. 完整性 (使用 $((var + N)) 避免 set -e 下 ((var+=N)) 返回 0 导致退出)
   local has_trigger=$(echo "$nodes" | jq '[.[] | select(.type | contains("Trigger"))] | length')
-  [[ ${has_trigger:-0} -gt 0 ]] && ((completeness+=8))
-  [[ ${node_count:-0} -ge 2 ]] && ((completeness+=6))
-  [[ ${node_count:-0} -ge 3 ]] && ((completeness+=6))
+  [[ ${has_trigger:-0} -gt 0 ]] && completeness=$((completeness + 8))
+  [[ ${node_count:-0} -ge 2 ]] && completeness=$((completeness + 6))
+  [[ ${node_count:-0} -ge 3 ]] && completeness=$((completeness + 6))
 
   # 2. 错误处理
   local has_error=$(echo "$nodes" | jq '[.[] | select(.type | contains("errorTrigger"))] | length')
-  [[ ${has_error:-0} -gt 0 ]] && ((error_handling+=10))
+  [[ ${has_error:-0} -gt 0 ]] && error_handling=$((error_handling + 10))
   # 检查是否有节点设置了 continueOnFail
   local has_continue_on_fail=$(echo "$nodes" | jq '[.[] | select(.continueOnFail == true)] | length')
-  [[ ${has_continue_on_fail:-0} -gt 0 ]] && ((error_handling+=10))
+  [[ ${has_continue_on_fail:-0} -gt 0 ]] && error_handling=$((error_handling + 10))
 
   # 3. 命名
   local default_names=$(echo "$nodes" | jq '[.[] | select(.name != null) | select(.name | test("^(Code|HTTP|SSH|IF)( \\d+)?$"))] | length')
-  [[ ${default_names:-0} -eq 0 ]] && ((naming+=15)) || ((naming+=5))
-  ((naming+=5))
+  [[ ${default_names:-0} -eq 0 ]] && naming=$((naming + 15)) || naming=$((naming + 5))
+  naming=$((naming + 5))
 
   # 4. 参数配置
   local has_params=$(echo "$nodes" | jq '[.[] | select(.parameters != null)] | length')
-  [[ ${has_params:-0} -gt 0 ]] && ((parameters+=10))
-  ((parameters+=10))
+  [[ ${has_params:-0} -gt 0 ]] && parameters=$((parameters + 10))
+  parameters=$((parameters + 10))
 
   # 5. 最佳实践
   local uses_credentials=$(echo "$nodes" | jq '[.[] | select(.credentials != null)] | length')
-  [[ ${uses_credentials:-0} -gt 0 ]] && ((best_practices+=8))
-  [[ ${node_count:-0} -le 15 ]] && ((best_practices+=6))
-  ((best_practices+=6))
+  [[ ${uses_credentials:-0} -gt 0 ]] && best_practices=$((best_practices + 8))
+  [[ ${node_count:-0} -le 15 ]] && best_practices=$((best_practices + 6))
+  best_practices=$((best_practices + 6))
 
   # 计算总分
   local total=$((completeness + error_handling + naming + parameters + best_practices))
@@ -437,10 +476,14 @@ for result in "${CHECK_RESULTS[@]}"; do
   check_passed=$(echo "$result" | jq -r '.passed')
   check_message=$(echo "$result" | jq -r '.message')
 
+  # HTML 转义防止 XSS
+  safe_name=$(html_escape "$check_name")
+  safe_msg=$(html_escape "$check_message")
+
   if [[ "$check_passed" == "true" ]]; then
-    CHECKS_HTML+="<div class=\"check-item pass\"><span class=\"icon\">✅</span><span class=\"name\">$check_name</span><span class=\"msg\">$check_message</span></div>"
+    CHECKS_HTML+="<div class=\"check-item pass\"><span class=\"icon\">✅</span><span class=\"name\">$safe_name</span><span class=\"msg\">$safe_msg</span></div>"
   else
-    CHECKS_HTML+="<div class=\"check-item fail\"><span class=\"icon\">❌</span><span class=\"name\">$check_name</span><span class=\"msg\">$check_message</span></div>"
+    CHECKS_HTML+="<div class=\"check-item fail\"><span class=\"icon\">❌</span><span class=\"name\">$safe_name</span><span class=\"msg\">$safe_msg</span></div>"
   fi
 done
 

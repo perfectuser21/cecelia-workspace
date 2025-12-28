@@ -110,33 +110,26 @@ upload_to_notion() {
   if [[ -z "$IMGBB_API_KEY" ]]; then
     log_warn "未配置图床，截图保存在本地: $image_path"
 
-    # 在 Notion 页面添加一条提示
+    # 在 Notion 页面添加一条提示（使用 jq 构建 JSON 防止注入）
+    local json_payload
+    json_payload=$(jq -n \
+      --arg msg "$caption: 截图已保存到服务器 $image_path" \
+      '{
+        children: [{
+          object: "block",
+          type: "callout",
+          callout: {
+            rich_text: [{type: "text", text: {content: $msg}}],
+            icon: {type: "emoji", emoji: "📸"}
+          }
+        }]
+      }')
+
     curl -sf -X PATCH "https://api.notion.com/v1/blocks/$page_id/children" \
       -H "Authorization: Bearer $NOTION_API_KEY" \
       -H "Notion-Version: 2022-06-28" \
       -H "Content-Type: application/json" \
-      -d "{
-        \"children\": [
-          {
-            \"object\": \"block\",
-            \"type\": \"callout\",
-            \"callout\": {
-              \"rich_text\": [
-                {
-                  \"type\": \"text\",
-                  \"text\": {
-                    \"content\": \"$caption: 截图已保存到服务器 $image_path\"
-                  }
-                }
-              ],
-              \"icon\": {
-                \"type\": \"emoji\",
-                \"emoji\": \"📸\"
-              }
-            }
-          }
-        ]
-      }" > /dev/null 2>&1
+      -d "$json_payload" > /dev/null 2>&1
 
     return 0
   fi
@@ -161,33 +154,28 @@ upload_to_notion() {
 
   log_info "图片已上传: $image_url"
 
-  # 在 Notion 页面添加图片
+  # 在 Notion 页面添加图片（使用 jq 构建 JSON 防止注入）
+  local json_payload
+  json_payload=$(jq -n \
+    --arg url "$image_url" \
+    --arg cap "$caption" \
+    '{
+      children: [{
+        object: "block",
+        type: "image",
+        image: {
+          type: "external",
+          external: {url: $url},
+          caption: [{type: "text", text: {content: $cap}}]
+        }
+      }]
+    }')
+
   curl -sf -X PATCH "https://api.notion.com/v1/blocks/$page_id/children" \
     -H "Authorization: Bearer $NOTION_API_KEY" \
     -H "Notion-Version: 2022-06-28" \
     -H "Content-Type: application/json" \
-    -d "{
-      \"children\": [
-        {
-          \"object\": \"block\",
-          \"type\": \"image\",
-          \"image\": {
-            \"type\": \"external\",
-            \"external\": {
-              \"url\": \"$image_url\"
-            },
-            \"caption\": [
-              {
-                \"type\": \"text\",
-                \"text\": {
-                  \"content\": \"$caption\"
-                }
-              }
-            ]
-          }
-        }
-      ]
-    }" > /dev/null 2>&1
+    -d "$json_payload" > /dev/null 2>&1
 
   if [[ $? -eq 0 ]]; then
     log_info "图片已添加到 Notion 页面"
@@ -253,50 +241,39 @@ send_feishu_image() {
   # 由于飞书图片上传 API 需要 app_id/app_secret，这里改用富文本消息嵌入外部图片链接
   # 或者发送包含图片链接的 Markdown 格式卡片
 
-  curl -sf -X POST "$FEISHU_BOT_WEBHOOK" \
-    -H "Content-Type: application/json" \
-    -d "{
-      \"msg_type\": \"interactive\",
-      \"card\": {
-        \"header\": {
-          \"title\": {
-            \"tag\": \"plain_text\",
-            \"content\": \"📸 $title\"
-          },
-          \"template\": \"blue\"
+  # 使用 jq 构建 JSON 防止注入
+  local json_payload
+  json_payload=$(jq -n \
+    --arg title "$title" \
+    --arg desc "$description" \
+    --arg url "$image_url" \
+    --arg link_text "**截图链接**: [$title]($url)" \
+    '{
+      msg_type: "interactive",
+      card: {
+        header: {
+          title: {tag: "plain_text", content: ("📸 " + $title)},
+          template: "blue"
         },
-        \"elements\": [
+        elements: [
+          {tag: "div", text: {tag: "lark_md", content: $desc}},
+          {tag: "div", text: {tag: "lark_md", content: ("**截图链接**: [" + $title + "](" + $url + ")")}},
           {
-            \"tag\": \"div\",
-            \"text\": {
-              \"tag\": \"lark_md\",
-              \"content\": \"$description\"
-            }
-          },
-          {
-            \"tag\": \"div\",
-            \"text\": {
-              \"tag\": \"lark_md\",
-              \"content\": \"**截图链接**: [$title]($image_url)\"
-            }
-          },
-          {
-            \"tag\": \"action\",
-            \"actions\": [
-              {
-                \"tag\": \"button\",
-                \"text\": {
-                  \"tag\": \"plain_text\",
-                  \"content\": \"查看截图\"
-                },
-                \"type\": \"primary\",
-                \"url\": \"$image_url\"
-              }
-            ]
+            tag: "action",
+            actions: [{
+              tag: "button",
+              text: {tag: "plain_text", content: "查看截图"},
+              type: "primary",
+              url: $url
+            }]
           }
         ]
       }
-    }" > /dev/null 2>&1
+    }')
+
+  curl -sf -X POST "$FEISHU_BOT_WEBHOOK" \
+    -H "Content-Type: application/json" \
+    -d "$json_payload" > /dev/null 2>&1
 
   log_info "飞书图片通知已发送（链接形式）"
 }
@@ -318,13 +295,14 @@ upload_all_screenshots() {
   fi
 
   local count=0
+  # 启用 nullglob 避免空目录时循环处理字面量模式
+  shopt -s nullglob
   for img in "$screenshots_dir"/*.png; do
-    if [[ -f "$img" ]]; then
-      local caption=$(basename "$img" .png)
-      upload_to_notion "$page_id" "$img" "$caption"
-      count=$((count + 1))
-    fi
+    local caption=$(basename "$img" .png)
+    upload_to_notion "$page_id" "$img" "$caption"
+    count=$((count + 1))
   done
+  shopt -u nullglob
 
   log_info "已上传 $count 张截图到 Notion"
 }

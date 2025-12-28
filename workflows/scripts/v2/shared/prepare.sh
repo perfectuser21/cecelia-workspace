@@ -31,9 +31,10 @@ CODING_TYPE="${2:-}"
 RUN_ID="${3:-}"
 
 # 清理 TASK_ID 中的特殊字符（只保留字母数字和连字符）
+ORIGINAL_TASK_ID="$TASK_ID"
 TASK_ID=$(echo "$TASK_ID" | tr -cd '[:alnum:]-')
 if [[ -z "$TASK_ID" ]]; then
-  log_error "TASK_ID 无效（清理后为空）"
+  log_error "TASK_ID 无效（原始值: '$ORIGINAL_TASK_ID'，清理后为空）"
   exit 1
 fi
 

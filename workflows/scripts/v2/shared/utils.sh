@@ -155,7 +155,7 @@ create_run_dir() {
 # 格式: YYYYMMDD-HHMMSS-RANDOM
 generate_run_id() {
   local timestamp=$(date '+%Y%m%d-%H%M%S')
-  local random=$(head -c 100 /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
+  local random=$(head -c 500 /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
   echo "${timestamp}-${random}"
 }
 
@@ -293,20 +293,15 @@ update_notion_status() {
   local max_retries=2
   local success=false
 
+  local json_payload
+  json_payload=$(jq -n --arg status "$status" '{properties: {Status: {status: {name: $status}}}}')
+
   while [[ $retries -lt $max_retries ]]; do
     if curl -sf --connect-timeout 10 --max-time 30 -X PATCH "https://api.notion.com/v1/pages/$task_id" \
       -H "Authorization: Bearer $NOTION_API_KEY" \
       -H "Notion-Version: 2022-06-28" \
       -H "Content-Type: application/json" \
-      -d "{
-        \"properties\": {
-          \"Status\": {
-            \"status\": {
-              \"name\": \"$status\"
-            }
-          }
-        }
-      }" > /dev/null 2>&1; then
+      -d "$json_payload" > /dev/null 2>&1; then
       success=true
       break
     fi
