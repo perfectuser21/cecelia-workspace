@@ -10,7 +10,8 @@
 #   coding_type - n8n / backend / frontend
 #
 # 环境变量:
-#   MAX_RETRIES - 最大返工次数（默认 2）
+#   MAX_RETRIES    - 最大返工次数（默认 2）
+#   STABILITY_RUNS - 稳定性验证次数（默认 3，质检通过后再跑N次确认）
 #
 # 输出:
 #   - JSON 格式的执行结果
@@ -31,6 +32,7 @@ source "$SHARED_DIR/utils.sh"
 TASK_ID="${1:-}"
 CODING_TYPE="${2:-}"
 MAX_RETRIES="${MAX_RETRIES:-2}"
+STABILITY_RUNS="${STABILITY_RUNS:-3}"
 
 if [[ -z "$TASK_ID" ]]; then
   echo "用法: main.sh <task_id> <coding_type>"
@@ -64,6 +66,7 @@ esac
 # ============================================================
 RUN_ID=$(generate_run_id)
 RETRY_COUNT=0
+STABILITY_COUNT=0
 FINAL_RESULT=""
 PASSED=false
 
@@ -74,6 +77,7 @@ echo "Task ID: $TASK_ID"
 echo "Coding Type: $CODING_TYPE"
 echo "Run ID: $RUN_ID"
 echo "Max Retries: $MAX_RETRIES"
+echo "Stability Runs: $STABILITY_RUNS"
 echo "=========================================="
 
 # ============================================================
@@ -163,6 +167,7 @@ while [[ $RETRY_COUNT -le $MAX_RETRIES ]]; do
     case $QUALITY_EXIT in
       0)
         echo "质检通过"
+        # 进入稳定性验证阶段
         PASSED=true
         break
         ;;
@@ -199,6 +204,59 @@ while [[ $RETRY_COUNT -le $MAX_RETRIES ]]; do
 done
 
 # ============================================================
+# 阶段 3.5: 稳定性验证（质检通过后再跑N次确认）
+# ============================================================
+if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
+  echo ""
+  echo "[阶段 3.5] 稳定性验证"
+  echo "----------------------------------------"
+  echo "质检已通过，再跑 $STABILITY_RUNS 次确认稳定性..."
+
+  STABILITY_COUNT=0
+  STABILITY_FAILED=false
+
+  while [[ $STABILITY_COUNT -lt $STABILITY_RUNS ]]; do
+    STABILITY_COUNT=$((STABILITY_COUNT + 1))
+    echo ""
+    echo "[稳定性验证 $STABILITY_COUNT/$STABILITY_RUNS]"
+
+    # 重新执行
+    echo "  执行中..."
+    EXECUTE_RESULT=$("$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH") 2>/dev/null
+    EXECUTE_EXIT=$?
+
+    if [[ $EXECUTE_EXIT -ne 0 ]]; then
+      echo "  ❌ 执行失败 (第 $STABILITY_COUNT 次)"
+      STABILITY_FAILED=true
+      break
+    fi
+
+    # 重新质检
+    echo "  质检中..."
+    QUALITY_RESULT=$("$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE") 2>/dev/null
+    QUALITY_EXIT=$?
+
+    if [[ $QUALITY_EXIT -ne 0 ]]; then
+      echo "  ❌ 质检失败 (第 $STABILITY_COUNT 次)"
+      STABILITY_FAILED=true
+      break
+    fi
+
+    echo "  ✅ 通过"
+  done
+
+  if [[ "$STABILITY_FAILED" == "true" ]]; then
+    echo ""
+    echo "稳定性验证失败！在第 $STABILITY_COUNT 次验证时出错"
+    echo "说明代码不稳定，需要检查"
+    PASSED=false
+  else
+    echo ""
+    echo "稳定性验证通过！连续 $STABILITY_RUNS 次执行全部成功"
+  fi
+fi
+
+# ============================================================
 # 阶段 4: 收尾
 # ============================================================
 echo ""
@@ -223,6 +281,7 @@ echo "Run ID: $RUN_ID"
 echo "Task ID: $TASK_ID"
 echo "结果: $(if $PASSED; then echo '成功'; else echo '失败'; fi)"
 echo "返工次数: $RETRY_COUNT"
+echo "稳定性验证: $STABILITY_COUNT/$STABILITY_RUNS 次通过"
 echo "=========================================="
 
 # 输出 JSON 结果
@@ -232,6 +291,8 @@ FINAL_RESULT=$(jq -n \
   --arg coding_type "$CODING_TYPE" \
   --argjson passed "$PASSED" \
   --argjson retry_count "$RETRY_COUNT" \
+  --argjson stability_count "$STABILITY_COUNT" \
+  --argjson stability_runs "$STABILITY_RUNS" \
   --arg work_dir "$WORK_DIR" \
   '{
     run_id: $run_id,
@@ -239,6 +300,8 @@ FINAL_RESULT=$(jq -n \
     coding_type: $coding_type,
     passed: $passed,
     retry_count: $retry_count,
+    stability_count: $stability_count,
+    stability_runs: $stability_runs,
     work_dir: $work_dir
   }')
 
