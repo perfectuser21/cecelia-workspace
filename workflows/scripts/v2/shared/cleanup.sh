@@ -125,15 +125,18 @@ log_info "[2/6] Git 推送..."
 
 BRANCH_NAME="${BRANCH_NAME:-feature/$TASK_ID}"
 
-git push origin "$BRANCH_NAME" 2>/dev/null || {
-  log_warn "Git push 失败，尝试设置 upstream..."
-  git push -u origin "$BRANCH_NAME" || {
-    log_error "Git push 失败"
-    # 不退出，继续后续步骤
-  }
-}
+PUSH_SUCCESS=false
+if git push origin "$BRANCH_NAME" 2>/dev/null; then
+  PUSH_SUCCESS=true
+elif git push -u origin "$BRANCH_NAME" 2>/dev/null; then
+  PUSH_SUCCESS=true
+fi
 
-log_info "Git 推送完成: $BRANCH_NAME"
+if [[ "$PUSH_SUCCESS" == "true" ]]; then
+  log_info "Git 推送完成: $BRANCH_NAME"
+else
+  log_warn "Git push 失败，分支仅存在于本地"
+fi
 
 # ============================================================
 # 步骤 3: 更新 Notion 状态
@@ -276,11 +279,14 @@ log_info "收尾阶段完成"
 log_info "=========================================="
 
 # 输出 JSON 结果（使用 jq 确保正确转义）
+# 规范化布尔值
+[[ "$PASSED" == "true" ]] && PASSED_BOOL=true || PASSED_BOOL=false
+
 jq -n \
   --argjson success true \
   --arg run_id "$RUN_ID" \
   --arg task_id "$TASK_ID" \
-  --argjson passed "$PASSED" \
+  --argjson passed $PASSED_BOOL \
   --argjson retry_count "$RETRY_COUNT" \
   --arg branch_name "$BRANCH_NAME" \
   --arg notion_status "$NEW_STATUS" \

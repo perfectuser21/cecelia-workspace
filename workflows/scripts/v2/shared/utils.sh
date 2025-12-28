@@ -167,6 +167,11 @@ generate_run_id() {
 load_secrets() {
   local secrets_file="$WORKFLOWS_DIR/.secrets"
   if [[ -f "$secrets_file" ]]; then
+    # 检查文件权限，拒绝过于宽松的权限
+    local perms=$(stat -c %a "$secrets_file" 2>/dev/null || stat -f %Lp "$secrets_file" 2>/dev/null)
+    if [[ "$perms" != "600" && "$perms" != "400" ]]; then
+      log_warn "Secrets 文件权限不安全 ($perms)，建议设置为 600"
+    fi
     source "$secrets_file"
   else
     log_warn "Secrets 文件不存在: $secrets_file"
@@ -508,10 +513,10 @@ create_feature_branch() {
 # ============================================================
 # 注意: cleanup_on_exit 和 setup_cleanup_trap 已移至 main.sh
 # main.sh 中有完整的进程管理和清理逻辑，避免重复定义
-export -f log_info log_warn log_error log_debug
-export -f acquire_lock release_lock
+export -f _log log_info log_warn log_error log_debug
+export -f is_lock_stale acquire_lock release_lock
 export -f create_run_dir generate_run_id
-export -f fetch_notion_task update_notion_status
+export -f load_secrets fetch_notion_task update_notion_status
 export -f send_feishu_notification send_feishu_card
 export -f save_env load_env
 export -f check_git_clean create_feature_branch

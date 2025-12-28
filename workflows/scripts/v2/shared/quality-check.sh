@@ -37,6 +37,12 @@ if [[ -z "$RUN_ID" || -z "$CODING_TYPE" ]]; then
   exit 1
 fi
 
+# RUN_ID 格式验证
+if [[ ! "$RUN_ID" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+  log_error "无效的 RUN_ID 格式: $RUN_ID"
+  exit 1
+fi
+
 WORK_DIR="/home/xx/data/runs/$RUN_ID"
 LOG_FILE="$WORK_DIR/logs/quality.log"
 
@@ -76,19 +82,7 @@ html_escape() {
   str="${str//</&lt;}"
   str="${str//>/&gt;}"
   str="${str//\"/&quot;}"
-  echo "$str"
-}
-
-# ============================================================
-# JSON 字符串转义函数
-# ============================================================
-json_escape() {
-  local str="$1"
-  # 转义反斜杠、双引号、换行符、制表符
-  str="${str//\\/\\\\}"
-  str="${str//\"/\\\"}"
-  str="${str//$'\n'/\\n}"
-  str="${str//$'\t'/\\t}"
+  str="${str//\'/&#39;}"
   echo "$str"
 }
 
@@ -469,6 +463,10 @@ else
   BG_GRADIENT="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
 fi
 
+# XSS 防护：转义用户输入
+SAFE_RUN_ID=$(html_escape "$RUN_ID")
+SAFE_CODING_TYPE=$(html_escape "$CODING_TYPE")
+
 # 生成检查项列表 HTML
 CHECKS_HTML=""
 for result in "${CHECK_RESULTS[@]}"; do
@@ -607,7 +605,7 @@ REPORT_HTML="<!DOCTYPE html>
 <body>
   <div class=\"container\">
     <h1>$STATUS_ICON $STATUS_TEXT</h1>
-    <div class=\"subtitle\">AI 工厂 v2 质检报告 · $CODING_TYPE</div>
+    <div class=\"subtitle\">AI 工厂 v2 质检报告 · $SAFE_CODING_TYPE</div>
 
     <div class=\"stats\">
       <div class=\"stat\">
@@ -640,11 +638,11 @@ REPORT_HTML="<!DOCTYPE html>
     <div class=\"card\">
       <div class=\"info-row\">
         <span>Run ID</span>
-        <span>$RUN_ID</span>
+        <span>$SAFE_RUN_ID</span>
       </div>
       <div class=\"info-row\">
         <span>Coding Type</span>
-        <span>$CODING_TYPE</span>
+        <span>$SAFE_CODING_TYPE</span>
       </div>
       <div class=\"info-row\">
         <span>检查时间</span>

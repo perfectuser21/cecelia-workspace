@@ -125,7 +125,7 @@ upload_to_notion() {
         }]
       }')
 
-    curl -sf -X PATCH "https://api.notion.com/v1/blocks/$page_id/children" \
+    curl -sf --connect-timeout 10 --max-time 30 -X PATCH "https://api.notion.com/v1/blocks/$page_id/children" \
       -H "Authorization: Bearer $NOTION_API_KEY" \
       -H "Notion-Version: 2022-06-28" \
       -H "Content-Type: application/json" \
@@ -134,15 +134,21 @@ upload_to_notion() {
     return 0
   fi
 
-  # 上传到 imgbb
+  # 上传到 imgbb（带重试）
   log_info "上传图片到 imgbb..."
-  local upload_result
-  upload_result=$(curl -sf -X POST "https://api.imgbb.com/1/upload" \
-    -F "key=$IMGBB_API_KEY" \
-    -F "image=@$image_path" 2>/dev/null)
+  local upload_result=""
+  local retry
+  for retry in 1 2 3; do
+    upload_result=$(curl -sf --connect-timeout 10 --max-time 60 \
+      -X POST "https://api.imgbb.com/1/upload" \
+      -F "key=$IMGBB_API_KEY" \
+      -F "image=@$image_path" 2>/dev/null) && break
+    log_warn "imgbb 上传失败，重试 $retry/3..."
+    sleep 2
+  done
 
   if [[ -z "$upload_result" ]]; then
-    log_error "上传图片失败"
+    log_error "上传图片失败（重试 3 次后）"
     return 1
   fi
 
@@ -171,7 +177,7 @@ upload_to_notion() {
       }]
     }')
 
-  curl -sf -X PATCH "https://api.notion.com/v1/blocks/$page_id/children" \
+  curl -sf --connect-timeout 10 --max-time 30 -X PATCH "https://api.notion.com/v1/blocks/$page_id/children" \
     -H "Authorization: Bearer $NOTION_API_KEY" \
     -H "Notion-Version: 2022-06-28" \
     -H "Content-Type: application/json" \
@@ -223,11 +229,17 @@ send_feishu_image() {
     return 0
   fi
 
-  # 上传到 imgbb
-  local upload_result
-  upload_result=$(curl -sf -X POST "https://api.imgbb.com/1/upload" \
-    -F "key=$IMGBB_API_KEY" \
-    -F "image=@$image_path" 2>/dev/null)
+  # 上传到 imgbb（带重试）
+  local upload_result=""
+  local retry
+  for retry in 1 2 3; do
+    upload_result=$(curl -sf --connect-timeout 10 --max-time 60 \
+      -X POST "https://api.imgbb.com/1/upload" \
+      -F "key=$IMGBB_API_KEY" \
+      -F "image=@$image_path" 2>/dev/null) && break
+    log_warn "imgbb 上传失败，重试 $retry/3..."
+    sleep 2
+  done
 
   local image_url=$(echo "$upload_result" | jq -r '.data.url // empty')
 
@@ -271,7 +283,7 @@ send_feishu_image() {
       }
     }')
 
-  curl -sf -X POST "$FEISHU_BOT_WEBHOOK" \
+  curl -sf --connect-timeout 10 --max-time 30 -X POST "$FEISHU_BOT_WEBHOOK" \
     -H "Content-Type: application/json" \
     -d "$json_payload" > /dev/null 2>&1
 

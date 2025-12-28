@@ -88,7 +88,8 @@ if [[ -f "$WORK_DIR/result.json" ]]; then
     # 重新读取结果信息用于输出
     WORKFLOW_ID="$EXISTING_ID"
     WORKFLOW_NAME=$(jq -r '.artifacts[0].name' "$WORK_DIR/result.json")
-    NODE_COUNT=$(jq -r '.artifacts[0].node_count' "$WORK_DIR/result.json")
+    NODE_COUNT=$(jq -r '.artifacts[0].node_count // 0' "$WORK_DIR/result.json")
+    [[ ! "$NODE_COUNT" =~ ^[0-9]+$ ]] && NODE_COUNT=0
     TEMPLATE_ID=$(jq -r '.artifacts[0].template_used' "$WORK_DIR/result.json")
 
     # 直接输出结果并退出（使用 jq 安全构建 JSON）
@@ -315,7 +316,8 @@ if [[ "${TEST_MODE:-}" == "1" ]]; then
   log_info "[TEST_MODE] 模拟 n8n API 创建"
   WORKFLOW_ID="test-workflow-$(date +%s)"
   WORKFLOW_NAME=$(echo "$WORKFLOW_JSON" | jq -r '.name')
-  NODE_COUNT=$(echo "$WORKFLOW_JSON" | jq '.nodes | length')
+  NODE_COUNT=$(echo "$WORKFLOW_JSON" | jq '.nodes | length // 0')
+  [[ ! "$NODE_COUNT" =~ ^[0-9]+$ ]] && NODE_COUNT=0
   log_info "Workflow 创建成功: $WORKFLOW_NAME (ID: $WORKFLOW_ID, 节点数: $NODE_COUNT)"
 
   log_info "[4/5] 激活 Workflow..."
@@ -350,6 +352,12 @@ else
 
     HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 
+    # 验证 HTTP_CODE 是否为有效数字
+    if [[ ! "$HTTP_CODE" =~ ^[0-9]+$ ]]; then
+      log_error "n8n API 请求失败，无法获取 HTTP 状态码"
+      HTTP_CODE="0"
+    fi
+
     if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "201" ]]; then
       break
     fi
@@ -371,21 +379,32 @@ else
 
   WORKFLOW_ID=$(echo "$RESPONSE_BODY" | jq -r '.id')
   WORKFLOW_NAME=$(echo "$RESPONSE_BODY" | jq -r '.name')
-  NODE_COUNT=$(echo "$RESPONSE_BODY" | jq '.nodes | length')
+  NODE_COUNT=$(echo "$RESPONSE_BODY" | jq '.nodes | length // 0')
+  [[ ! "$NODE_COUNT" =~ ^[0-9]+$ ]] && NODE_COUNT=0
 
   log_info "Workflow 创建成功: $WORKFLOW_NAME (ID: $WORKFLOW_ID, 节点数: $NODE_COUNT)"
 
   # ============================================================
-  # 激活 Workflow
+  # 激活 Workflow（带重试）
   # ============================================================
   log_info "[4/5] 激活 Workflow..."
 
-  ACTIVATE_RESPONSE=$(curl -sf -X PATCH "$N8N_API_URL/workflows/$WORKFLOW_ID" \
-    -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-    -H "Content-Type: application/json" \
-    -d '{"active": true}' 2>&1)
+  local activate_ok=false
+  for retry in 1 2 3; do
+    ACTIVATE_RESPONSE=$(curl -sf --connect-timeout 10 --max-time 30 \
+      -X PATCH "$N8N_API_URL/workflows/$WORKFLOW_ID" \
+      -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"active": true}' 2>&1)
 
-  if echo "$ACTIVATE_RESPONSE" | jq -e '.active == true' > /dev/null 2>&1; then
+    if echo "$ACTIVATE_RESPONSE" | jq -e '.active == true' > /dev/null 2>&1; then
+      activate_ok=true
+      break
+    fi
+    [[ $retry -lt 3 ]] && { log_warn "激活失败，重试 $retry/3..."; sleep 2; }
+  done
+
+  if [[ "$activate_ok" == "true" ]]; then
     log_info "Workflow 已激活"
   else
     log_warn "Workflow 激活失败，但继续执行"

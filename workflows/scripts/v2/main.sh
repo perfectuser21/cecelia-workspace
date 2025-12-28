@@ -94,10 +94,14 @@ if ! acquire_lock; then
 fi
 
 # 信号处理函数
+LOCK_RELEASED=false
 cleanup_and_exit() {
   local sig="$1"
   log_warn "收到信号 $sig，开始清理..."
-  release_lock
+  if [[ "$LOCK_RELEASED" != "true" ]]; then
+    release_lock
+    LOCK_RELEASED=true
+  fi
   exit 130
 }
 
@@ -105,7 +109,7 @@ cleanup_and_exit() {
 trap 'cleanup_and_exit SIGINT' SIGINT
 trap 'cleanup_and_exit SIGTERM' SIGTERM
 trap 'cleanup_and_exit SIGHUP' SIGHUP
-trap 'release_lock' EXIT
+trap 'if [[ "$LOCK_RELEASED" != "true" ]]; then release_lock; LOCK_RELEASED=true; fi' EXIT
 
 # ============================================================
 # 初始化
@@ -137,10 +141,12 @@ echo "[阶段 1/4] 准备"
 echo "----------------------------------------"
 
 # 日志输出到终端(stderr)，JSON结果捕获到变量(stdout)
-PREPARE_RESULT=$("$SHARED_DIR/prepare.sh" "$TASK_ID" "$CODING_TYPE" "$RUN_ID") || {
-  echo "准备阶段失败 (exit code: $?)"
+PREPARE_EXIT=0
+PREPARE_RESULT=$("$SHARED_DIR/prepare.sh" "$TASK_ID" "$CODING_TYPE" "$RUN_ID" 2>&1) || PREPARE_EXIT=$?
+if [[ $PREPARE_EXIT -ne 0 ]]; then
+  echo "准备阶段失败 (exit code: $PREPARE_EXIT)"
   exit 4
-}
+fi
 
 # 解析准备结果（只取最后的 JSON 块）
 # 使用 grep -n 找到最后一个以 { 开头的行号，然后从该行开始提取
@@ -289,6 +295,7 @@ if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
   STABILITY_FAILED=false
 
   # 清空稳定性日志（避免无限增长）
+  mkdir -p "$WORK_DIR/logs"
   > "$WORK_DIR/logs/stability.log"
 
   while [[ $STABILITY_COUNT -lt $STABILITY_RUNS ]]; do
