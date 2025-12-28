@@ -12,6 +12,7 @@
 # 环境变量:
 #   MAX_RETRIES    - 最大返工次数（默认 2）
 #   STABILITY_RUNS - 稳定性验证次数（默认 3，质检通过后再跑N次确认）
+#   FULL_RETRY_MAX - 稳定性验证失败后整体重试次数（默认 1）
 #
 # 输出:
 #   - JSON 格式的执行结果
@@ -33,6 +34,7 @@ TASK_ID="${1:-}"
 CODING_TYPE="${2:-}"
 MAX_RETRIES="${MAX_RETRIES:-2}"
 STABILITY_RUNS="${STABILITY_RUNS:-3}"
+FULL_RETRY_MAX="${FULL_RETRY_MAX:-1}"
 
 if [[ -z "$TASK_ID" ]]; then
   echo "用法: main.sh <task_id> <coding_type>"
@@ -67,6 +69,7 @@ esac
 RUN_ID=$(generate_run_id)
 RETRY_COUNT=0
 STABILITY_COUNT=0
+FULL_RETRY_COUNT=0
 FINAL_RESULT=""
 PASSED=false
 
@@ -78,6 +81,7 @@ echo "Coding Type: $CODING_TYPE"
 echo "Run ID: $RUN_ID"
 echo "Max Retries: $MAX_RETRIES"
 echo "Stability Runs: $STABILITY_RUNS"
+echo "Full Retry Max: $FULL_RETRY_MAX"
 echo "=========================================="
 
 # ============================================================
@@ -107,9 +111,22 @@ fi
 echo "准备完成: $WORK_DIR"
 
 # ============================================================
-# 阶段 2 & 3: 执行 + 质检（带返工循环）
+# 阶段 2 & 3 & 3.5: 执行 + 质检 + 稳定性验证（带整体重试）
 # ============================================================
-while [[ $RETRY_COUNT -le $MAX_RETRIES ]]; do
+while [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; do
+  # 如果是整体重试，显示提示
+  if [[ $FULL_RETRY_COUNT -gt 0 ]]; then
+    echo ""
+    echo "=========================================="
+    echo "[整体重试 $FULL_RETRY_COUNT/$FULL_RETRY_MAX]"
+    echo "=========================================="
+    RETRY_COUNT=0  # 重置返工计数
+  fi
+
+  # ------------------------------------------------------------
+  # 执行 + 质检循环（带返工）
+  # ------------------------------------------------------------
+  while [[ $RETRY_COUNT -le $MAX_RETRIES ]]; do
   echo ""
   if [[ $RETRY_COUNT -gt 0 ]]; then
     echo "[返工 $RETRY_COUNT/$MAX_RETRIES]"
@@ -248,13 +265,32 @@ if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
   if [[ "$STABILITY_FAILED" == "true" ]]; then
     echo ""
     echo "稳定性验证失败！在第 $STABILITY_COUNT 次验证时出错"
-    echo "说明代码不稳定，需要检查"
-    PASSED=false
+
+    # 检查是否还有整体重试机会
+    FULL_RETRY_COUNT=$((FULL_RETRY_COUNT + 1))
+    if [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; then
+      echo "将进行整体重试 ($FULL_RETRY_COUNT/$FULL_RETRY_MAX)..."
+      sleep 2
+      PASSED=false
+      continue  # 继续外层循环，整体重试
+    else
+      echo "已用完整体重试次数，需要人工处理"
+      PASSED=false
+      break  # 跳出外层循环
+    fi
   else
     echo ""
     echo "稳定性验证通过！连续 $STABILITY_RUNS 次执行全部成功"
+    break  # 成功，跳出外层循环
   fi
 fi
+
+  # 如果质检都没过（PASSED=false），检查是否需要整体重试
+  if [[ "$PASSED" == "false" ]]; then
+    break  # 质检失败，不需要整体重试，直接退出
+  fi
+
+done  # 结束整体重试循环
 
 # ============================================================
 # 阶段 4: 收尾
@@ -282,6 +318,7 @@ echo "Task ID: $TASK_ID"
 echo "结果: $(if $PASSED; then echo '成功'; else echo '失败'; fi)"
 echo "返工次数: $RETRY_COUNT"
 echo "稳定性验证: $STABILITY_COUNT/$STABILITY_RUNS 次通过"
+echo "整体重试: $FULL_RETRY_COUNT/$FULL_RETRY_MAX 次"
 echo "=========================================="
 
 # 输出 JSON 结果
@@ -293,6 +330,8 @@ FINAL_RESULT=$(jq -n \
   --argjson retry_count "$RETRY_COUNT" \
   --argjson stability_count "$STABILITY_COUNT" \
   --argjson stability_runs "$STABILITY_RUNS" \
+  --argjson full_retry_count "$FULL_RETRY_COUNT" \
+  --argjson full_retry_max "$FULL_RETRY_MAX" \
   --arg work_dir "$WORK_DIR" \
   '{
     run_id: $run_id,
@@ -302,6 +341,8 @@ FINAL_RESULT=$(jq -n \
     retry_count: $retry_count,
     stability_count: $stability_count,
     stability_runs: $stability_runs,
+    full_retry_count: $full_retry_count,
+    full_retry_max: $full_retry_max,
     work_dir: $work_dir
   }')
 
