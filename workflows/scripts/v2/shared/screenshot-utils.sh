@@ -249,7 +249,10 @@ send_feishu_image() {
     return 0
   fi
 
-  # 发送带图片的卡片消息
+  # 飞书卡片消息中的 img 元素需要 img_key（需要先上传到飞书获取）
+  # 由于飞书图片上传 API 需要 app_id/app_secret，这里改用富文本消息嵌入外部图片链接
+  # 或者发送包含图片链接的 Markdown 格式卡片
+
   curl -sf -X POST "$FEISHU_BOT_WEBHOOK" \
     -H "Content-Type: application/json" \
     -d "{
@@ -264,25 +267,38 @@ send_feishu_image() {
         },
         \"elements\": [
           {
-            \"tag\": \"img\",
-            \"img_key\": \"$image_url\",
-            \"alt\": {
-              \"tag\": \"plain_text\",
-              \"content\": \"$title\"
+            \"tag\": \"div\",
+            \"text\": {
+              \"tag\": \"lark_md\",
+              \"content\": \"$description\"
             }
           },
           {
             \"tag\": \"div\",
             \"text\": {
-              \"tag\": \"plain_text\",
-              \"content\": \"$description\"
+              \"tag\": \"lark_md\",
+              \"content\": \"**截图链接**: [$title]($image_url)\"
             }
+          },
+          {
+            \"tag\": \"action\",
+            \"actions\": [
+              {
+                \"tag\": \"button\",
+                \"text\": {
+                  \"tag\": \"plain_text\",
+                  \"content\": \"查看截图\"
+                },
+                \"type\": \"primary\",
+                \"url\": \"$image_url\"
+              }
+            ]
           }
         ]
       }
     }" > /dev/null 2>&1
 
-  log_info "飞书图片通知已发送"
+  log_info "飞书图片通知已发送（链接形式）"
 }
 
 # ============================================================

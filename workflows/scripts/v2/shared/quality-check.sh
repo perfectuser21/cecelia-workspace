@@ -171,9 +171,11 @@ check_git() {
     return 1
   }
 
-  # 检查合并冲突
-  if git diff --check 2>/dev/null | grep -q "conflict"; then
-    fail_check "git" "存在合并冲突"
+  # 检查合并冲突标记 (git diff --check 只检查空白问题，不检测冲突标记)
+  local conflict_files=""
+  conflict_files=$(grep -rl "^<<<<<<< " --include="*.sh" --include="*.json" --include="*.ts" --include="*.js" --include="*.py" . 2>/dev/null || true)
+  if [[ -n "$conflict_files" ]]; then
+    fail_check "git" "存在合并冲突标记: $(echo "$conflict_files" | head -3 | tr '\n' ' ')"
     NEEDS_MANUAL=true
     return 1
   fi
@@ -267,33 +269,33 @@ check_n8n_quality_score() {
   local parameters=0
   local best_practices=0
 
-  # 1. 完整性
+  # 1. 完整性 (使用 ${VAR:-0} 确保变量有默认值，避免算术错误)
   local has_trigger=$(echo "$nodes" | jq '[.[] | select(.type | contains("Trigger"))] | length')
-  [[ $has_trigger -gt 0 ]] && ((completeness+=8))
-  [[ $node_count -ge 2 ]] && ((completeness+=6))
-  [[ $node_count -ge 3 ]] && ((completeness+=6))
+  [[ ${has_trigger:-0} -gt 0 ]] && ((completeness+=8))
+  [[ ${node_count:-0} -ge 2 ]] && ((completeness+=6))
+  [[ ${node_count:-0} -ge 3 ]] && ((completeness+=6))
 
   # 2. 错误处理
   local has_error=$(echo "$nodes" | jq '[.[] | select(.type | contains("errorTrigger"))] | length')
-  [[ $has_error -gt 0 ]] && ((error_handling+=10))
+  [[ ${has_error:-0} -gt 0 ]] && ((error_handling+=10))
   # 检查是否有节点设置了 continueOnFail
   local has_continue_on_fail=$(echo "$nodes" | jq '[.[] | select(.continueOnFail == true)] | length')
-  [[ $has_continue_on_fail -gt 0 ]] && ((error_handling+=10))
+  [[ ${has_continue_on_fail:-0} -gt 0 ]] && ((error_handling+=10))
 
   # 3. 命名
   local default_names=$(echo "$nodes" | jq '[.[] | select(.name | test("^(Code|HTTP|SSH|IF)( \\d+)?$"))] | length')
-  [[ $default_names -eq 0 ]] && ((naming+=15)) || ((naming+=5))
+  [[ ${default_names:-0} -eq 0 ]] && ((naming+=15)) || ((naming+=5))
   ((naming+=5))
 
   # 4. 参数配置
   local has_params=$(echo "$nodes" | jq '[.[] | select(.parameters != null)] | length')
-  [[ $has_params -gt 0 ]] && ((parameters+=10))
+  [[ ${has_params:-0} -gt 0 ]] && ((parameters+=10))
   ((parameters+=10))
 
   # 5. 最佳实践
   local uses_credentials=$(echo "$nodes" | jq '[.[] | select(.credentials != null)] | length')
-  [[ $uses_credentials -gt 0 ]] && ((best_practices+=8))
-  [[ $node_count -le 15 ]] && ((best_practices+=6))
+  [[ ${uses_credentials:-0} -gt 0 ]] && ((best_practices+=8))
+  [[ ${node_count:-0} -le 15 ]] && ((best_practices+=6))
   ((best_practices+=6))
 
   # 计算总分

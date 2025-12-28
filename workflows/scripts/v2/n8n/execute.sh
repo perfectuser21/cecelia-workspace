@@ -79,7 +79,7 @@ if [[ -f "$WORK_DIR/result.json" ]]; then
   "success": true,
   "workflow_id": "$WORKFLOW_ID",
   "workflow_name": "$WORKFLOW_NAME",
-  "node_count": $NODE_COUNT,
+  "node_count": ${NODE_COUNT:-0},
   "template_used": "${TEMPLATE_ID:-none}",
   "skipped": true,
   "reason": "stability_verification"
@@ -245,8 +245,8 @@ $TASK_CONTENT
   \"settings\": {\"executionOrder\": \"v1\"}
 }"
 
-  # 调用 Claude
-  CLAUDE_OUTPUT=$(cd /home/xx/data/factory-workspace && timeout -k 10 300 claude -p "$PROMPT" \
+  # 调用 Claude（超时 600s，复杂 workflow 需要更多时间）
+  CLAUDE_OUTPUT=$(cd /home/xx/data/factory-workspace && timeout -k 10 600 claude -p "$PROMPT" \
     --add-dir "$WORKFLOWS_DIR" --model "sonnet" 2>&1) || {
     log_error "Claude 调用失败"
     exit 1

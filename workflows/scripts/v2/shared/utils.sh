@@ -482,36 +482,10 @@ create_feature_branch() {
 }
 
 # ============================================================
-# 错误处理
-# ============================================================
-
-# 清理函数（trap 使用）
-cleanup_on_exit() {
-  local exit_code=$?
-
-  if [[ $exit_code -ne 0 ]]; then
-    log_error "脚本异常退出 (exit code: $exit_code)"
-
-    # 发送通知
-    if [[ -n "$TASK_ID" ]]; then
-      send_feishu_notification "AI 工厂执行异常\nTask: $TASK_ID\nRun: ${RUN_ID:-unknown}\nExit: $exit_code"
-    fi
-  fi
-
-  # 释放锁
-  release_lock
-
-  exit $exit_code
-}
-
-# 设置退出清理
-setup_cleanup_trap() {
-  trap cleanup_on_exit EXIT
-}
-
-# ============================================================
 # 导出函数（供其他脚本使用）
 # ============================================================
+# 注意: cleanup_on_exit 和 setup_cleanup_trap 已移至 main.sh
+# main.sh 中有完整的进程管理和清理逻辑，避免重复定义
 export -f log_info log_warn log_error log_debug
 export -f acquire_lock release_lock
 export -f create_run_dir generate_run_id

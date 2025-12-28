@@ -72,7 +72,7 @@ if ! acquire_lock; then
 fi
 
 # 设置 trap 确保锁释放（Ctrl+C、正常退出、异常退出）
-trap 'release_lock; exit' EXIT INT TERM
+trap 'release_lock' EXIT
 
 # ============================================================
 # 初始化
@@ -109,7 +109,13 @@ PREPARE_RESULT=$("$SHARED_DIR/prepare.sh" "$TASK_ID" "$CODING_TYPE" "$RUN_ID") |
 }
 
 # 解析准备结果（只取最后的 JSON 块）
-PREPARE_JSON=$(echo "$PREPARE_RESULT" | grep -A 100 '^{' | head -20)
+# 使用 grep -n 找到最后一个以 { 开头的行号，然后从该行开始提取
+LAST_JSON_LINE=$(echo "$PREPARE_RESULT" | grep -n '^{' | tail -1 | cut -d: -f1)
+if [[ -n "$LAST_JSON_LINE" ]]; then
+  PREPARE_JSON=$(echo "$PREPARE_RESULT" | tail -n +"$LAST_JSON_LINE" | head -20)
+else
+  PREPARE_JSON=""
+fi
 WORK_DIR=$(echo "$PREPARE_JSON" | jq -r '.work_dir // empty' 2>/dev/null)
 TASK_INFO_PATH=$(echo "$PREPARE_JSON" | jq -r '.task_info_path // empty' 2>/dev/null)
 
@@ -301,10 +307,10 @@ if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
   fi
 fi
 
-  # 如果质检都没过（PASSED=false），检查是否需要整体重试
-  if [[ "$PASSED" == "false" ]]; then
-    break  # 质检失败，不需要整体重试，直接退出
-  fi
+# 如果质检都没过（PASSED=false），检查是否需要整体重试
+if [[ "$PASSED" == "false" ]]; then
+  break  # 质检失败，不需要整体重试，直接退出
+fi
 
 done  # 结束整体重试循环
 
