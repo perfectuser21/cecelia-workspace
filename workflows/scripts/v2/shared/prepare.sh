@@ -30,9 +30,9 @@ TASK_ID="${1:-}"
 CODING_TYPE="${2:-}"
 RUN_ID="${3:-}"
 
-# 清理 TASK_ID 中的特殊字符（只保留字母数字和连字符）
+# P0: 清理 TASK_ID 中的特殊字符（使用白名单：字母、数字、连字符、下划线）
 ORIGINAL_TASK_ID="$TASK_ID"
-TASK_ID=$(echo "$TASK_ID" | tr -cd '[:alnum:]-')
+TASK_ID=$(echo "$TASK_ID" | tr -cd 'a-zA-Z0-9_-')
 if [[ -z "$TASK_ID" ]]; then
   log_error "TASK_ID 无效（原始值: '$ORIGINAL_TASK_ID'，清理后为空）"
   exit 1
@@ -70,6 +70,9 @@ if [[ -z "$RUN_ID" ]]; then
   RUN_ID=$(generate_run_id)
 fi
 
+# P1: 在 create_run_dir 前设置临时 LOG_FILE（用于早期日志记录）
+LOG_FILE="${LOGS_DIR:-/home/xx/data/logs}/prepare-$RUN_ID.log"
+
 log_info "=========================================="
 log_info "准备阶段开始"
 log_info "Task ID: $TASK_ID"
@@ -83,8 +86,8 @@ log_info "=========================================="
 # 注意：锁由 main.sh 统一管理，prepare.sh 不再处理锁
 log_info "[1/4] 创建运行目录..."
 
-# P2: 检查磁盘空间（至少需要 100MB）
-if ! check_disk_space "${RUNS_DIR:-/home/xx/data/runs}" 100; then
+# P1: 检查磁盘空间（至少需要 500MB）
+if ! check_disk_space "${RUNS_DIR:-/home/xx/data/runs}" 500; then
   log_error "磁盘空间不足，无法创建运行目录"
   send_feishu_notification "AI 工厂准备失败\nTask: $TASK_ID\n原因: 磁盘空间不足"
   exit 1
@@ -95,6 +98,7 @@ if [[ -z "$WORK_DIR" || ! -d "$WORK_DIR" ]]; then
   log_error "创建运行目录失败: RUN_ID=$RUN_ID"
   exit 1
 fi
+# 更新 LOG_FILE 到运行目录
 LOG_FILE="$WORK_DIR/logs/prepare.log"
 
 log_info "运行目录: $WORK_DIR"
@@ -118,6 +122,21 @@ else
 
     # 发送通知
     send_feishu_notification "AI 工厂准备失败\nTask: $TASK_ID\nRun: $RUN_ID\n原因: Git 状态不干净，需要人工清理"
+
+    exit 1
+  fi
+
+  # P0: 检查 Git submodule 状态
+  cd "$PROJECT_DIR" || exit 1
+  if git submodule status 2>/dev/null | grep -qE '^[-+]'; then
+    log_error "Git submodule 状态异常，请先同步 submodule"
+    log_error "提示: 使用 'git submodule update --init --recursive' 同步"
+
+    if ! jq -n '{error: "submodule_not_clean", message: "Git submodule 状态异常"}' > "$WORK_DIR/error.json"; then
+      log_warn "无法写入 error.json"
+    fi
+
+    send_feishu_notification "AI 工厂准备失败\nTask: $TASK_ID\nRun: $RUN_ID\n原因: Git submodule 状态异常"
 
     exit 1
   fi
@@ -154,6 +173,15 @@ if [[ "${TEST_MODE:-}" == "1" ]]; then
       content: $content,
       coding_type: $coding_type
     }')
+
+  # P1: 在 TEST_MODE 下也验证 mock JSON 有效性
+  if ! echo "$TASK_INFO" | jq empty 2>/dev/null; then
+    log_error "[TEST_MODE] Mock JSON 生成失败"
+    if ! jq -n '{error: "mock_json_invalid", message: "Mock JSON 生成失败"}' > "$WORK_DIR/error.json"; then
+      log_warn "无法写入 error.json"
+    fi
+    exit 1
+  fi
 else
   TASK_INFO=$(fetch_notion_task "$TASK_ID")
 
@@ -192,6 +220,10 @@ log_info "任务详情已保存: $WORK_DIR/task_info.json"
 TASK_NAME=$(echo "$TASK_INFO" | jq -r '.task_name')
 if [[ -z "$TASK_NAME" || "$TASK_NAME" == "null" ]]; then
   log_error "任务名称为空或无效: '$TASK_NAME'"
+  # P1: 保存错误信息到 error.json
+  if ! jq -n --arg task_name "$TASK_NAME" '{error: "task_name_invalid", message: "任务名称为空或无效", task_name: $task_name}' > "$WORK_DIR/error.json"; then
+    log_warn "无法写入 error.json"
+  fi
   exit 1
 fi
 log_info "任务名称: $TASK_NAME"
@@ -207,7 +239,14 @@ export BRANCH_NAME
 export WORK_DIR
 export LOG_FILE
 
-save_env "$WORK_DIR"
+# P0: 检查 save_env 返回值
+if ! save_env "$WORK_DIR"; then
+  log_error "保存环境变量失败"
+  if ! jq -n '{error: "save_env_failed", message: "保存环境变量失败"}' > "$WORK_DIR/error.json"; then
+    log_warn "无法写入 error.json"
+  fi
+  exit 1
+fi
 
 # ============================================================
 # 更新 Notion 状态

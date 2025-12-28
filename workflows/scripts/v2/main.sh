@@ -17,7 +17,14 @@
 #
 # 输出:
 #   - JSON 格式的执行结果
-#   - 返回值: 0=成功, 1=失败, 2=失败需人工处理, 4=准备阶段失败, 5=准备数据异常
+#   - 返回值:
+#     0 = 成功
+#     1 = 一般失败
+#     2 = 失败需人工处理（质检失败或超过最大返工次数）
+#     3 = 质检超时
+#     4 = 准备阶段失败
+#     5 = 准备数据异常
+#     6 = 致命错误（如脚本不存在）
 #
 
 set -e
@@ -94,22 +101,43 @@ if ! acquire_lock; then
 fi
 
 # 信号处理函数
-LOCK_RELEASED=false
+# P0 修复: 使用数字 0/1 代替字符串，简化 trap 逻辑防止竞态
+LOCK_RELEASED=0
+CLEANUP_IN_PROGRESS=0
+
 cleanup_and_exit() {
-  local sig="$1"
+  # 防止重复触发
+  [[ $CLEANUP_IN_PROGRESS -eq 1 ]] && return
+  CLEANUP_IN_PROGRESS=1
+
+  local sig="${1:-EXIT}"
   log_warn "收到信号 $sig，开始清理..."
-  if [[ "$LOCK_RELEASED" != "true" ]]; then
-    release_lock
-    LOCK_RELEASED=true
+
+  # 杀死所有子进程
+  local child_pids
+  child_pids=$(jobs -p 2>/dev/null) || true
+  if [[ -n "$child_pids" ]]; then
+    log_warn "终止子进程: $child_pids"
+    kill $child_pids 2>/dev/null || true
+    sleep 1
+    kill -9 $child_pids 2>/dev/null || true
   fi
-  exit 130
+
+  # 释放锁
+  if [[ $LOCK_RELEASED -eq 0 ]]; then
+    release_lock
+    LOCK_RELEASED=1
+  fi
+
+  # 如果是信号触发，退出码 130
+  [[ "$sig" != "EXIT" ]] && exit 130
 }
 
-# 设置 trap 确保锁释放（Ctrl+C、正常退出、异常退出）
+# 设置 trap 确保锁释放（简化逻辑，统一入口）
 trap 'cleanup_and_exit SIGINT' SIGINT
 trap 'cleanup_and_exit SIGTERM' SIGTERM
 trap 'cleanup_and_exit SIGHUP' SIGHUP
-trap 'if [[ "$LOCK_RELEASED" != "true" ]]; then release_lock; LOCK_RELEASED=true; fi' EXIT
+trap 'cleanup_and_exit EXIT' EXIT
 
 # ============================================================
 # 初始化
@@ -121,6 +149,9 @@ FULL_RETRY_COUNT=0
 FINAL_RESULT=""
 PASSED=false
 FATAL_ERROR=false
+# P1 修复: 添加标志区分不同失败类型
+QUALITY_FAILED_MANUAL=false
+QUALITY_TIMEOUT=false
 
 echo "=========================================="
 echo "AI 工厂 v2"
@@ -141,8 +172,11 @@ echo "[阶段 1/4] 准备"
 echo "----------------------------------------"
 
 # 日志输出到终端(stderr)，JSON结果捕获到变量(stdout)
+# P1 修复: 添加 timeout 控制，超时后 10 秒强杀
 PREPARE_EXIT=0
-PREPARE_RESULT=$("$SHARED_DIR/prepare.sh" "$TASK_ID" "$CODING_TYPE" "$RUN_ID" 2>&1) || PREPARE_EXIT=$?
+PREPARE_RESULT=$(timeout -k 10 300 "$SHARED_DIR/prepare.sh" "$TASK_ID" "$CODING_TYPE" "$RUN_ID" 2>&1) || PREPARE_EXIT=$?
+# 等待子进程确保退出
+wait 2>/dev/null || true
 if [[ $PREPARE_EXIT -ne 0 ]]; then
   echo "准备阶段失败 (exit code: $PREPARE_EXIT)"
   exit 4
@@ -207,10 +241,14 @@ while [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; do
     echo "错误: 执行脚本不存在: $EXECUTE_SCRIPT"
     PASSED=false
     FATAL_ERROR=true
-    break
+    # P0 修复: 使用 break 2 直接跳出外层循环
+    break 2
   fi
 
-  EXECUTE_RESULT=$("$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH" 2>&1) && EXECUTE_EXIT=0 || EXECUTE_EXIT=$?
+  # P1 修复: 添加 timeout 控制，超时后 10 秒强杀
+  EXECUTE_RESULT=$(timeout -k 10 600 "$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH" 2>&1) && EXECUTE_EXIT=0 || EXECUTE_EXIT=$?
+  # 等待子进程确保退出
+  wait 2>/dev/null || true
 
   if [[ $EXECUTE_EXIT -ne 0 ]]; then
     echo "执行阶段失败 (exit code: $EXECUTE_EXIT)"
@@ -241,7 +279,10 @@ while [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; do
   QUALITY_SCRIPT="$SHARED_DIR/quality-check.sh"
 
   if [[ -f "$QUALITY_SCRIPT" ]]; then
-    QUALITY_RESULT=$("$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE" 2>&1) && QUALITY_EXIT=0 || QUALITY_EXIT=$?
+    # P1 修复: 添加 timeout 控制，超时后 10 秒强杀
+    QUALITY_RESULT=$(timeout -k 10 300 "$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE" 2>&1) && QUALITY_EXIT=0 || QUALITY_EXIT=$?
+    # 等待子进程确保退出
+    wait 2>/dev/null || true
 
     case $QUALITY_EXIT in
       0)
@@ -266,6 +307,16 @@ while [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; do
       2)
         echo "质检失败，需要人工处理"
         PASSED=false
+        # P1 修复: 添加标志区分质检失败需人工处理
+        QUALITY_FAILED_MANUAL=true
+        # P0 修复: 使用 break 2 直接跳出外层循环
+        break 2
+        ;;
+      124)
+        # P1 修复: 区分超时退出
+        echo "质检脚本超时 (exit code: 124)"
+        PASSED=false
+        QUALITY_TIMEOUT=true
         break
         ;;
       *)
@@ -294,36 +345,44 @@ if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
   STABILITY_COUNT=0
   STABILITY_FAILED=false
 
-  # 清空稳定性日志（避免无限增长）
+  # P1 修复: 按运行次数分离日志文件
   mkdir -p "$WORK_DIR/logs"
-  > "$WORK_DIR/logs/stability.log"
 
   while [[ $STABILITY_COUNT -lt $STABILITY_RUNS ]]; do
     STABILITY_COUNT=$((STABILITY_COUNT + 1))
     echo ""
     echo "[稳定性验证 $STABILITY_COUNT/$STABILITY_RUNS]"
 
+    # P1 修复: 按运行次数分离日志
+    STABILITY_LOG="$WORK_DIR/logs/stability-run-$STABILITY_COUNT.log"
+
     # 重新执行
     echo "  执行中..."
-    EXECUTE_RESULT=$("$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH" 2>>"$WORK_DIR/logs/stability.log") && EXECUTE_EXIT=0 || EXECUTE_EXIT=$?
+    # P1 修复: 添加 timeout 控制
+    EXECUTE_RESULT=$(timeout -k 10 600 "$EXECUTE_SCRIPT" "$RUN_ID" "$TASK_INFO_PATH" 2>"$STABILITY_LOG") && EXECUTE_EXIT=0 || EXECUTE_EXIT=$?
+    # 等待子进程确保退出
+    wait 2>/dev/null || true
 
     if [[ $EXECUTE_EXIT -ne 0 ]]; then
-      echo "  ❌ 执行失败 (第 $STABILITY_COUNT 次)"
+      echo "  执行失败 (第 $STABILITY_COUNT 次, exit: $EXECUTE_EXIT)"
       STABILITY_FAILED=true
       break
     fi
 
     # 重新质检
     echo "  质检中..."
-    QUALITY_RESULT=$("$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE" 2>>"$WORK_DIR/logs/stability.log") && QUALITY_EXIT=0 || QUALITY_EXIT=$?
+    # P1 修复: 添加 timeout 控制
+    QUALITY_RESULT=$(timeout -k 10 300 "$QUALITY_SCRIPT" "$RUN_ID" "$CODING_TYPE" 2>>"$STABILITY_LOG") && QUALITY_EXIT=0 || QUALITY_EXIT=$?
+    # 等待子进程确保退出
+    wait 2>/dev/null || true
 
     if [[ $QUALITY_EXIT -ne 0 ]]; then
-      echo "  ❌ 质检失败 (第 $STABILITY_COUNT 次)"
+      echo "  质检失败 (第 $STABILITY_COUNT 次, exit: $QUALITY_EXIT)"
       STABILITY_FAILED=true
       break
     fi
 
-    echo "  ✅ 通过"
+    echo "  通过"
   done
 
   if [[ "$STABILITY_FAILED" == "true" ]]; then
@@ -349,14 +408,10 @@ if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
   fi
 fi
 
-# 如果质检都没过（PASSED=false），检查是否需要整体重试
+# P0 修复: FATAL_ERROR 已通过 break 2 跳出，不需要重复检查
+# 如果质检都没过（PASSED=false），直接退出外层循环
 if [[ "$PASSED" == "false" ]]; then
   break  # 质检失败，不需要整体重试，直接退出
-fi
-
-# 如果遇到致命错误，跳出外层循环
-if [[ "$FATAL_ERROR" == "true" ]]; then
-  break
 fi
 
 done  # 结束整体重试循环
@@ -421,11 +476,17 @@ FINAL_RESULT=$(jq -n \
 
 echo "$FINAL_RESULT"
 
-# 返回适当的退出码
+# P1 修复: 返回适当的退出码，区分不同失败类型
 if [[ "$PASSED" == "true" ]]; then
-  exit 0
+  exit 0  # 成功
+elif [[ "$QUALITY_FAILED_MANUAL" == "true" ]]; then
+  exit 2  # 质检失败，需要人工处理
+elif [[ "$QUALITY_TIMEOUT" == "true" ]]; then
+  exit 3  # 质检超时
+elif [[ "$FATAL_ERROR" == "true" ]]; then
+  exit 6  # 致命错误（如脚本不存在）
 elif [[ $RETRY_COUNT -gt $MAX_RETRIES ]]; then
-  exit 2  # 需要人工处理
+  exit 2  # 超过最大返工次数，需要人工处理
 else
-  exit 1  # 失败
+  exit 1  # 一般失败
 fi

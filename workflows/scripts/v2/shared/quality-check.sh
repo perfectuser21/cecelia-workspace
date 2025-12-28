@@ -194,7 +194,15 @@ check_existence() {
     return 1
   fi
 
-  local artifact_count=$(jq '.artifacts | length' "$WORK_DIR/result.json" 2>/dev/null || echo 0)
+  local artifact_count_raw
+  artifact_count_raw=$(jq '.artifacts | length' "$WORK_DIR/result.json" 2>/dev/null || echo 0)
+  # 验证是数字，否则默认为 0
+  local artifact_count
+  if [[ "$artifact_count_raw" =~ ^[0-9]+$ ]]; then
+    artifact_count="$artifact_count_raw"
+  else
+    artifact_count=0
+  fi
   if [[ "$artifact_count" -eq 0 ]]; then
     fail_check "existence" "没有产出物"
     return 1
@@ -219,9 +227,13 @@ check_security() {
         issues+=("发现硬编码密码: $(basename "$file")")
       fi
 
-      # 检查 API Key
-      if grep -qiE '"(api.?key|secret.?key|access.?token)"\s*:\s*"[a-zA-Z0-9]{20,}"' "$file" 2>/dev/null; then
-        issues+=("发现硬编码 API Key: $(basename "$file")")
+      # 检查 API Key（改进正则：32-128字符，排除常见非敏感模式如 UUID）
+      # 匹配模式：字段名包含 key/secret/token，值是 32-128 位字母数字（可含下划线/连字符）
+      if grep -qiE '"(api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|bearer[_-]?token)"\s*:\s*"[a-zA-Z0-9_-]{32,128}"' "$file" 2>/dev/null; then
+        # 排除明显是 UUID 格式的值（8-4-4-4-12）
+        if ! grep -qE '"[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"' "$file" 2>/dev/null; then
+          issues+=("发现硬编码 API Key: $(basename "$file")")
+        fi
       fi
 
       # 检查私钥
@@ -229,7 +241,7 @@ check_security() {
         issues+=("发现私钥内容: $(basename "$file")")
       fi
     fi
-  done < <(find "$WORK_DIR" -maxdepth 1 -name "*.json" -print0 2>/dev/null)
+  done < <(find "$WORK_DIR" -- -maxdepth 1 -name "*.json" -print0 2>/dev/null)
 
   if [[ ${#issues[@]} -gt 0 ]]; then
     fail_check "security" "${issues[*]}"
@@ -284,23 +296,22 @@ check_git() {
       exit 0
     fi
 
-    if ! git merge --no-commit --no-ff "origin/$base_branch" 2>/dev/null; then
-      # 加强 git merge --abort 错误处理
+    # 辅助函数：安全地取消合并
+    _safe_merge_abort() {
       local abort_result
       if ! abort_result=$(git merge --abort 2>&1); then
         echo "WARN:git merge --abort 失败: $abort_result"
         # 尝试使用 reset 作为后备
         git reset --hard HEAD 2>/dev/null || true
       fi
+    }
+
+    if ! git merge --no-commit --no-ff "origin/$base_branch" 2>/dev/null; then
+      _safe_merge_abort
       echo "FAIL:与 $base_branch 存在冲突"
       exit 1
     fi
-    # 加强 git merge --abort 错误处理
-    local abort_result
-    if ! abort_result=$(git merge --abort 2>&1); then
-      echo "WARN:git merge --abort 失败: $abort_result"
-      git reset --hard HEAD 2>/dev/null || true
-    fi
+    _safe_merge_abort
 
     echo "PASS:无合并冲突"
     exit 0
@@ -359,8 +370,12 @@ check_n8n_workflow_exists() {
   fi
 
   # 检查 n8n 中是否存在
-  local response=$(curl -sf "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$workflow_id" \
-    -H "X-N8N-API-KEY: $N8N_REST_API_KEY" 2>/dev/null)
+  # 禁用调试输出，避免 API Key 泄露到日志
+  local response
+  { set +x; } 2>/dev/null
+  response=$(curl -sf "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$workflow_id" \
+    -H "X-N8N-API-KEY: $N8N_REST_API_KEY" 2>/dev/null) || true
+  # 如果之前开启了调试，这里不自动恢复（安全优先）
 
   if [[ -z "$response" ]]; then
     fail_check "n8n_exists" "Workflow $workflow_id 在 n8n 中不存在"
@@ -411,6 +426,22 @@ check_n8n_quality_score() {
     fi
   }
 
+  # P0 修复: 添加 _clamp_score 函数，限制分数在 0-100 范围内
+  _clamp_score() {
+    local score="$1"
+    local min="${2:-0}"
+    local max="${3:-100}"
+    if [[ ! "$score" =~ ^-?[0-9]+$ ]]; then
+      echo "$min"
+    elif [[ "$score" -lt "$min" ]]; then
+      echo "$min"
+    elif [[ "$score" -gt "$max" ]]; then
+      echo "$max"
+    else
+      echo "$score"
+    fi
+  }
+
   # 评分维度
   local completeness=0
   local error_handling=0
@@ -456,9 +487,13 @@ check_n8n_quality_score() {
   local has_params
   has_params=$(_validate_numeric "$(echo "$nodes" | jq '[.[] | select(.parameters != null and (.parameters | length) > 0)] | length' 2>/dev/null)")
   [[ ${has_params:-0} -gt 0 ]] && parameters=$((parameters + 10))
-  # 参数配置比例检查
-  if [[ ${node_count:-0} -gt 0 ]] && [[ $((has_params * 100 / node_count)) -ge 50 ]]; then
-    parameters=$((parameters + 10))
+  # 参数配置比例检查（确保两个变量都是合法整数且 node_count > 0）
+  local _nc="${node_count:-0}"
+  local _hp="${has_params:-0}"
+  if [[ "$_nc" =~ ^[0-9]+$ ]] && [[ "$_hp" =~ ^[0-9]+$ ]] && [[ "$_nc" -gt 0 ]]; then
+    if [[ $((_hp * 100 / _nc)) -ge 50 ]]; then
+      parameters=$((parameters + 10))
+    fi
   fi
 
   # 5. 最佳实践 (20分)
@@ -474,8 +509,11 @@ check_n8n_quality_score() {
   has_notes=$(_validate_numeric "$(echo "$nodes" | jq '[.[] | select(.notes != null and .notes != "")] | length' 2>/dev/null)")
   [[ ${has_notes:-0} -gt 0 ]] && best_practices=$((best_practices + 6))
 
-  # 计算总分
-  local total=$((completeness + error_handling + naming + parameters + best_practices))
+  # 计算总分并使用 _clamp_score 限制范围
+  local total_raw=$((completeness + error_handling + naming + parameters + best_practices))
+  # P0 修复: 使用 _clamp_score 限制分数在 0-100 范围内
+  local total
+  total=$(_clamp_score "$total_raw")
 
   log_info "    完整性: $completeness/20"
   log_info "    错误处理: $error_handling/20"
@@ -511,7 +549,15 @@ check_backend_result() {
   fi
 
   # 检查文件数
-  local files_changed=$(jq -r '.artifacts[0].files_changed // .files_changed // 0' "$WORK_DIR/result.json" 2>/dev/null)
+  local files_changed_raw
+  files_changed_raw=$(jq -r '.artifacts[0].files_changed // .files_changed // 0' "$WORK_DIR/result.json" 2>/dev/null)
+  # 验证是数字，否则默认为 0
+  local files_changed
+  if [[ "$files_changed_raw" =~ ^[0-9]+$ ]]; then
+    files_changed="$files_changed_raw"
+  else
+    files_changed=0
+  fi
   if [[ "$files_changed" -eq 0 ]]; then
     fail_check "backend_result" "没有生成文件"
     return 1
@@ -550,7 +596,15 @@ check_frontend_result() {
   fi
 
   # 检查组件数
-  local components=$(jq -r '.artifacts[0].components_created // .components_created // 0' "$WORK_DIR/result.json" 2>/dev/null)
+  local components_raw
+  components_raw=$(jq -r '.artifacts[0].components_created // .components_created // 0' "$WORK_DIR/result.json" 2>/dev/null)
+  # 验证是数字，否则默认为 0
+  local components
+  if [[ "$components_raw" =~ ^[0-9]+$ ]]; then
+    components="$components_raw"
+  else
+    components=0
+  fi
   if [[ "$components" -eq 0 ]]; then
     fail_check "frontend_result" "没有生成组件"
     return 1

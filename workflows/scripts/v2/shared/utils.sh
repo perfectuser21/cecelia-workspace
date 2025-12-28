@@ -45,7 +45,7 @@ _init_locks_dir() {
 _init_locks_dir 2>/dev/null || true
 
 LOCK_FILE="$LOCKS_DIR/workflow-factory.lock"
-LOCK_TIMEOUT=1800  # 30 分钟死锁阈值
+LOCK_TIMEOUT=600  # P1 修复: 10 分钟死锁阈值（原 30 分钟太长）
 LOCK_RETRY_INTERVAL=60  # 重试间隔 60 秒
 LOCK_MAX_RETRIES=3  # 最大重试次数
 
@@ -78,10 +78,20 @@ _log() {
   # 输出到 stderr（可被重定向到日志文件）
   echo -e "${color}[$timestamp] [$level]${NC} $message" >&2
 
-  # 如果设置了日志文件，也写入文件
+  # 如果设置了日志文件，也写入文件（P0: 安全权限 + 并发保护）
   if [[ -n "$LOG_FILE" ]]; then
-    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null
-    echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
+    local log_dir
+    log_dir="$(dirname "$LOG_FILE")"
+    if [[ ! -d "$log_dir" ]]; then
+      mkdir -p "$log_dir" 2>/dev/null && chmod 700 "$log_dir"
+    fi
+    # P0 修复: 使用 flock 防止并发写入竞态
+    (
+      flock -w 5 200 2>/dev/null || true
+      echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
+      # 确保日志文件权限安全（仅当前用户可读写）
+      chmod 600 "$LOG_FILE" 2>/dev/null || true
+    ) 200>"${LOG_FILE}.lock"
   fi
 }
 
@@ -119,20 +129,37 @@ is_lock_stale() {
 
 # 获取锁
 # 返回: 0=成功, 1=失败
+# P1 修复: 使用 mkdir 原子操作替代文件创建，避免 TOCTOU 竞态
 acquire_lock() {
   local retries=0
+  local lock_dir="${LOCK_FILE}.d"
 
   while [[ $retries -lt $LOCK_MAX_RETRIES ]]; do
     # 检查死锁
     if is_lock_stale; then
       log_warn "发现过期锁，强制清理"
-      rm -f "$LOCK_FILE"
+      rm -rf "$lock_dir" "$LOCK_FILE" 2>/dev/null
     fi
 
-    # 尝试获取锁（原子操作，限制权限）
-    if (umask 077; set -C; echo "PID: $$
+    # P1 修复: 使用 mkdir 原子操作获取锁（mkdir 是原子的）
+    if mkdir "$lock_dir" 2>/dev/null; then
+      # mkdir 成功，写入锁信息
+      echo "PID: $$
 TASK_ID: ${TASK_ID:-unknown}
-STARTED_AT: $(date -Iseconds)" > "$LOCK_FILE") 2>/dev/null; then
+STARTED_AT: $(date -Iseconds)" > "$LOCK_FILE"
+      chmod 600 "$LOCK_FILE" 2>/dev/null
+
+      # P1 修复: 验证写入的 PID 是否正确（防止写入竞态）
+      local written_pid
+      written_pid=$(grep -oP 'PID: \K\d+' "$LOCK_FILE" 2>/dev/null)
+      if [[ "$written_pid" != "$$" ]]; then
+        log_warn "锁 PID 验证失败 (expected: $$, got: $written_pid)"
+        rm -rf "$lock_dir" 2>/dev/null
+        retries=$((retries + 1))
+        sleep 1
+        continue
+      fi
+
       log_info "获取锁成功 (PID: $$)"
       return 0
     fi
@@ -152,12 +179,15 @@ STARTED_AT: $(date -Iseconds)" > "$LOCK_FILE") 2>/dev/null; then
 
 # 释放锁
 # 只有锁持有者进程才能释放锁，防止子进程误释放
+# P1 修复: 同时清理锁目录
 release_lock() {
+  local lock_dir="${LOCK_FILE}.d"
   if [[ -f "$LOCK_FILE" ]]; then
     local holder_pid=$(grep -oP 'PID: \K\d+' "$LOCK_FILE" 2>/dev/null)
     # 只有锁持有者才能释放
     if [[ "$holder_pid" == "$$" ]]; then
       rm -f "$LOCK_FILE"
+      rm -rf "$lock_dir" 2>/dev/null
       log_info "释放锁成功 (PID: $$)"
     else
       log_debug "锁不属于当前进程 (holder: $holder_pid, current: $$)，不释放"
@@ -192,34 +222,53 @@ check_disk_space() {
   return 0
 }
 
-# 创建运行目录
+# 创建运行目录（使用 flock 保护，防止竞态条件）
 # 参数: $1=run_id
 # 返回: 运行目录路径（失败时返回空字符串并返回非零状态）
 create_run_dir() {
   local run_id="$1"
   local run_dir="$RUNS_DIR/$run_id"
+  local lock_file="$LOCKS_DIR/run_dir_create.lock"
 
-  # P2 修复: 添加返回值检查和权限验证
-  if ! mkdir -p "$run_dir/logs" 2>/dev/null; then
-    log_error "无法创建目录: $run_dir/logs"
-    return 1
+  # 确保锁目录存在
+  mkdir -p "$LOCKS_DIR" 2>/dev/null || true
+
+  # 使用 flock 进行原子化目录创建（P0: 防止竞态条件）
+  (
+    flock -w 10 200 || {
+      log_error "获取目录创建锁超时"
+      return 1
+    }
+
+    # P2 修复: 添加返回值检查和权限验证
+    if ! mkdir -p "$run_dir/logs" 2>/dev/null; then
+      log_error "无法创建目录: $run_dir/logs"
+      return 1
+    fi
+
+    if ! mkdir -p "$run_dir/screenshots" 2>/dev/null; then
+      log_error "无法创建目录: $run_dir/screenshots"
+      return 1
+    fi
+
+    # 验证目录可写
+    if [[ ! -w "$run_dir" ]]; then
+      log_error "目录不可写: $run_dir"
+      return 1
+    fi
+
+    # 设置安全权限（仅当前用户可访问）
+    chmod 700 "$run_dir" 2>/dev/null || {
+      log_warn "无法设置目录权限: $run_dir"
+    }
+
+  ) 200>"$lock_file"
+
+  # 检查子 shell 的退出状态
+  local exit_code=$?
+  if [[ $exit_code -ne 0 ]]; then
+    return $exit_code
   fi
-
-  if ! mkdir -p "$run_dir/screenshots" 2>/dev/null; then
-    log_error "无法创建目录: $run_dir/screenshots"
-    return 1
-  fi
-
-  # 验证目录可写
-  if [[ ! -w "$run_dir" ]]; then
-    log_error "目录不可写: $run_dir"
-    return 1
-  fi
-
-  # 设置安全权限（仅当前用户可访问）
-  chmod 700 "$run_dir" 2>/dev/null || {
-    log_warn "无法设置目录权限: $run_dir"
-  }
 
   echo "$run_dir"
 }
@@ -237,13 +286,17 @@ generate_run_id() {
 # ============================================================
 
 # 加载 secrets
+# P0 修复: 权限不安全时 return 1 而非仅警告
 load_secrets() {
   local secrets_file="$WORKFLOWS_DIR/.secrets"
   if [[ -f "$secrets_file" ]]; then
-    # 检查文件权限，拒绝过于宽松的权限
-    local perms=$(stat -c %a "$secrets_file" 2>/dev/null || stat -f %Lp "$secrets_file" 2>/dev/null)
+    # P0 修复: 检查文件权限，拒绝过于宽松的权限
+    local perms
+    perms=$(stat -c %a "$secrets_file" 2>/dev/null || stat -f %Lp "$secrets_file" 2>/dev/null)
     if [[ "$perms" != "600" && "$perms" != "400" ]]; then
-      log_warn "Secrets 文件权限不安全 ($perms)，建议设置为 600"
+      log_error "Secrets 文件权限不安全 ($perms)，必须设置为 600 或 400"
+      log_error "请运行: chmod 600 $secrets_file"
+      return 1
     fi
     source "$secrets_file"
   else
@@ -282,25 +335,52 @@ fetch_notion_task() {
     return 1
   fi
 
-  # P2 修复: 保存 curl stderr 到临时文件用于诊断
+  # P0 修复: 安全创建临时文件，检查返回值并设置权限
   local curl_err_file
-  curl_err_file=$(mktemp -t notion-curl-err.XXXXXX 2>/dev/null || echo "/tmp/notion-curl-err.$$")
+  curl_err_file=$(mktemp -t notion-curl-err.XXXXXX 2>/dev/null)
+  if [[ -z "$curl_err_file" || ! -f "$curl_err_file" ]]; then
+    log_error "无法创建临时文件用于 curl 错误诊断"
+    return 1
+  fi
+  chmod 600 "$curl_err_file" 2>/dev/null || {
+    rm -f "$curl_err_file"
+    log_error "无法设置临时文件权限"
+    return 1
+  }
   trap "rm -f '$curl_err_file'" RETURN
 
-  # 获取页面属性（带重试）
+  # P1 修复: 获取页面属性（带重试，不重试 401/403 认证错误）
   local response=""
   local retries=0
   local max_retries=2
+  local http_code=""
   while [[ $retries -lt $max_retries ]]; do
-    response=$(curl -sf --connect-timeout 10 --max-time 30 "https://api.notion.com/v1/pages/$task_id" \
+    # P1 修复: 使用 -w 获取 HTTP 状态码，用于判断是否应该重试
+    local curl_output
+    curl_output=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" \
+      "https://api.notion.com/v1/pages/$task_id" \
       -H "Authorization: Bearer $NOTION_API_KEY" \
       -H "Notion-Version: 2022-06-28" \
-      -H "Content-Type: application/json" 2>"$curl_err_file") && break
+      -H "Content-Type: application/json" 2>"$curl_err_file")
+    http_code=$(echo "$curl_output" | tail -1)
+    response=$(echo "$curl_output" | sed '$d')
+
+    # 成功
+    if [[ "$http_code" == "200" ]]; then
+      break
+    fi
+
+    # P1 修复: 401/403 认证错误不重试
+    if [[ "$http_code" == "401" || "$http_code" == "403" ]]; then
+      log_error "Notion API 认证失败 (HTTP $http_code)，不重试"
+      return 1
+    fi
+
     retries=$((retries + 1))
     if [[ $retries -lt $max_retries ]]; then
       local curl_err
       curl_err=$(cat "$curl_err_file" 2>/dev/null | head -c 200)
-      log_warn "获取 Notion 页面失败，重试 $retries/$max_retries... (错误: ${curl_err:-unknown})"
+      log_warn "获取 Notion 页面失败 (HTTP $http_code)，重试 $retries/$max_retries... (错误: ${curl_err:-unknown})"
       sleep 2
     fi
   done
@@ -312,18 +392,34 @@ fetch_notion_task() {
     return 1
   fi
 
-  # 获取页面内容（blocks，带重试）
+  # P1 修复: 获取页面内容（blocks，带重试，不重试 401/403）
   local blocks=""
   retries=0
   while [[ $retries -lt $max_retries ]]; do
-    blocks=$(curl -sf --connect-timeout 10 --max-time 30 "https://api.notion.com/v1/blocks/$task_id/children" \
+    local blocks_output
+    blocks_output=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" \
+      "https://api.notion.com/v1/blocks/$task_id/children" \
       -H "Authorization: Bearer $NOTION_API_KEY" \
-      -H "Notion-Version: 2022-06-28" 2>"$curl_err_file") && break
+      -H "Notion-Version: 2022-06-28" 2>"$curl_err_file")
+    http_code=$(echo "$blocks_output" | tail -1)
+    blocks=$(echo "$blocks_output" | sed '$d')
+
+    # 成功
+    if [[ "$http_code" == "200" ]]; then
+      break
+    fi
+
+    # P1 修复: 401/403 认证错误不重试
+    if [[ "$http_code" == "401" || "$http_code" == "403" ]]; then
+      log_error "Notion API blocks 认证失败 (HTTP $http_code)，不重试"
+      return 1
+    fi
+
     retries=$((retries + 1))
     if [[ $retries -lt $max_retries ]]; then
       local curl_err
       curl_err=$(cat "$curl_err_file" 2>/dev/null | head -c 200)
-      log_warn "获取 Notion blocks 失败，重试 $retries/$max_retries... (错误: ${curl_err:-unknown})"
+      log_warn "获取 Notion blocks 失败 (HTTP $http_code)，重试 $retries/$max_retries... (错误: ${curl_err:-unknown})"
       sleep 2
     fi
   done
@@ -563,24 +659,64 @@ check_git_clean() {
 
 # 创建 feature 分支
 # 参数: $1=task_id
+# P1 修复: 添加完整错误处理
 create_feature_branch() {
   local task_id="$1"
   local branch_name="feature/$task_id"
 
-  cd "$PROJECT_DIR" || return 1
+  # P1 修复: 验证参数
+  if [[ -z "$task_id" ]]; then
+    log_error "task_id 不能为空"
+    return 1
+  fi
 
-  # 切换到基础分支并拉取最新（支持 develop/main/master）
+  # P1 修复: 验证 PROJECT_DIR 存在且是 git 仓库
+  if [[ ! -d "$PROJECT_DIR/.git" ]]; then
+    log_error "PROJECT_DIR 不是有效的 Git 仓库: $PROJECT_DIR"
+    return 1
+  fi
+
+  cd "$PROJECT_DIR" || {
+    log_error "无法进入项目目录: $PROJECT_DIR"
+    return 1
+  }
+
+  # P1 修复: 切换到基础分支并拉取最新（支持 develop/main/master），添加错误处理
   log_info "切换到基础分支..."
-  git checkout develop >/dev/null 2>&1 || git checkout main >/dev/null 2>&1 || git checkout master >/dev/null 2>&1
-  git pull origin "$(git branch --show-current)" >/dev/null 2>&1 || true
+  local checkout_success=false
+  if git checkout develop >/dev/null 2>&1; then
+    checkout_success=true
+  elif git checkout main >/dev/null 2>&1; then
+    checkout_success=true
+  elif git checkout master >/dev/null 2>&1; then
+    checkout_success=true
+  fi
+
+  if [[ "$checkout_success" != "true" ]]; then
+    log_error "无法切换到基础分支 (develop/main/master)"
+    return 1
+  fi
 
   # 记录当前基础分支
-  local base_branch=$(git branch --show-current)
+  local base_branch
+  base_branch=$(git branch --show-current)
+  if [[ -z "$base_branch" ]]; then
+    log_error "无法获取当前分支名称"
+    return 1
+  fi
+
+  # P1 修复: 拉取最新代码，失败时警告但不中断
+  if ! git pull origin "$base_branch" >/dev/null 2>&1; then
+    log_warn "无法从 origin/$base_branch 拉取最新代码，继续使用本地版本"
+  fi
 
   # 检查分支是否已存在
   if git show-ref --verify --quiet "refs/heads/$branch_name"; then
     log_info "分支已存在，切换并更新: $branch_name"
-    git checkout "$branch_name" >/dev/null 2>&1
+    if ! git checkout "$branch_name" >/dev/null 2>&1; then
+      log_error "无法切换到分支: $branch_name"
+      return 1
+    fi
     # 尝试 rebase 到最新基础分支（失败不影响继续）
     if [[ -n "$base_branch" ]]; then
       if git rebase "origin/$base_branch" >/dev/null 2>&1; then
@@ -592,7 +728,18 @@ create_feature_branch() {
     fi
   else
     log_info "创建新分支: $branch_name"
-    git checkout -b "$branch_name" >/dev/null 2>&1
+    if ! git checkout -b "$branch_name" >/dev/null 2>&1; then
+      log_error "无法创建分支: $branch_name"
+      return 1
+    fi
+  fi
+
+  # P1 修复: 验证当前分支是否正确
+  local current_branch
+  current_branch=$(git branch --show-current)
+  if [[ "$current_branch" != "$branch_name" ]]; then
+    log_error "分支切换验证失败: 期望 $branch_name，实际 $current_branch"
+    return 1
   fi
 
   echo "$branch_name"

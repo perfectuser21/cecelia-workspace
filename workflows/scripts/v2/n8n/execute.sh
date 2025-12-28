@@ -38,38 +38,44 @@ match_template() {
   local combined="${task_name} ${task_desc}"
   local combined_lower=$(echo "$combined" | tr '[:upper:]' '[:lower:]')
 
-  # 高置信度关键词直接匹配
-  if echo "$combined_lower" | grep -qiE "github.*star|star.*github"; then
+  # 高置信度关键词直接匹配（使用更严格的边界词匹配）
+  # \b 用于英文单词边界，中文通过上下文确保准确性
+  if echo "$combined_lower" | grep -qiE "\bgithub\b.*\bstar\b|\bstar\b.*\bgithub\b"; then
     echo "github-api"
     return
   fi
 
-  if echo "$combined_lower" | grep -qiE "vps.*健康|健康.*检查.*磁盘|磁盘.*空间.*告警"; then
+  if echo "$combined_lower" | grep -qiE "\bvps\b.*健康|健康.*检查.*磁盘|磁盘.*空间.*告警"; then
     echo "vps-health-check"
     return
   fi
 
-  if echo "$combined_lower" | grep -qiE "ssh|远程执行|服务器命令"; then
+  # ssh 需要严格边界，避免匹配 "sshd" 等
+  if echo "$combined_lower" | grep -qiE "\bssh\b[^a-z]|^ssh$|远程执行|服务器命令"; then
     echo "ssh-execution"
     return
   fi
 
-  if echo "$combined_lower" | grep -qiE "每天|每小时|每分钟|定时|cron|schedule"; then
+  # 定时任务匹配
+  if echo "$combined_lower" | grep -qiE "每天|每小时|每分钟|定时任务|\bcron\b|\bschedule\b"; then
     echo "scheduled-task"
     return
   fi
 
-  if echo "$combined_lower" | grep -qiE "通知|飞书|告警|alert|notification"; then
+  # 通知/告警匹配
+  if echo "$combined_lower" | grep -qiE "通知|飞书|告警|\balert\b|\bnotification\b"; then
     echo "notification"
     return
   fi
 
-  if echo "$combined_lower" | grep -qiE "webhook|ping|pong|api端点"; then
+  # webhook 匹配
+  if echo "$combined_lower" | grep -qiE "\bwebhook\b|\bping\b|\bpong\b|api端点"; then
     echo "webhook-response"
     return
   fi
 
-  if echo "$combined_lower" | grep -qiE "数据处理|etl|database|postgres"; then
+  # 数据处理匹配
+  if echo "$combined_lower" | grep -qiE "数据处理|\betl\b|\bdatabase\b|\bpostgres\b|\bpostgresql\b"; then
     echo "data-processing"
     return
   fi
@@ -197,6 +203,58 @@ $TASK_CONTENT
   fi
 fi
 
+# ============================================================
+# Workflow Schema 验证函数
+# ============================================================
+validate_workflow_schema() {
+  local json="$1"
+
+  # 验证是有效 JSON
+  if ! echo "$json" | jq empty 2>/dev/null; then
+    log_error "Workflow JSON 格式无效"
+    return 1
+  fi
+
+  # 验证必需字段：name
+  local name
+  name=$(echo "$json" | jq -r 'if .name != null and .name != "" then .name else empty end' 2>/dev/null)
+  if [[ -z "$name" ]]; then
+    log_error "Workflow 缺少必需字段: name"
+    return 1
+  fi
+
+  # 验证必需字段：nodes（必须是数组且非空）
+  local nodes_type nodes_length
+  nodes_type=$(echo "$json" | jq -r 'if .nodes != null then (.nodes | type) else "null" end' 2>/dev/null)
+  if [[ "$nodes_type" != "array" ]]; then
+    log_error "Workflow 缺少必需字段: nodes（必须是数组）"
+    return 1
+  fi
+
+  nodes_length=$(echo "$json" | jq '.nodes | length' 2>/dev/null)
+  if [[ -z "$nodes_length" ]] || [[ ! "$nodes_length" =~ ^[0-9]+$ ]] || [[ "$nodes_length" -eq 0 ]]; then
+    log_error "Workflow nodes 数组为空"
+    return 1
+  fi
+
+  # 验证必需字段：connections（必须是对象）
+  local connections_type
+  connections_type=$(echo "$json" | jq -r 'if .connections != null then (.connections | type) else "null" end' 2>/dev/null)
+  if [[ "$connections_type" != "object" ]]; then
+    log_error "Workflow 缺少必需字段: connections（必须是对象）"
+    return 1
+  fi
+
+  return 0
+}
+
+# 验证 Workflow Schema
+if ! validate_workflow_schema "$WORKFLOW_JSON"; then
+  echo "$WORKFLOW_JSON" > "$WORK_DIR/workflow_invalid.json"
+  exit 1
+fi
+log_info "Workflow Schema 验证通过"
+
 # 检查磁盘空间
 check_disk_space "$WORK_DIR" 100 || exit 1
 
@@ -222,10 +280,19 @@ log_info "[3/5] 创建 Workflow..."
 if [[ "${TEST_MODE:-}" == "1" ]]; then
   log_info "[TEST_MODE] 模拟 n8n API 创建"
   WORKFLOW_ID="test-workflow-$(date +%s)-$RANDOM"
-  WORKFLOW_NAME=$(echo "$WORKFLOW_JSON" | jq -r '.name // empty')
-  [[ -z "$WORKFLOW_NAME" ]] && WORKFLOW_NAME="$TASK_NAME"
-  NODE_COUNT=$(echo "$WORKFLOW_JSON" | jq '.nodes | length // 0')
-  [[ ! "$NODE_COUNT" =~ ^[0-9]+$ ]] && NODE_COUNT=0
+
+  # 安全提取 .name，处理 null 和空值
+  WORKFLOW_NAME=$(echo "$WORKFLOW_JSON" | jq -r 'if .name != null and .name != "" then .name else empty end' 2>/dev/null)
+  if [[ -z "$WORKFLOW_NAME" ]]; then
+    WORKFLOW_NAME="$TASK_NAME"
+  fi
+
+  # 安全提取 .nodes | length，处理 null 和非数组情况
+  NODE_COUNT=$(echo "$WORKFLOW_JSON" | jq 'if .nodes != null and (.nodes | type) == "array" then (.nodes | length) else 0 end' 2>/dev/null)
+  if [[ -z "$NODE_COUNT" ]] || [[ ! "$NODE_COUNT" =~ ^[0-9]+$ ]]; then
+    NODE_COUNT=0
+  fi
+
   log_info "Workflow 创建成功: $WORKFLOW_NAME (ID: $WORKFLOW_ID, 节点数: $NODE_COUNT)"
 
   log_info "[4/5] 激活 Workflow..."
@@ -255,30 +322,44 @@ else
 
   # 创建 Workflow（带重试）
   retries=0
-  max_retries=2
+  max_retries=3
   RESPONSE=""
   HTTP_CODE=""
 
+  # 使用临时文件分离响应体和状态码，避免解析问题
+  RESPONSE_BODY_FILE="$WORK_DIR/api_response_body.tmp.$$"
+  CURL_ERROR_FILE="$WORK_DIR/curl_error.tmp.$$"
+  trap 'rm -f "$RESPONSE_BODY_FILE" "$CURL_ERROR_FILE"' RETURN
+
   while [[ $retries -lt $max_retries ]]; do
     # 添加连接超时和最大时间限制，防止无限挂起
-    RESPONSE=$(curl -sf -w "\n%{http_code}" \
+    # stderr 重定向到临时文件，避免 API 密钥泄露到日志
+    HTTP_CODE=$(curl -s -w "%{http_code}" \
       --connect-timeout 10 \
       --max-time 60 \
       -X POST "$N8N_API_URL/workflows" \
       -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
       -H "Content-Type: application/json" \
-      -d "$FILTERED_JSON" 2>&1)
-
-    # 更健壮地提取 HTTP_CODE，处理空行情况
-    HTTP_CODE=$(echo "$RESPONSE" | grep -E '^[0-9]+$' | tail -n1)
+      -d "$FILTERED_JSON" \
+      -o "$RESPONSE_BODY_FILE" 2>"$CURL_ERROR_FILE")
 
     # 验证 HTTP_CODE 是否为有效数字
     if [[ ! "$HTTP_CODE" =~ ^[0-9]+$ ]]; then
       log_error "n8n API 请求失败，无法获取 HTTP 状态码"
+      # 记录 curl 错误（不含敏感信息）
+      if [[ -s "$CURL_ERROR_FILE" ]]; then
+        log_error "curl 错误: $(head -1 "$CURL_ERROR_FILE")"
+      fi
       HTTP_CODE="0"
     fi
 
     if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "201" ]]; then
+      break
+    fi
+
+    # 401/403 认证错误不重试
+    if [[ "$HTTP_CODE" == "401" || "$HTTP_CODE" == "403" ]]; then
+      log_error "n8n API 认证失败 (HTTP $HTTP_CODE)，请检查 API 密钥"
       break
     fi
 
@@ -290,7 +371,11 @@ else
     fi
   done
 
-  RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
+  RESPONSE_BODY=""
+  if [[ -f "$RESPONSE_BODY_FILE" ]]; then
+    RESPONSE_BODY=$(cat "$RESPONSE_BODY_FILE")
+  fi
+  rm -f "$RESPONSE_BODY_FILE" "$CURL_ERROR_FILE"
 
   if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" ]]; then
     log_error "n8n API 创建失败 (HTTP $HTTP_CODE)，已重试 $max_retries 次"
@@ -305,9 +390,14 @@ else
     exit 1
   fi
 
-  WORKFLOW_ID=$(echo "$RESPONSE_BODY" | jq -r '.id // empty')
-  WORKFLOW_NAME=$(echo "$RESPONSE_BODY" | jq -r '.name // empty')
-  NODE_COUNT=$(echo "$RESPONSE_BODY" | jq '.nodes | length' 2>/dev/null)
+  # 安全提取 .id，处理 null
+  WORKFLOW_ID=$(echo "$RESPONSE_BODY" | jq -r 'if .id != null and .id != "" then .id else empty end' 2>/dev/null)
+
+  # 安全提取 .name，处理 null
+  WORKFLOW_NAME=$(echo "$RESPONSE_BODY" | jq -r 'if .name != null and .name != "" then .name else empty end' 2>/dev/null)
+
+  # 安全提取 .nodes | length，处理 null 和非数组情况
+  NODE_COUNT=$(echo "$RESPONSE_BODY" | jq 'if .nodes != null and (.nodes | type) == "array" then (.nodes | length) else 0 end' 2>/dev/null)
 
   # 验证 NODE_COUNT 是有效数字
   if [[ -z "$NODE_COUNT" ]] || [[ ! "$NODE_COUNT" =~ ^[0-9]+$ ]]; then
@@ -337,24 +427,49 @@ else
   log_info "[4/5] 激活 Workflow..."
 
   activate_ok=false
+  ACTIVATE_BODY_FILE="$WORK_DIR/activate_response.tmp.$$"
+  ACTIVATE_ERROR_FILE="$WORK_DIR/activate_error.tmp.$$"
+
   for retry in 1 2 3; do
-    ACTIVATE_RESPONSE=$(curl -sf --connect-timeout 10 --max-time 30 \
+    # 使用临时文件分离响应体，stderr 重定向避免敏感信息泄露
+    ACTIVATE_HTTP_CODE=$(curl -s -w "%{http_code}" \
+      --connect-timeout 10 \
+      --max-time 30 \
       -X PATCH "$N8N_API_URL/workflows/$WORKFLOW_ID" \
       -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
       -H "Content-Type: application/json" \
-      -d '{"active": true}' 2>&1)
+      -d '{"active": true}' \
+      -o "$ACTIVATE_BODY_FILE" 2>"$ACTIVATE_ERROR_FILE")
 
-    if echo "$ACTIVATE_RESPONSE" | jq -e '.active == true' > /dev/null 2>&1; then
+    ACTIVATE_RESPONSE=""
+    if [[ -f "$ACTIVATE_BODY_FILE" ]]; then
+      ACTIVATE_RESPONSE=$(cat "$ACTIVATE_BODY_FILE")
+    fi
+
+    # 检查是否有 .error 字段
+    if echo "$ACTIVATE_RESPONSE" | jq -e '.error != null' > /dev/null 2>&1; then
+      ACTIVATE_ERROR_MSG=$(echo "$ACTIVATE_RESPONSE" | jq -r '.error // .message // "未知错误"' 2>/dev/null)
+      log_warn "激活返回错误: $ACTIVATE_ERROR_MSG"
+      # 保存详细错误
+      echo "$ACTIVATE_RESPONSE" > "$WORK_DIR/activate_error.json"
+    elif echo "$ACTIVATE_RESPONSE" | jq -e '.active == true' > /dev/null 2>&1; then
       activate_ok=true
       break
     fi
-    [[ $retry -lt 3 ]] && { log_warn "激活失败，重试 $retry/3..."; sleep 2; }
+
+    [[ $retry -lt 3 ]] && { log_warn "激活失败 (HTTP $ACTIVATE_HTTP_CODE)，重试 $retry/3..."; sleep $((2 ** retry)); }
   done
+
+  rm -f "$ACTIVATE_BODY_FILE" "$ACTIVATE_ERROR_FILE"
 
   if [[ "$activate_ok" == "true" ]]; then
     log_info "Workflow 已激活"
   else
     log_warn "Workflow 激活失败"
+    # 保存最后一次响应用于调试
+    if [[ -n "$ACTIVATE_RESPONSE" ]]; then
+      echo "$ACTIVATE_RESPONSE" > "$WORK_DIR/activate_last_response.json"
+    fi
     ACTIVATION_FAILED=true
   fi
 fi

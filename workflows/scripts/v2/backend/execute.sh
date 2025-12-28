@@ -174,12 +174,27 @@ $TASK_CONTENT
   }
 
   # 解析并写入文件
+  # 首先验证 .files 是数组类型
+  FILES_TYPE=$(echo "$CODE_OUTPUT" | jq -r 'if .files == null then "null" elif (.files | type) == "array" then "array" else "invalid" end')
+  if [[ "$FILES_TYPE" == "null" ]]; then
+    log_error "Claude 输出缺少 .files 字段"
+    exit 1
+  fi
+  if [[ "$FILES_TYPE" != "array" ]]; then
+    log_error "Claude 输出的 .files 不是数组类型: $FILES_TYPE"
+    exit 1
+  fi
+
   FILE_COUNT=$(echo "$CODE_OUTPUT" | jq '.files | length')
 
   # 验证 FILE_COUNT 是有效数字且在合理范围
   if ! [[ "$FILE_COUNT" =~ ^[0-9]+$ ]]; then
     log_error "FILE_COUNT 不是有效数字: $FILE_COUNT"
     exit 1
+  fi
+  if [[ "$FILE_COUNT" -eq 0 ]]; then
+    log_warn "Claude 未生成任何文件，可能需要检查 PRD 内容"
+    # 不退出，继续执行后续步骤（测试/lint）
   fi
   if [[ "$FILE_COUNT" -gt 100 ]]; then
     log_error "FILE_COUNT 超出限制 (最大 100): $FILE_COUNT"
@@ -201,6 +216,16 @@ $TASK_CONTENT
       continue
     fi
 
+    # 验证 FILE_ACTION 是有效值（create 或 modify）
+    # 同时检查 "null" 字符串（jq 可能返回字符串 "null"）
+    if [[ -z "$FILE_ACTION" || "$FILE_ACTION" == "null" ]]; then
+      log_warn "文件操作类型为空 (索引 $i): $FILE_PATH，默认使用 create"
+      FILE_ACTION="create"
+    elif [[ "$FILE_ACTION" != "create" && "$FILE_ACTION" != "modify" ]]; then
+      log_warn "无效的文件操作类型 '$FILE_ACTION' (索引 $i): $FILE_PATH，默认使用 create"
+      FILE_ACTION="create"
+    fi
+
     # 安全检查：禁止路径遍历
     if [[ "$FILE_PATH" == *".."* ]]; then
       log_error "安全错误: 文件路径包含非法字符 (..): $FILE_PATH"
@@ -214,19 +239,20 @@ $TASK_CONTENT
       log_error "无法解析文件路径: $FULL_PATH"
       exit 1
     }
-    # 路径安全验证：必须在 TARGET_PROJECT 目录内（添加 / 后缀防止前缀匹配绕过）
-    case "$RESOLVED_PATH" in
-      "$TARGET_PROJECT"/*)
-        ;;  # 在允许范围内
-      "$TARGET_PROJECT")
-        log_error "安全错误: 不能写入项目根目录本身"
-        exit 1
-        ;;
-      *)
-        log_error "安全错误: 文件路径逃逸出项目目录: $FILE_PATH -> $RESOLVED_PATH"
-        exit 1
-        ;;
-    esac
+    # 路径安全验证：必须在 TARGET_PROJECT 目录内
+    # 确保 TARGET_PROJECT 不以特殊字符结尾（防止前缀匹配绕过）
+    # 例如：TARGET_PROJECT="/home/xx/dev" 可能匹配 "/home/xx/dev-malicious"
+    TARGET_PROJECT_NORMALIZED="${TARGET_PROJECT%/}"  # 移除末尾斜杠（如果有）
+
+    # 使用 [[ ]] 进行更严格的路径匹配
+    if [[ "$RESOLVED_PATH" == "$TARGET_PROJECT_NORMALIZED" ]]; then
+      log_error "安全错误: 不能写入项目根目录本身"
+      exit 1
+    elif [[ "$RESOLVED_PATH" != "$TARGET_PROJECT_NORMALIZED/"* ]]; then
+      log_error "安全错误: 文件路径逃逸出项目目录: $FILE_PATH -> $RESOLVED_PATH"
+      exit 1
+    fi
+    # else: 在允许范围内，继续执行
 
     mkdir -p "$(dirname "$RESOLVED_PATH")" || {
       log_error "无法创建目录: $(dirname "$RESOLVED_PATH")"
@@ -264,29 +290,46 @@ TEST_OUTPUT=""
 
 TEST_TIMEOUT=${TEST_TIMEOUT:-300}  # 默认 5 分钟超时
 
+# 验证 TEST_TIMEOUT 是有效数字
+if ! [[ "$TEST_TIMEOUT" =~ ^[0-9]+$ ]] || [[ "$TEST_TIMEOUT" -le 0 ]]; then
+  log_warn "TEST_TIMEOUT 不是有效正整数: $TEST_TIMEOUT，使用默认值 300"
+  TEST_TIMEOUT=300
+fi
+
+# 清理可能卡住的测试进程的函数
+cleanup_test_processes() {
+  # 清理可能残留的 npm/pytest 进程
+  pkill -u "$(whoami)" -f "npm test" 2>/dev/null || true
+  pkill -u "$(whoami)" -f "pytest" 2>/dev/null || true
+}
+
 if [[ "${TEST_MODE:-}" == "1" ]]; then
   log_info "[TEST_MODE] 模拟测试通过"
   TEST_RESULT="passed"
   TEST_OUTPUT="All tests passed (mock)"
 else
-  # 使用子 shell 避免改变全局目录
+  # 使用子 shell 隔离目录变更，避免影响后续代码
   if [[ "$PROJECT_TYPE" == "typescript" || "$PROJECT_TYPE" == "javascript" ]]; then
     if [[ -f "$TARGET_PROJECT/package.json" ]] && grep -q '"test"' "$TARGET_PROJECT/package.json"; then
       log_info "运行 npm test (timeout: ${TEST_TIMEOUT}s)..."
-      if ! cd "$TARGET_PROJECT" 2>/dev/null; then
+      # 使用子 shell 隔离 cd，-k 10 表示超时后 10 秒强制 SIGKILL
+      TEST_OUTPUT=$(
+        cd "$TARGET_PROJECT" 2>/dev/null || { echo "Failed to cd to project directory"; exit 1; }
+        timeout -k 10 "$TEST_TIMEOUT" npm test 2>&1
+      )
+      TEST_EXIT_CODE=$?
+      if [[ $TEST_EXIT_CODE -eq 0 ]]; then
+        TEST_RESULT="passed"
+      elif [[ $TEST_EXIT_CODE -eq 124 || $TEST_EXIT_CODE -eq 137 ]]; then
+        # 124 = timeout, 137 = killed by SIGKILL (128+9)
+        TEST_RESULT="timeout"
+        log_warn "npm test 超时 (${TEST_TIMEOUT}s)"
+        cleanup_test_processes
+      elif [[ "$TEST_OUTPUT" == "Failed to cd to project directory" ]]; then
         log_error "无法切换到项目目录: $TARGET_PROJECT"
         TEST_RESULT="failed"
-        TEST_OUTPUT="Failed to cd to project directory"
       else
-        TEST_OUTPUT=$(timeout "$TEST_TIMEOUT" npm test 2>&1) && TEST_RESULT="passed" || {
-          if [[ $? -eq 124 ]]; then
-            TEST_RESULT="timeout"
-            log_warn "npm test 超时 (${TEST_TIMEOUT}s)"
-          else
-            TEST_RESULT="failed"
-          fi
-        }
-        cd - >/dev/null 2>&1 || true
+        TEST_RESULT="failed"
       fi
     else
       log_info "未配置测试脚本，跳过"
@@ -294,20 +337,23 @@ else
   elif [[ "$PROJECT_TYPE" == "python" ]]; then
     if command -v pytest &>/dev/null; then
       log_info "运行 pytest (timeout: ${TEST_TIMEOUT}s)..."
-      if ! cd "$TARGET_PROJECT" 2>/dev/null; then
+      # 使用子 shell 隔离 cd，-k 10 表示超时后 10 秒强制 SIGKILL
+      TEST_OUTPUT=$(
+        cd "$TARGET_PROJECT" 2>/dev/null || { echo "Failed to cd to project directory"; exit 1; }
+        timeout -k 10 "$TEST_TIMEOUT" pytest --tb=short 2>&1
+      )
+      TEST_EXIT_CODE=$?
+      if [[ $TEST_EXIT_CODE -eq 0 ]]; then
+        TEST_RESULT="passed"
+      elif [[ $TEST_EXIT_CODE -eq 124 || $TEST_EXIT_CODE -eq 137 ]]; then
+        TEST_RESULT="timeout"
+        log_warn "pytest 超时 (${TEST_TIMEOUT}s)"
+        cleanup_test_processes
+      elif [[ "$TEST_OUTPUT" == "Failed to cd to project directory" ]]; then
         log_error "无法切换到项目目录: $TARGET_PROJECT"
         TEST_RESULT="failed"
-        TEST_OUTPUT="Failed to cd to project directory"
       else
-        TEST_OUTPUT=$(timeout "$TEST_TIMEOUT" pytest --tb=short 2>&1) && TEST_RESULT="passed" || {
-          if [[ $? -eq 124 ]]; then
-            TEST_RESULT="timeout"
-            log_warn "pytest 超时 (${TEST_TIMEOUT}s)"
-          else
-            TEST_RESULT="failed"
-          fi
-        }
-        cd - >/dev/null 2>&1 || true
+        TEST_RESULT="failed"
       fi
     else
       log_info "pytest 未安装，跳过测试"
@@ -327,82 +373,104 @@ LINT_OUTPUT=""
 
 LINT_TIMEOUT=${LINT_TIMEOUT:-120}  # 默认 2 分钟超时
 
+# 验证 LINT_TIMEOUT 是有效数字
+if ! [[ "$LINT_TIMEOUT" =~ ^[0-9]+$ ]] || [[ "$LINT_TIMEOUT" -le 0 ]]; then
+  log_warn "LINT_TIMEOUT 不是有效正整数: $LINT_TIMEOUT，使用默认值 120"
+  LINT_TIMEOUT=120
+fi
+
+# 清理可能卡住的 lint 进程的函数
+cleanup_lint_processes() {
+  pkill -u "$(whoami)" -f "npm run lint" 2>/dev/null || true
+  pkill -u "$(whoami)" -f "eslint" 2>/dev/null || true
+  pkill -u "$(whoami)" -f "ruff check" 2>/dev/null || true
+  pkill -u "$(whoami)" -f "flake8" 2>/dev/null || true
+}
+
 if [[ "${TEST_MODE:-}" == "1" ]]; then
   log_info "[TEST_MODE] 模拟 lint 通过"
   LINT_RESULT="passed"
   LINT_OUTPUT="No lint errors (mock)"
 else
-  # 使用子 shell 避免改变全局目录
+  # 使用子 shell 隔离目录变更
   if [[ "$PROJECT_TYPE" == "typescript" || "$PROJECT_TYPE" == "javascript" ]]; then
     if [[ -f "$TARGET_PROJECT/package.json" ]] && grep -q '"lint"' "$TARGET_PROJECT/package.json"; then
       log_info "运行 npm run lint (timeout: ${LINT_TIMEOUT}s)..."
-      if ! cd "$TARGET_PROJECT" 2>/dev/null; then
+      LINT_OUTPUT=$(
+        cd "$TARGET_PROJECT" 2>/dev/null || { echo "Failed to cd to project directory"; exit 1; }
+        timeout -k 10 "$LINT_TIMEOUT" npm run lint 2>&1
+      )
+      LINT_EXIT_CODE=$?
+      if [[ $LINT_EXIT_CODE -eq 0 ]]; then
+        LINT_RESULT="passed"
+      elif [[ $LINT_EXIT_CODE -eq 124 || $LINT_EXIT_CODE -eq 137 ]]; then
+        LINT_RESULT="timeout"
+        log_warn "npm run lint 超时 (${LINT_TIMEOUT}s)"
+        cleanup_lint_processes
+      elif [[ "$LINT_OUTPUT" == "Failed to cd to project directory" ]]; then
         log_error "无法切换到项目目录: $TARGET_PROJECT"
         LINT_RESULT="failed"
-        LINT_OUTPUT="Failed to cd to project directory"
       else
-        LINT_OUTPUT=$(timeout "$LINT_TIMEOUT" npm run lint 2>&1) && LINT_RESULT="passed" || {
-          if [[ $? -eq 124 ]]; then
-            LINT_RESULT="timeout"
-            log_warn "npm run lint 超时 (${LINT_TIMEOUT}s)"
-          else
-            LINT_RESULT="warning"
-          fi
-        }
-        cd - >/dev/null 2>&1 || true
+        LINT_RESULT="warning"
       fi
     elif command -v eslint &>/dev/null; then
       log_info "运行 eslint (timeout: ${LINT_TIMEOUT}s)..."
-      if ! cd "$TARGET_PROJECT" 2>/dev/null; then
+      LINT_OUTPUT=$(
+        cd "$TARGET_PROJECT" 2>/dev/null || { echo "Failed to cd to project directory"; exit 1; }
+        timeout -k 10 "$LINT_TIMEOUT" eslint --ext .ts,.js src/ 2>&1
+      )
+      LINT_EXIT_CODE=$?
+      if [[ $LINT_EXIT_CODE -eq 0 ]]; then
+        LINT_RESULT="passed"
+      elif [[ $LINT_EXIT_CODE -eq 124 || $LINT_EXIT_CODE -eq 137 ]]; then
+        LINT_RESULT="timeout"
+        log_warn "eslint 超时 (${LINT_TIMEOUT}s)"
+        cleanup_lint_processes
+      elif [[ "$LINT_OUTPUT" == "Failed to cd to project directory" ]]; then
         log_error "无法切换到项目目录: $TARGET_PROJECT"
         LINT_RESULT="failed"
-        LINT_OUTPUT="Failed to cd to project directory"
       else
-        LINT_OUTPUT=$(timeout "$LINT_TIMEOUT" eslint --ext .ts,.js src/ 2>&1) && LINT_RESULT="passed" || {
-          if [[ $? -eq 124 ]]; then
-            LINT_RESULT="timeout"
-            log_warn "eslint 超时 (${LINT_TIMEOUT}s)"
-          else
-            LINT_RESULT="warning"
-          fi
-        }
-        cd - >/dev/null 2>&1 || true
+        LINT_RESULT="warning"
       fi
     fi
   elif [[ "$PROJECT_TYPE" == "python" ]]; then
     if command -v ruff &>/dev/null; then
       log_info "运行 ruff (timeout: ${LINT_TIMEOUT}s)..."
-      if ! cd "$TARGET_PROJECT" 2>/dev/null; then
+      LINT_OUTPUT=$(
+        cd "$TARGET_PROJECT" 2>/dev/null || { echo "Failed to cd to project directory"; exit 1; }
+        timeout -k 10 "$LINT_TIMEOUT" ruff check . 2>&1
+      )
+      LINT_EXIT_CODE=$?
+      if [[ $LINT_EXIT_CODE -eq 0 ]]; then
+        LINT_RESULT="passed"
+      elif [[ $LINT_EXIT_CODE -eq 124 || $LINT_EXIT_CODE -eq 137 ]]; then
+        LINT_RESULT="timeout"
+        log_warn "ruff 超时 (${LINT_TIMEOUT}s)"
+        cleanup_lint_processes
+      elif [[ "$LINT_OUTPUT" == "Failed to cd to project directory" ]]; then
         log_error "无法切换到项目目录: $TARGET_PROJECT"
         LINT_RESULT="failed"
-        LINT_OUTPUT="Failed to cd to project directory"
       else
-        LINT_OUTPUT=$(timeout "$LINT_TIMEOUT" ruff check . 2>&1) && LINT_RESULT="passed" || {
-          if [[ $? -eq 124 ]]; then
-            LINT_RESULT="timeout"
-            log_warn "ruff 超时 (${LINT_TIMEOUT}s)"
-          else
-            LINT_RESULT="warning"
-          fi
-        }
-        cd - >/dev/null 2>&1 || true
+        LINT_RESULT="warning"
       fi
     elif command -v flake8 &>/dev/null; then
       log_info "运行 flake8 (timeout: ${LINT_TIMEOUT}s)..."
-      if ! cd "$TARGET_PROJECT" 2>/dev/null; then
+      LINT_OUTPUT=$(
+        cd "$TARGET_PROJECT" 2>/dev/null || { echo "Failed to cd to project directory"; exit 1; }
+        timeout -k 10 "$LINT_TIMEOUT" flake8 . 2>&1
+      )
+      LINT_EXIT_CODE=$?
+      if [[ $LINT_EXIT_CODE -eq 0 ]]; then
+        LINT_RESULT="passed"
+      elif [[ $LINT_EXIT_CODE -eq 124 || $LINT_EXIT_CODE -eq 137 ]]; then
+        LINT_RESULT="timeout"
+        log_warn "flake8 超时 (${LINT_TIMEOUT}s)"
+        cleanup_lint_processes
+      elif [[ "$LINT_OUTPUT" == "Failed to cd to project directory" ]]; then
         log_error "无法切换到项目目录: $TARGET_PROJECT"
         LINT_RESULT="failed"
-        LINT_OUTPUT="Failed to cd to project directory"
       else
-        LINT_OUTPUT=$(timeout "$LINT_TIMEOUT" flake8 . 2>&1) && LINT_RESULT="passed" || {
-          if [[ $? -eq 124 ]]; then
-            LINT_RESULT="timeout"
-            log_warn "flake8 超时 (${LINT_TIMEOUT}s)"
-          else
-            LINT_RESULT="warning"
-          fi
-        }
-        cd - >/dev/null 2>&1 || true
+        LINT_RESULT="warning"
       fi
     fi
   fi
@@ -414,6 +482,13 @@ log_info "Lint 结果: $LINT_RESULT"
 # 保存结果
 # ============================================================
 RESULT_SUCCESS=true
+
+# 检查是否有文件变更（非 TEST_MODE 下，0 个文件变更视为失败）
+if [[ "${TEST_MODE:-}" != "1" && ${#FILES_CHANGED[@]} -eq 0 ]]; then
+  log_warn "没有文件变更，标记为失败"
+  RESULT_SUCCESS=false
+fi
+
 # 检查测试结果（failed 或 timeout 均视为失败）
 if [[ "$TEST_RESULT" == "failed" || "$TEST_RESULT" == "timeout" ]]; then
   RESULT_SUCCESS=false

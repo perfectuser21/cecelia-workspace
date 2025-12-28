@@ -75,22 +75,30 @@ STYLING="css"
 if [[ -f "$TARGET_PROJECT/package.json" ]]; then
   PACKAGE_JSON_CONTENT=$(cat "$TARGET_PROJECT/package.json" 2>/dev/null) || PACKAGE_JSON_CONTENT=""
 
-  # 检测前端框架
+  # P1-10: 检测前端框架（扩展支持 Angular 和 Preact）
   if [[ "$PACKAGE_JSON_CONTENT" == *'"react"'* ]]; then
     FRAMEWORK="react"
+  elif [[ "$PACKAGE_JSON_CONTENT" == *'"preact"'* ]]; then
+    FRAMEWORK="preact"
   elif [[ "$PACKAGE_JSON_CONTENT" == *'"vue"'* ]]; then
     FRAMEWORK="vue"
   elif [[ "$PACKAGE_JSON_CONTENT" == *'"svelte"'* ]]; then
     FRAMEWORK="svelte"
+  elif [[ "$PACKAGE_JSON_CONTENT" == *'"@angular/core"'* ]]; then
+    FRAMEWORK="angular"
   fi
 
-  # 检测样式方案
+  # P1-10: 检测样式方案（扩展支持 SASS 和 LESS）
   if [[ "$PACKAGE_JSON_CONTENT" == *'"tailwindcss"'* ]]; then
     STYLING="tailwind"
   elif [[ "$PACKAGE_JSON_CONTENT" == *'"styled-components"'* ]]; then
     STYLING="styled-components"
   elif [[ "$PACKAGE_JSON_CONTENT" == *'"@emotion"'* ]]; then
     STYLING="emotion"
+  elif [[ "$PACKAGE_JSON_CONTENT" == *'"sass"'* ]] || [[ "$PACKAGE_JSON_CONTENT" == *'"node-sass"'* ]]; then
+    STYLING="sass"
+  elif [[ "$PACKAGE_JSON_CONTENT" == *'"less"'* ]]; then
+    STYLING="less"
   fi
 fi
 
@@ -105,6 +113,7 @@ log_info "[2/5] 调用 Claude 生成组件..."
 check_disk_space "$WORK_DIR" 100 || exit 1
 
 FILES_CHANGED=()
+FILES_FAILED=()
 COMPONENT_COUNT=0
 
 if [[ "${TEST_MODE:-}" == "1" ]]; then
@@ -112,6 +121,21 @@ if [[ "${TEST_MODE:-}" == "1" ]]; then
 
   # 创建 mock 组件文件
   MOCK_COMPONENT="$TARGET_PROJECT/src/components/MockFeature-${RUN_ID}.tsx"
+
+  # P0-1: 二次验证 Mock 组件路径安全性
+  MOCK_COMPONENT_REAL=$(realpath -m "$MOCK_COMPONENT" 2>/dev/null) || {
+    log_error "无法解析 Mock 组件路径: $MOCK_COMPONENT"
+    exit 1
+  }
+
+  # 验证路径在 TARGET_PROJECT 目录内（使用显式前缀检查）
+  if [[ "$MOCK_COMPONENT_REAL" != "$TARGET_PROJECT/"* ]]; then
+    log_error "Mock 组件路径超出目标项目范围: $MOCK_COMPONENT_REAL"
+    exit 1
+  fi
+
+  MOCK_COMPONENT="$MOCK_COMPONENT_REAL"
+
   mkdir -p "$(dirname "$MOCK_COMPONENT")" || {
     log_error "无法创建目录: $(dirname "$MOCK_COMPONENT")"
     exit 1
@@ -192,6 +216,19 @@ $TASK_CONTENT
 }"
 
   if ! call_claude "$PROMPT" 600; then
+    # P1-7: 记录详细的失败上下文
+    log_error "Claude 调用失败，记录上下文信息"
+    {
+      echo "=== Claude 调用失败上下文 ==="
+      echo "时间: $(date -Iseconds)"
+      echo "任务名: $TASK_NAME"
+      echo "任务 ID: $TASK_ID"
+      echo "目标项目: $TARGET_PROJECT"
+      echo "框架: $FRAMEWORK"
+      echo "样式: $STYLING"
+      echo "=== END ==="
+    } >> "$WORK_DIR/claude_error_context.txt"
+    chmod 600 "$WORK_DIR/claude_error_context.txt" 2>/dev/null || true
     exit 1
   fi
 
@@ -199,6 +236,18 @@ $TASK_CONTENT
     log_error "无法解析 Claude 输出"
     exit 1
   }
+
+  # P0-2: 验证 CODE_OUTPUT 是有效的 JSON 对象
+  if ! echo "$CODE_OUTPUT" | jq -e 'type == "object"' >/dev/null 2>&1; then
+    log_error "CODE_OUTPUT 不是有效的 JSON 对象"
+    exit 1
+  fi
+
+  # P0-2: 验证 .components 存在且是数组
+  if ! echo "$CODE_OUTPUT" | jq -e '.components | type == "array"' >/dev/null 2>&1; then
+    log_error "CODE_OUTPUT.components 不存在或不是数组"
+    exit 1
+  fi
 
   # 解析并写入文件
   COMPONENT_COUNT=$(echo "$CODE_OUTPUT" | jq '.components | length')
@@ -219,17 +268,17 @@ $TASK_CONTENT
     COMP_NAME=$(echo "$CODE_OUTPUT" | jq -r ".components[$i].name // empty")
     COMP_CONTENT=$(echo "$CODE_OUTPUT" | jq -r ".components[$i].content // empty")
 
-    # 验证必要字段非空
-    if [[ -z "$COMP_PATH" ]]; then
-      log_error "组件路径为空 (索引 $i)，跳过"
+    # P1-9: 验证必要字段非空，同时检查 "null" 字符串（jq 可能返回字面量 "null"）
+    if [[ -z "$COMP_PATH" ]] || [[ "$COMP_PATH" == "null" ]]; then
+      log_error "组件路径为空或 null (索引 $i)，跳过"
       continue
     fi
-    if [[ -z "$COMP_NAME" ]]; then
-      log_warn "组件名为空 (索引 $i): $COMP_PATH，使用路径作为名称"
+    if [[ -z "$COMP_NAME" ]] || [[ "$COMP_NAME" == "null" ]]; then
+      log_warn "组件名为空或 null (索引 $i): $COMP_PATH，使用路径作为名称"
       COMP_NAME=$(basename "$COMP_PATH")
     fi
-    if [[ -z "$COMP_CONTENT" ]]; then
-      log_warn "组件内容为空 (索引 $i): $COMP_PATH，跳过"
+    if [[ -z "$COMP_CONTENT" ]] || [[ "$COMP_CONTENT" == "null" ]]; then
+      log_warn "组件内容为空或 null (索引 $i): $COMP_PATH，跳过"
       continue
     fi
 
@@ -247,19 +296,15 @@ $TASK_CONTENT
       continue
     }
 
-    # 路径安全验证：必须在 TARGET_PROJECT 目录内（添加 / 后缀防止前缀匹配绕过）
-    case "$FULL_PATH_REAL" in
-      "$TARGET_PROJECT"/*)
-        ;;  # 在允许范围内
-      "$TARGET_PROJECT")
-        log_error "安全错误: 不能写入项目根目录本身"
-        continue
-        ;;
-      *)
-        log_error "组件路径超出目标项目范围: $FULL_PATH_REAL"
-        continue
-        ;;
-    esac
+    # P0-5: 路径安全验证：使用显式前缀检查，必须以 TARGET_PROJECT/ 开头
+    # 注意：必须检查 "$TARGET_PROJECT/" 而不是 "$TARGET_PROJECT"，防止 /target-project-evil 绕过
+    if [[ "$FULL_PATH_REAL" == "$TARGET_PROJECT" ]]; then
+      log_error "安全错误: 不能写入项目根目录本身"
+      continue
+    elif [[ "$FULL_PATH_REAL" != "$TARGET_PROJECT/"* ]]; then
+      log_error "组件路径超出目标项目范围: $FULL_PATH_REAL (期望前缀: $TARGET_PROJECT/)"
+      continue
+    fi
 
     mkdir -p "$(dirname "$FULL_PATH_REAL")" || {
       log_error "无法创建目录: $(dirname "$FULL_PATH_REAL")"
@@ -267,13 +312,28 @@ $TASK_CONTENT
     }
 
     # 使用 printf 避免 echo 的 -e/-n 问题
-    printf '%s\n' "$COMP_CONTENT" > "$FULL_PATH_REAL" || {
+    if ! printf '%s\n' "$COMP_CONTENT" > "$FULL_PATH_REAL"; then
       log_error "无法写入文件: $FULL_PATH_REAL"
+      # P1-8: 记录失败文件用于后续回滚
+      FILES_FAILED+=("$FULL_PATH_REAL")
       continue
+    fi
+
+    # P0-3: 设置正确的文件权限
+    chmod 644 "$FULL_PATH_REAL" || {
+      log_warn "无法设置文件权限: $FULL_PATH_REAL"
     }
+
     FILES_CHANGED+=("$FULL_PATH_REAL")
     log_info "[创建] $COMP_NAME -> $COMP_PATH"
   done
+
+  # P1-8: 如果有失败的文件且需要回滚，清理已创建的文件
+  if [[ ${#FILES_FAILED[@]} -gt 0 ]]; then
+    log_warn "有 ${#FILES_FAILED[@]} 个文件写入失败"
+    # 记录失败文件列表
+    printf '%s\n' "${FILES_FAILED[@]}" > "$WORK_DIR/files_failed.txt"
+  fi
 fi
 
 # 保存变更文件列表
@@ -299,22 +359,25 @@ else
   if [[ -f "$TARGET_PROJECT/tsconfig.json" ]]; then
     if command -v npx &>/dev/null; then
       log_info "运行 tsc --noEmit (timeout 120s)..."
-      if ! cd "$TARGET_PROJECT" 2>/dev/null; then
+      # P0-4: 使用子 shell 隔离 cd 命令，避免影响主进程工作目录
+      TSC_OUTPUT=$(
+        cd "$TARGET_PROJECT" 2>/dev/null || {
+          echo "Failed to cd to project directory"
+          exit 1
+        }
+        timeout 120 npx tsc --noEmit 2>&1
+      )
+      TSC_EXIT_CODE=$?
+      if [[ $TSC_EXIT_CODE -eq 0 ]]; then
+        TSC_RESULT="passed"
+      elif [[ $TSC_EXIT_CODE -eq 124 ]]; then
+        TSC_RESULT="timeout"
+        log_warn "TypeScript 类型检查超时 (120s)"
+      elif [[ $TSC_EXIT_CODE -eq 1 ]] && [[ "$TSC_OUTPUT" == "Failed to cd to project directory" ]]; then
         log_error "无法切换到项目目录: $TARGET_PROJECT"
         TSC_RESULT="failed"
-        TSC_OUTPUT="Failed to cd to project directory"
       else
-        TSC_OUTPUT=$(timeout 120 npx tsc --noEmit 2>&1)
-        TSC_EXIT_CODE=$?
-        if [[ $TSC_EXIT_CODE -eq 0 ]]; then
-          TSC_RESULT="passed"
-        elif [[ $TSC_EXIT_CODE -eq 124 ]]; then
-          TSC_RESULT="timeout"
-          log_warn "TypeScript 类型检查超时 (120s)"
-        else
-          TSC_RESULT="warning"
-        fi
-        cd - >/dev/null 2>&1 || true
+        TSC_RESULT="warning"
       fi
     fi
   else
@@ -339,22 +402,25 @@ else
   # 使用已读取的 PACKAGE_JSON_CONTENT 检查 build 脚本
   if [[ -f "$TARGET_PROJECT/package.json" ]] && [[ "$PACKAGE_JSON_CONTENT" == *'"build"'* ]]; then
     log_info "运行 npm run build (timeout 300s)..."
-    if ! cd "$TARGET_PROJECT" 2>/dev/null; then
+    # P0-4: 使用子 shell 隔离 cd 命令，避免影响主进程工作目录
+    BUILD_OUTPUT=$(
+      cd "$TARGET_PROJECT" 2>/dev/null || {
+        echo "Failed to cd to project directory"
+        exit 1
+      }
+      timeout 300 npm run build 2>&1
+    )
+    BUILD_EXIT_CODE=$?
+    if [[ $BUILD_EXIT_CODE -eq 0 ]]; then
+      BUILD_RESULT="passed"
+    elif [[ $BUILD_EXIT_CODE -eq 124 ]]; then
+      BUILD_RESULT="timeout"
+      log_warn "构建超时 (300s)"
+    elif [[ $BUILD_EXIT_CODE -eq 1 ]] && [[ "$BUILD_OUTPUT" == "Failed to cd to project directory" ]]; then
       log_error "无法切换到项目目录: $TARGET_PROJECT"
       BUILD_RESULT="failed"
-      BUILD_OUTPUT="Failed to cd to project directory"
     else
-      BUILD_OUTPUT=$(timeout 300 npm run build 2>&1)
-      BUILD_EXIT_CODE=$?
-      if [[ $BUILD_EXIT_CODE -eq 0 ]]; then
-        BUILD_RESULT="passed"
-      elif [[ $BUILD_EXIT_CODE -eq 124 ]]; then
-        BUILD_RESULT="timeout"
-        log_warn "构建超时 (300s)"
-      else
-        BUILD_RESULT="failed"
-      fi
-      cd - >/dev/null 2>&1 || true
+      BUILD_RESULT="failed"
     fi
   else
     log_info "未配置构建脚本，跳过"
@@ -402,7 +468,12 @@ save_result
 # ============================================================
 log_info "[5/5] 生成执行结果截图..."
 
+# P0-6: 对所有用户可控输入进行 HTML 转义
 SAFE_PROJECT=$(html_escape "$TARGET_PROJECT")
+SAFE_FRAMEWORK=$(html_escape "$FRAMEWORK")
+SAFE_STYLING=$(html_escape "$STYLING")
+SAFE_TSC_RESULT=$(html_escape "$TSC_RESULT")
+SAFE_BUILD_RESULT=$(html_escape "$BUILD_RESULT")
 
 # 生成组件列表 HTML
 COMPONENTS_HTML=""
@@ -419,7 +490,7 @@ MAIN_CONTENT="
   </div>
   <div class=\"card\">
     <div class=\"card-title\">框架</div>
-    <div class=\"card-value\">${FRAMEWORK}</div>
+    <div class=\"card-value\">${SAFE_FRAMEWORK}</div>
   </div>
 </div>
 <div class=\"card\">
@@ -429,19 +500,19 @@ MAIN_CONTENT="
 <div class=\"card\">
   <div class=\"info-row\">
     <span class=\"info-label\">样式方案</span>
-    <span class=\"info-value\">${STYLING}</span>
+    <span class=\"info-value\">${SAFE_STYLING}</span>
   </div>
 </div>
 <div class=\"card\">
   <div class=\"card-title\">类型检查</div>
   <div class=\"card-value $([ "$TSC_RESULT" == "passed" ] && echo "success")\">
-    $([ "$TSC_RESULT" == "passed" ] && echo "✅" || echo "⚠️") ${TSC_RESULT}
+    $([ "$TSC_RESULT" == "passed" ] && echo "✅" || echo "⚠️") ${SAFE_TSC_RESULT}
   </div>
 </div>
 <div class=\"card\">
   <div class=\"card-title\">构建结果</div>
   <div class=\"card-value $([ "$BUILD_RESULT" == "passed" ] && echo "success")\">
-    $([ "$BUILD_RESULT" == "passed" ] && echo "✅" || echo "⚠️") ${BUILD_RESULT}
+    $([ "$BUILD_RESULT" == "passed" ] && echo "✅" || echo "⚠️") ${SAFE_BUILD_RESULT}
   </div>
 </div>
 <div class=\"card\">

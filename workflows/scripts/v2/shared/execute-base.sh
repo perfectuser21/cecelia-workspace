@@ -74,10 +74,17 @@ json_get() {
   local default="${3:-}"
   local value
 
+  # 检查文件是否存在
+  if [[ ! -f "$file" ]]; then
+    log_error "json_get: 文件不存在: $file"
+    echo "$default"
+    return 1
+  fi
+
   # 验证 field 格式：只允许以 . 开头的安全 jq 表达式
-  # 允许的格式: .key, .key.subkey, .key[0], .key[0].subkey
+  # 允许的格式: .key, .key.subkey, .key[0], .key[0].subkey, .key[0][1].subkey
   # 禁止: 函数调用、管道、分号、括号表达式等
-  if [[ ! "$field" =~ ^(\.[a-zA-Z_][a-zA-Z0-9_]*(\[[0-9]+\])?)+$ ]]; then
+  if [[ ! "$field" =~ ^(\.[a-zA-Z_][a-zA-Z0-9_]*(\[[0-9]+\])*)+$ ]]; then
     log_error "json_get: 非法的字段表达式: $field"
     echo "$default"
     return 1
@@ -212,7 +219,10 @@ call_claude() {
 
   # 使用 WORK_DIR 存储临时文件，防止 TMPDIR 被注入
   # WORK_DIR 由 parse_execute_args 设置，是可信的安全路径
-  prompt_file=$(mktemp "$WORK_DIR/claude_prompt.XXXXXX")
+  prompt_file=$(mktemp "$WORK_DIR/claude_prompt.XXXXXX") || {
+    log_error "无法创建临时文件"
+    return 1
+  }
 
   # 确保临时文件在函数退出时清理
   trap 'rm -f "$prompt_file" 2>/dev/null' RETURN
@@ -229,14 +239,21 @@ call_claude() {
   if [[ $CLAUDE_EXIT -ne 0 ]]; then
     log_error "Claude 调用失败 (exit: $CLAUDE_EXIT)"
     # 清理敏感信息后保存错误日志
-    # 移除可能的 API 密钥、token、密码等敏感信息
+    # 移除可能的 API 密钥、token、密码、凭据等敏感信息
     local sanitized_output
     sanitized_output=$(printf '%s' "$CLAUDE_OUTPUT" | sed \
       -e 's/\(api[_-]*key["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[a-zA-Z0-9_-]\{20,\}["\x27]*/\1[REDACTED]/gi' \
       -e 's/\(token["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[a-zA-Z0-9_-]\{20,\}["\x27]*/\1[REDACTED]/gi' \
       -e 's/\(password["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[^"\x27[:space:]]\{1,\}["\x27]*/\1[REDACTED]/gi' \
       -e 's/\(secret["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[a-zA-Z0-9_-]\{20,\}["\x27]*/\1[REDACTED]/gi' \
-      -e 's/Bearer [a-zA-Z0-9._-]\{20,\}/Bearer [REDACTED]/gi')
+      -e 's/Bearer [a-zA-Z0-9._-]\{20,\}/Bearer [REDACTED]/gi' \
+      -e 's/\(AWS_ACCESS_KEY_ID["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[A-Z0-9]\{16,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(AWS_SECRET_ACCESS_KEY["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[a-zA-Z0-9/+=]\{20,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(GITHUB_TOKEN["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[a-zA-Z0-9_-]\{20,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(OPENAI_API_KEY["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*sk-[a-zA-Z0-9]\{20,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(ANTHROPIC_API_KEY["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*sk-ant-[a-zA-Z0-9-]\{20,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(PRIVATE_KEY["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[^"\x27]\{20,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(credential[s]*["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[a-zA-Z0-9_-]\{20,\}["\x27]*/\1[REDACTED]/gi')
     printf '%s\n' "$sanitized_output" > "$WORK_DIR/claude_error_debug.txt"
     # 设置文件权限为仅所有者可读写
     chmod 600 "$WORK_DIR/claude_error_debug.txt"
@@ -248,6 +265,11 @@ call_claude() {
 }
 
 # 从 Claude 输出中提取 JSON
+# 更健壮的 JSON 提取逻辑：
+# 1. 先尝试直接解析整个输出
+# 2. 尝试提取 markdown 代码块中的 JSON
+# 3. 尝试使用正则提取最外层的 JSON 对象/数组
+# 4. 最后尝试 jq -s 'last'（可能不是期望的对象）
 extract_json_from_claude() {
   local output="$1"
   local extracted=""
@@ -258,14 +280,36 @@ extract_json_from_claude() {
     return 0
   fi
 
-  # 移除 markdown 代码块后尝试解析
+  # 尝试提取 markdown ```json 代码块中的内容
+  local json_block
+  json_block=$(echo "$output" | sed -n '/```json/,/```/{/```json/d;/```/d;p}')
+  if [[ -n "$json_block" ]] && echo "$json_block" | jq empty 2>/dev/null; then
+    echo "$json_block"
+    return 0
+  fi
+
+  # 尝试使用 grep 提取以 { 开头到最后一个 } 的内容（最外层对象）
+  local json_obj
+  json_obj=$(echo "$output" | grep -ozP '\{[\s\S]*\}' | tr '\0' '\n' | tail -1)
+  if [[ -n "$json_obj" ]] && echo "$json_obj" | jq empty 2>/dev/null; then
+    echo "$json_obj"
+    return 0
+  fi
+
+  # 尝试提取 JSON 数组
+  local json_arr
+  json_arr=$(echo "$output" | grep -ozP '\[[\s\S]*\]' | tr '\0' '\n' | tail -1)
+  if [[ -n "$json_arr" ]] && echo "$json_arr" | jq empty 2>/dev/null; then
+    echo "$json_arr"
+    return 0
+  fi
+
+  # 最后尝试移除 markdown 代码块后使用 jq -s 'last'
   local cleaned
   cleaned=$(echo "$output" | sed 's/```json//g; s/```//g')
+  extracted=$(echo "$cleaned" | jq -s 'if length > 0 then last else empty end' 2>/dev/null) || true
 
-  # 使用 jq -s 'last' 提取最后一个有效 JSON 对象
-  extracted=$(echo "$cleaned" | jq -s 'last' 2>/dev/null) || true
-
-  if [[ -n "$extracted" ]] && echo "$extracted" | jq empty 2>/dev/null; then
+  if [[ -n "$extracted" ]] && [[ "$extracted" != "null" ]] && echo "$extracted" | jq empty 2>/dev/null; then
     echo "$extracted"
     return 0
   fi
@@ -323,7 +367,10 @@ save_result() {
 
   # 使用临时文件 + 原子 mv 写入，防止写入中断导致文件损坏
   local temp_file
-  temp_file=$(mktemp "$WORK_DIR/result.json.XXXXXX")
+  temp_file=$(mktemp "$WORK_DIR/result.json.XXXXXX") || {
+    log_error "无法创建临时文件"
+    return 1
+  }
 
   if ! printf '%s\n' "$result_json" > "$temp_file"; then
     log_error "无法写入临时文件"
