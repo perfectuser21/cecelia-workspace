@@ -147,6 +147,7 @@ create_run_dir() {
   local run_dir="$RUNS_DIR/$run_id"
 
   mkdir -p "$run_dir/logs"
+  mkdir -p "$run_dir/screenshots"
   echo "$run_dir"
 }
 
@@ -203,23 +204,34 @@ fetch_notion_task() {
     return 1
   fi
 
-  # 获取页面属性
-  local response
-  response=$(curl -sf --max-time 30 "https://api.notion.com/v1/pages/$task_id" \
-    -H "Authorization: Bearer $NOTION_API_KEY" \
-    -H "Notion-Version: 2022-06-28" \
-    -H "Content-Type: application/json" 2>/dev/null)
+  # 获取页面属性（带重试）
+  local response=""
+  local retries=0
+  local max_retries=2
+  while [[ $retries -lt $max_retries ]]; do
+    response=$(curl -sf --connect-timeout 10 --max-time 30 "https://api.notion.com/v1/pages/$task_id" \
+      -H "Authorization: Bearer $NOTION_API_KEY" \
+      -H "Notion-Version: 2022-06-28" \
+      -H "Content-Type: application/json" 2>/dev/null) && break
+    retries=$((retries + 1))
+    [[ $retries -lt $max_retries ]] && { log_warn "获取 Notion 页面失败，重试 $retries/$max_retries..."; sleep 2; }
+  done
 
   if [[ -z "$response" ]]; then
     log_error "无法获取 Notion 任务: $task_id"
     return 1
   fi
 
-  # 获取页面内容（blocks）
-  local blocks
-  blocks=$(curl -sf --max-time 30 "https://api.notion.com/v1/blocks/$task_id/children" \
-    -H "Authorization: Bearer $NOTION_API_KEY" \
-    -H "Notion-Version: 2022-06-28" 2>/dev/null)
+  # 获取页面内容（blocks，带重试）
+  local blocks=""
+  retries=0
+  while [[ $retries -lt $max_retries ]]; do
+    blocks=$(curl -sf --connect-timeout 10 --max-time 30 "https://api.notion.com/v1/blocks/$task_id/children" \
+      -H "Authorization: Bearer $NOTION_API_KEY" \
+      -H "Notion-Version: 2022-06-28" 2>/dev/null) && break
+    retries=$((retries + 1))
+    [[ $retries -lt $max_retries ]] && { log_warn "获取 Notion blocks 失败，重试 $retries/$max_retries..."; sleep 2; }
+  done
 
   # 提取内容（简化处理，只取 paragraph 类型的文本）
   local content=""
@@ -232,7 +244,7 @@ fetch_notion_task() {
         elif .type == "bulleted_list_item" then "- " + (.bulleted_list_item.rich_text[0].plain_text // "")
         else .paragraph.rich_text[0].plain_text // ""
         end
-    ' 2>/dev/null | tr '\n' '\n')
+    ' 2>/dev/null)
   fi
 
   # 构建 task_info JSON
@@ -277,25 +289,36 @@ update_notion_status() {
     return 1
   fi
 
-  curl -sf --max-time 30 -X PATCH "https://api.notion.com/v1/pages/$task_id" \
-    -H "Authorization: Bearer $NOTION_API_KEY" \
-    -H "Notion-Version: 2022-06-28" \
-    -H "Content-Type: application/json" \
-    -d "{
-      \"properties\": {
-        \"Status\": {
-          \"status\": {
-            \"name\": \"$status\"
+  local retries=0
+  local max_retries=2
+  local success=false
+
+  while [[ $retries -lt $max_retries ]]; do
+    if curl -sf --connect-timeout 10 --max-time 30 -X PATCH "https://api.notion.com/v1/pages/$task_id" \
+      -H "Authorization: Bearer $NOTION_API_KEY" \
+      -H "Notion-Version: 2022-06-28" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"properties\": {
+          \"Status\": {
+            \"status\": {
+              \"name\": \"$status\"
+            }
           }
         }
-      }
-    }" > /dev/null 2>&1
+      }" > /dev/null 2>&1; then
+      success=true
+      break
+    fi
+    retries=$((retries + 1))
+    [[ $retries -lt $max_retries ]] && { log_warn "更新 Notion 状态失败，重试 $retries/$max_retries..."; sleep 2; }
+  done
 
-  if [[ $? -eq 0 ]]; then
+  if [[ "$success" == "true" ]]; then
     log_info "更新 Notion 状态: $status"
     return 0
   else
-    log_error "更新 Notion 状态失败"
+    log_error "更新 Notion 状态失败 (已重试 $max_retries 次)"
     return 1
   fi
 }
@@ -318,7 +341,7 @@ send_feishu_notification() {
   local json_payload
   json_payload=$(jq -n --arg msg "$message" '{msg_type: "text", content: {text: $msg}}')
 
-  if curl -sf --max-time 30 -X POST "$FEISHU_BOT_WEBHOOK" \
+  if curl -sf --connect-timeout 10 --max-time 30 -X POST "$FEISHU_BOT_WEBHOOK" \
     -H "Content-Type: application/json" \
     -d "$json_payload" > /dev/null 2>&1; then
     log_info "飞书通知已发送"
@@ -377,9 +400,15 @@ send_feishu_card() {
       }
     }')
 
-  curl -sf --max-time 30 -X POST "$FEISHU_BOT_WEBHOOK" \
+  if curl -sf --connect-timeout 10 --max-time 30 -X POST "$FEISHU_BOT_WEBHOOK" \
     -H "Content-Type: application/json" \
-    -d "$json_payload" > /dev/null 2>&1
+    -d "$json_payload" > /dev/null 2>&1; then
+    log_info "飞书卡片已发送"
+    return 0
+  else
+    log_warn "飞书卡片发送失败"
+    return 1
+  fi
 }
 
 # ============================================================

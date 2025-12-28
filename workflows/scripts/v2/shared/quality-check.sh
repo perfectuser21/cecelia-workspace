@@ -144,6 +144,7 @@ check_security() {
   local issues=()
 
   # 检查工作目录下的文件
+  shopt -s nullglob
   for file in "$WORK_DIR"/*.json; do
     if [[ -f "$file" ]]; then
       # 检查硬编码密码
@@ -162,6 +163,7 @@ check_security() {
       fi
     fi
   done
+  shopt -u nullglob
 
   if [[ ${#issues[@]} -gt 0 ]]; then
     fail_check "security" "${issues[*]}"
@@ -294,7 +296,7 @@ check_n8n_quality_score() {
   [[ ${has_continue_on_fail:-0} -gt 0 ]] && ((error_handling+=10))
 
   # 3. 命名
-  local default_names=$(echo "$nodes" | jq '[.[] | select(.name | test("^(Code|HTTP|SSH|IF)( \\d+)?$"))] | length')
+  local default_names=$(echo "$nodes" | jq '[.[] | select(.name != null) | select(.name | test("^(Code|HTTP|SSH|IF)( \\d+)?$"))] | length')
   [[ ${default_names:-0} -eq 0 ]] && ((naming+=15)) || ((naming+=5))
   ((naming+=5))
 
@@ -353,6 +355,9 @@ run_checks() {
       log_info "[4] Frontend 专用检查（待实现）..."
       pass_check "frontend_stub" "Frontend 检查跳过（待实现）"
       ;;
+    *)
+      log_warn "未知的 CODING_TYPE: $CODING_TYPE，跳过类型检查"
+      ;;
   esac
 }
 
@@ -364,7 +369,12 @@ generate_report() {
   log_info "生成质检报告..."
 
   local passed=$([[ $FAILED_CHECKS -eq 0 ]] && echo "true" || echo "false")
-  local checks_json=$(printf '%s\n' "${CHECK_RESULTS[@]}" | jq -s '.')
+  local checks_json
+  if [[ ${#CHECK_RESULTS[@]} -eq 0 ]]; then
+    checks_json="[]"
+  else
+    checks_json=$(printf '%s\n' "${CHECK_RESULTS[@]}" | jq -s '.')
+  fi
 
   local report=$(jq -n \
     --argjson passed "$passed" \

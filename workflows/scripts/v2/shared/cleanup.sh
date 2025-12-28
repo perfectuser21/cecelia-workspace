@@ -228,7 +228,13 @@ log_info "运行目录保留: $WORK_DIR"
 log_info "清理旧运行目录..."
 RUNS_DIR="/home/xx/data/runs"
 # 删除 7 天前的目录，但至少保留 50 个
-OLD_DIRS=$(find "$RUNS_DIR" -maxdepth 1 -type d -name "20*" -mtime +7 2>/dev/null | sort | head -n -50)
+# 使用可移植方式代替 head -n -50 (GNU 扩展)
+ALL_OLD=$(find "$RUNS_DIR" -maxdepth 1 -type d -name "20*" -mtime +7 2>/dev/null | sort)
+OLD_COUNT=$(echo "$ALL_OLD" | grep -c . 2>/dev/null || echo "0")
+OLD_DIRS=""
+if [[ $OLD_COUNT -gt 50 ]]; then
+  OLD_DIRS=$(echo "$ALL_OLD" | head -n $((OLD_COUNT - 50)))
+fi
 if [[ -n "$OLD_DIRS" ]]; then
   echo "$OLD_DIRS" | xargs rm -rf 2>/dev/null || true
   log_info "已清理 $(echo "$OLD_DIRS" | wc -l) 个旧目录"
@@ -242,7 +248,13 @@ fi
 # 注意：锁由 main.sh 统一管理，cleanup.sh 不再释放锁
 log_info "切换回 develop 分支..."
 cd "$PROJECT_DIR"
-git checkout develop 2>/dev/null || git checkout main 2>/dev/null || true
+if git checkout develop 2>/dev/null; then
+  log_info "已切换到 develop 分支"
+elif git checkout main 2>/dev/null; then
+  log_info "已切换到 main 分支"
+else
+  log_warn "无法切换到 develop/main 分支，保持当前分支"
+fi
 
 # ============================================================
 # 输出结果
@@ -251,15 +263,13 @@ log_info "=========================================="
 log_info "收尾阶段完成"
 log_info "=========================================="
 
-# 输出 JSON 结果
-cat << EOF
-{
-  "success": true,
-  "run_id": "$RUN_ID",
-  "task_id": "$TASK_ID",
-  "passed": $PASSED,
-  "retry_count": $RETRY_COUNT,
-  "branch_name": "$BRANCH_NAME",
-  "notion_status": "$NEW_STATUS"
-}
-EOF
+# 输出 JSON 结果（使用 jq 确保正确转义）
+jq -n \
+  --argjson success true \
+  --arg run_id "$RUN_ID" \
+  --arg task_id "$TASK_ID" \
+  --argjson passed "$PASSED" \
+  --argjson retry_count "$RETRY_COUNT" \
+  --arg branch_name "$BRANCH_NAME" \
+  --arg notion_status "$NEW_STATUS" \
+  '{success: $success, run_id: $run_id, task_id: $task_id, passed: $passed, retry_count: $retry_count, branch_name: $branch_name, notion_status: $notion_status}'

@@ -26,6 +26,11 @@ source "$SHARED_DIR/utils.sh"
 # 加载 secrets
 load_secrets
 
+# HTML 转义函数：防止 XSS 和 HTML 注入
+html_escape() {
+  echo "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g'
+}
+
 # ============================================================
 # 参数解析
 # ============================================================
@@ -250,33 +255,20 @@ $TASK_CONTENT
     exit 1
   }
 
-  # 提取 JSON
-  WORKFLOW_JSON=$(echo "$CLAUDE_OUTPUT" | sed 's/```json//g' | sed 's/```//g' | awk '
-    BEGIN { depth=0; started=0; }
-    {
-      for(i=1; i<=length($0); i++) {
-        c = substr($0, i, 1)
-        if (c == "{") {
-          if (!started) started = 1
-          depth++
-        }
-        if (started) {
-          printf "%s", c
-          if (c == "}") {
-            depth--
-            if (depth == 0) {
-              print ""
-              exit
-            }
-          }
-        }
-      }
-      if (started) print ""
-    }
-  ')
+  # 提取 JSON - 使用 jq 验证和提取，避免 awk 括号计数问题
+  WORKFLOW_JSON=""
+  # 先尝试直接解析整个输出（Claude 有时只返回纯 JSON）
+  if echo "$CLAUDE_OUTPUT" | jq empty 2>/dev/null; then
+    WORKFLOW_JSON="$CLAUDE_OUTPUT"
+  else
+    # 否则移除 markdown 代码块后尝试解析
+    CLEANED_OUTPUT=$(echo "$CLAUDE_OUTPUT" | sed 's/```json//g; s/```//g')
+    # 使用 jq -s 'last' 提取最后一个有效 JSON 对象
+    WORKFLOW_JSON=$(echo "$CLEANED_OUTPUT" | jq -s 'last' 2>/dev/null) || true
+  fi
 
   # 验证 JSON
-  if ! echo "$WORKFLOW_JSON" | jq empty 2>/dev/null; then
+  if [[ -z "$WORKFLOW_JSON" ]] || ! echo "$WORKFLOW_JSON" | jq empty 2>/dev/null; then
     log_error "生成的 JSON 无效"
     echo "$CLAUDE_OUTPUT" > "$WORK_DIR/claude_output_debug.txt"
     exit 1
@@ -287,7 +279,10 @@ $TASK_CONTENT
 fi
 
 # 保存 Workflow JSON
-echo "$WORKFLOW_JSON" > "$WORK_DIR/workflow.json"
+if ! echo "$WORKFLOW_JSON" > "$WORK_DIR/workflow.json"; then
+  log_error "无法写入 workflow.json"
+  exit 1
+fi
 log_info "Workflow JSON 已保存: $WORK_DIR/workflow.json"
 
 # ============================================================
@@ -383,12 +378,22 @@ RESULT_JSON=$(jq -n \
     created_at: $created_at
   }')
 
-echo "$RESULT_JSON" > "$WORK_DIR/result.json"
+if ! echo "$RESULT_JSON" > "$WORK_DIR/result.json"; then
+  log_error "无法写入 result.json"
+  exit 1
+fi
 
 # ============================================================
 # 截图：执行结果证明
 # ============================================================
 log_info "[5/5] 生成执行结果截图..."
+
+# HTML 转义变量（防止 XSS 和 HTML 注入）
+SAFE_WORKFLOW_ID=$(html_escape "$WORKFLOW_ID")
+SAFE_WORKFLOW_NAME=$(html_escape "$WORKFLOW_NAME")
+SAFE_TEMPLATE_ID=$(html_escape "${TEMPLATE_ID:-}")
+SAFE_RUN_ID=$(html_escape "$RUN_ID")
+SAFE_TASK_ID=$(html_escape "$TASK_ID")
 
 # 生成结果报告 HTML
 REPORT_HTML="<!DOCTYPE html>
@@ -468,7 +473,7 @@ REPORT_HTML="<!DOCTYPE html>
     <div class=\"grid\">
       <div class=\"card\">
         <div class=\"card-title\">Workflow ID</div>
-        <div class=\"card-value\">${WORKFLOW_ID}</div>
+        <div class=\"card-value\">${SAFE_WORKFLOW_ID}</div>
       </div>
       <div class=\"card\">
         <div class=\"card-title\">节点数量</div>
@@ -478,21 +483,21 @@ REPORT_HTML="<!DOCTYPE html>
 
     <div class=\"card\">
       <div class=\"card-title\">Workflow 名称</div>
-      <div class=\"card-value\" style=\"font-size: 20px;\">${WORKFLOW_NAME}</div>
+      <div class=\"card-value\" style=\"font-size: 20px;\">${SAFE_WORKFLOW_NAME}</div>
     </div>
 
     <div class=\"card\">
       <div class=\"info-row\">
         <span class=\"info-label\">使用模板</span>
-        <span class=\"info-value\">${TEMPLATE_ID:-无（Claude 生成）}</span>
+        <span class=\"info-value\">$(if [[ -n "$SAFE_TEMPLATE_ID" && "$SAFE_TEMPLATE_ID" != "none" ]]; then echo "$SAFE_TEMPLATE_ID"; else echo "无（Claude 生成）"; fi)</span>
       </div>
       <div class=\"info-row\">
         <span class=\"info-label\">Run ID</span>
-        <span class=\"info-value\">${RUN_ID}</span>
+        <span class=\"info-value\">${SAFE_RUN_ID}</span>
       </div>
       <div class=\"info-row\">
         <span class=\"info-label\">Task ID</span>
-        <span class=\"info-value\">${TASK_ID}</span>
+        <span class=\"info-value\">${SAFE_TASK_ID}</span>
       </div>
       <div class=\"info-row\">
         <span class=\"info-label\">创建时间</span>
@@ -542,8 +547,11 @@ fi
 # 添加 RUN_ID 后缀避免文件名冲突
 EXPORT_FILE="$EXPORT_DIR/${SAFE_NAME}-${RUN_ID}.json"
 
-echo "$WORKFLOW_JSON" | jq --arg id "$WORKFLOW_ID" '. + {n8n_id: $id}' > "$EXPORT_FILE"
-log_info "Workflow 已导出: $EXPORT_FILE"
+if ! echo "$WORKFLOW_JSON" | jq --arg id "$WORKFLOW_ID" '. + {n8n_id: $id}' > "$EXPORT_FILE"; then
+  log_warn "无法导出 workflow 到: $EXPORT_FILE"
+else
+  log_info "Workflow 已导出: $EXPORT_FILE"
+fi
 
 # ============================================================
 # 输出结果

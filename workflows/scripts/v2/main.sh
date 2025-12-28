@@ -16,7 +16,7 @@
 #
 # 输出:
 #   - JSON 格式的执行结果
-#   - 返回值: 0=成功, 1=失败需返工, 2=失败需人工处理
+#   - 返回值: 0=成功, 1=失败, 2=失败需人工处理, 4=准备阶段失败, 5=准备数据异常
 #
 
 set -e
@@ -83,6 +83,7 @@ STABILITY_COUNT=0
 FULL_RETRY_COUNT=0
 FINAL_RESULT=""
 PASSED=false
+FATAL_ERROR=false
 
 echo "=========================================="
 echo "AI 工厂 v2"
@@ -165,6 +166,7 @@ while [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; do
   if [[ ! -f "$EXECUTE_SCRIPT" ]]; then
     echo "错误: 执行脚本不存在: $EXECUTE_SCRIPT"
     PASSED=false
+    FATAL_ERROR=true
     break
   fi
 
@@ -254,6 +256,9 @@ if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
   STABILITY_COUNT=0
   STABILITY_FAILED=false
 
+  # 清空稳定性日志（避免无限增长）
+  > "$WORK_DIR/logs/stability.log"
+
   while [[ $STABILITY_COUNT -lt $STABILITY_RUNS ]]; do
     STABILITY_COUNT=$((STABILITY_COUNT + 1))
     echo ""
@@ -312,6 +317,11 @@ if [[ "$PASSED" == "false" ]]; then
   break  # 质检失败，不需要整体重试，直接退出
 fi
 
+# 如果遇到致命错误，跳出外层循环
+if [[ "$FATAL_ERROR" == "true" ]]; then
+  break
+fi
+
 done  # 结束整体重试循环
 
 # ============================================================
@@ -339,7 +349,11 @@ echo "Run ID: $RUN_ID"
 echo "Task ID: $TASK_ID"
 echo "结果: $(if $PASSED; then echo '成功'; else echo '失败'; fi)"
 echo "返工次数: $RETRY_COUNT"
-echo "稳定性验证: $STABILITY_COUNT/$STABILITY_RUNS 次通过"
+if [[ "$PASSED" == "true" ]]; then
+  echo "稳定性验证: $STABILITY_COUNT/$STABILITY_RUNS 次通过"
+else
+  echo "稳定性验证: $STABILITY_COUNT/$STABILITY_RUNS 次 (最后一次失败)"
+fi
 echo "整体重试: $FULL_RETRY_COUNT/$FULL_RETRY_MAX 次"
 echo "=========================================="
 
