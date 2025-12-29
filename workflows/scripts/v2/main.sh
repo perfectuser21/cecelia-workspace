@@ -85,10 +85,10 @@ fi
 
 # 验证 coding_type
 case "$CODING_TYPE" in
-  n8n|backend|frontend)
+  n8n|backend|frontend|check)
     ;;
   *)
-    echo "错误: 无效的 coding_type: $CODING_TYPE (应为: n8n/backend/frontend)"
+    echo "错误: 无效的 coding_type: $CODING_TYPE (应为: n8n/backend/frontend/check)"
     exit 1
     ;;
 esac

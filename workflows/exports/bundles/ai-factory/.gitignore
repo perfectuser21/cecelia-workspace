@@ -1,3 +1,7 @@
 # 自动生成的导出文件
 *.json
 !bundle.json
+!vibe-coding-master.json
+!execution-callback.json
+!completion-sync.json
+!codebase-factory.json

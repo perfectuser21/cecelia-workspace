@@ -288,9 +288,68 @@ if [[ -n "$NOTION_API_KEY" && -f "$REPORT_FILE" ]]; then
 fi
 
 # ============================================================
-# 步骤 5: 清理
+# 步骤 5: Webhook 通知 (Execution Callback)
 # ============================================================
-log_info "[5/5] 清理..."
+log_info "[5/6] 发送 Webhook 通知..."
+
+WEBHOOK_URL="https://zenithjoy21xx.app.n8n.cloud/webhook/execution-callback"
+
+# 检查是否是 Feature Check (Daily Highlight = true 的任务)
+IS_FEATURE_CHECK=false
+if [[ -f "$WORK_DIR/task_info.json" ]]; then
+  DAILY_HIGHLIGHT=$(jq -r '.daily_highlight // false' "$WORK_DIR/task_info.json" 2>/dev/null || echo "false")
+  if [[ "$DAILY_HIGHLIGHT" == "true" ]]; then
+    IS_FEATURE_CHECK=true
+  fi
+fi
+
+# 构建 Webhook payload
+WEBHOOK_PAYLOAD=$(jq -n \
+  --arg task_id "$TASK_ID" \
+  --arg status "$NEW_STATUS" \
+  --arg run_id "$RUN_ID" \
+  --arg coding_type "$CODING_TYPE" \
+  --arg task_name "$TASK_NAME" \
+  --arg quality_score "$QUALITY_SCORE" \
+  --argjson is_feature_check "$IS_FEATURE_CHECK" \
+  '{
+    task_id: $task_id,
+    status: $status,
+    run_id: $run_id,
+    coding_type: $coding_type,
+    task_name: $task_name,
+    quality_score: ($quality_score | tonumber? // 0),
+    is_feature_check: $is_feature_check
+  }')
+
+# 发送 Webhook 通知（带重试机制）
+WEBHOOK_MAX_RETRIES=3
+WEBHOOK_RETRY_DELAY=2
+WEBHOOK_SUCCESS=false
+
+for i in $(seq 1 $WEBHOOK_MAX_RETRIES); do
+  if curl -sf --connect-timeout 10 --max-time 30 -X POST "$WEBHOOK_URL" \
+    -H "Content-Type: application/json" \
+    -d "$WEBHOOK_PAYLOAD" > /dev/null 2>&1; then
+    WEBHOOK_SUCCESS=true
+    log_info "Webhook 通知已发送 (尝试 $i/$WEBHOOK_MAX_RETRIES)"
+    break
+  else
+    if [[ $i -lt $WEBHOOK_MAX_RETRIES ]]; then
+      log_warn "Webhook 通知失败，${WEBHOOK_RETRY_DELAY}秒后重试 ($i/$WEBHOOK_MAX_RETRIES)"
+      sleep $WEBHOOK_RETRY_DELAY
+    fi
+  fi
+done
+
+if [[ "$WEBHOOK_SUCCESS" != "true" ]]; then
+  log_warn "Webhook 通知失败（已重试 $WEBHOOK_MAX_RETRIES 次），任务状态可能需要手动同步"
+fi
+
+# ============================================================
+# 步骤 6: 清理
+# ============================================================
+log_info "[6/6] 清理..."
 
 log_info "运行目录保留: $WORK_DIR"
 
