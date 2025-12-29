@@ -144,11 +144,11 @@ fi
 log_info "[3/6] 更新 Notion 状态..."
 
 if [[ "$PASSED" == "true" ]]; then
-  NEW_STATUS="Done"
-  log_info "质检通过，状态更新为: Done"
+  NEW_STATUS="AI Done"
+  log_info "质检通过，状态更新为: AI Done"
 else
-  NEW_STATUS="Failed"
-  log_info "质检失败，状态更新为: Failed (需人工处理)"
+  NEW_STATUS="AI Failed"
+  log_info "质检失败，状态更新为: AI Failed (需人工处理)"
 fi
 
 update_notion_status "$TASK_ID" "$NEW_STATUS" || log_warn "更新 Notion 状态失败"
