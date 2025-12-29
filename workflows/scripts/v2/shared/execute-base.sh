@@ -456,8 +456,8 @@ extract_json_from_claude() {
 #   - 使用临时文件 + 原子 mv 写入
 save_result() {
   local success="${RESULT_SUCCESS:-true}"
-  local artifacts="${RESULT_ARTIFACTS:-[]}"
-  local extra="${RESULT_EXTRA:-{}}"
+  local artifacts="${RESULT_ARTIFACTS:-"[]"}"
+  local extra="${RESULT_EXTRA:-"{}"}"
 
   # 验证 success 是合法的布尔值
   if [[ "$success" != "true" && "$success" != "false" ]]; then

@@ -444,12 +444,37 @@ fetch_notion_task() {
   local coding_type=$(echo "$response" | jq -r '.properties["Coding Type"].select.name // "n8n"')
   local status=$(echo "$response" | jq -r '.properties.Status.status.name // "Unknown"')
 
+  # v3.0: 获取 Check 执行器需要的额外字段
+  # blocked_by: Notion relation 字段，包含依赖任务的 page ID 列表
+  local blocked_by=$(echo "$response" | jq -c '[.properties["Blocked by"].relation[]?.id // empty] // []')
+  # version: 版本号（rich_text 或 number 类型）
+  local version=$(echo "$response" | jq -r '
+    if .properties.Version.rich_text then
+      (.properties.Version.rich_text | map(.plain_text // "") | join(""))
+    elif .properties.Version.number then
+      (.properties.Version.number | tostring)
+    else
+      "1.0.0"
+    end
+  ')
+  # sub_project: 子项目名称（select 类型）
+  local sub_project=$(echo "$response" | jq -r '.properties["Sub Project"].select.name // "autopilot"')
+  # daily_highlight: 是否为今日高亮（checkbox 类型）
+  local daily_highlight=$(echo "$response" | jq -r '.properties["Daily Highlight"].checkbox // false')
+
+  # 如果 version 为空，使用默认值
+  [[ -z "$version" || "$version" == "null" ]] && version="1.0.0"
+
   jq -n \
     --arg task_id "$task_id" \
     --arg task_name "$task_name" \
     --arg coding_type "$coding_type" \
     --arg status "$status" \
     --arg content "$content" \
+    --argjson blocked_by "$blocked_by" \
+    --arg version "$version" \
+    --arg sub_project "$sub_project" \
+    --argjson daily_highlight "$daily_highlight" \
     --arg fetched_at "$(date -Iseconds)" \
     '{
       task_id: $task_id,
@@ -457,6 +482,10 @@ fetch_notion_task() {
       coding_type: $coding_type,
       status: $status,
       content: $content,
+      blocked_by: $blocked_by,
+      version: $version,
+      sub_project: $sub_project,
+      daily_highlight: $daily_highlight,
       fetched_at: $fetched_at
     }'
 }
@@ -506,6 +535,141 @@ update_notion_status() {
     return 0
   else
     log_error "更新 Notion 状态失败 (已重试 $max_retries 次)"
+    return 1
+  fi
+}
+
+# 追加内容到 Notion 页面
+# 参数: $1=page_id, $2=report_file (Markdown 文件路径)
+# 将报告作为 callout block 追加到页面底部
+append_report_to_notion() {
+  local page_id="$1"
+  local report_file="$2"
+
+  if [[ "${TEST_MODE:-}" == "1" ]]; then
+    log_info "[TEST_MODE] 模拟追加报告到 Notion: $page_id"
+    return 0
+  fi
+
+  if [[ -z "$page_id" ]]; then
+    log_error "page_id 不能为空"
+    return 1
+  fi
+
+  if [[ ! -f "$report_file" ]]; then
+    log_error "报告文件不存在: $report_file"
+    return 1
+  fi
+
+  load_secrets
+
+  if [[ -z "$NOTION_API_KEY" ]]; then
+    log_error "NOTION_API_KEY 未设置"
+    return 1
+  fi
+
+  # 读取报告内容
+  local report_content
+  report_content=$(cat "$report_file")
+
+  # 提取标题行（第一行 # 开头）
+  local title_line
+  title_line=$(echo "$report_content" | head -1 | sed 's/^#\s*//')
+
+  # 提取正文（去掉第一行）
+  local body_content
+  body_content=$(echo "$report_content" | tail -n +2)
+
+  # 将内容按段落分割，构建 Notion blocks
+  # 简化版：使用 divider + heading + 多个 paragraph blocks
+  local blocks='[]'
+
+  # 添加分割线
+  blocks=$(echo "$blocks" | jq '. + [{"object": "block", "type": "divider", "divider": {}}]')
+
+  # 添加标题 (heading_2)
+  blocks=$(echo "$blocks" | jq --arg title "$title_line" '. + [{
+    "object": "block",
+    "type": "heading_2",
+    "heading_2": {
+      "rich_text": [{"type": "text", "text": {"content": $title}}]
+    }
+  }]')
+
+  # 将正文按空行分段，每段作为一个 paragraph
+  local paragraph=""
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ -z "$line" ]]; then
+      # 空行 = 段落结束
+      if [[ -n "$paragraph" ]]; then
+        # 截断超长段落（Notion 限制 2000 字符）
+        local truncated="${paragraph:0:1950}"
+        blocks=$(echo "$blocks" | jq --arg text "$truncated" '. + [{
+          "object": "block",
+          "type": "paragraph",
+          "paragraph": {
+            "rich_text": [{"type": "text", "text": {"content": $text}}]
+          }
+        }]')
+        paragraph=""
+      fi
+    else
+      # 累积段落内容
+      if [[ -n "$paragraph" ]]; then
+        paragraph="$paragraph
+$line"
+      else
+        paragraph="$line"
+      fi
+    fi
+  done <<< "$body_content"
+
+  # 处理最后一个段落
+  if [[ -n "$paragraph" ]]; then
+    local truncated="${paragraph:0:1950}"
+    blocks=$(echo "$blocks" | jq --arg text "$truncated" '. + [{
+      "object": "block",
+      "type": "paragraph",
+      "paragraph": {
+        "rich_text": [{"type": "text", "text": {"content": $text}}]
+      }
+    }]')
+  fi
+
+  # 构建请求 payload
+  local payload
+  payload=$(jq -n --argjson children "$blocks" '{"children": $children}')
+
+  # 发送请求（带重试）
+  local max_retries=3
+  local retries=0
+  local success=false
+
+  while [[ $retries -lt $max_retries && "$success" != "true" ]]; do
+    retries=$((retries + 1))
+
+    local http_code
+    http_code=$(curl -sf --connect-timeout 10 --max-time 60 -X PATCH \
+      "https://api.notion.com/v1/blocks/$page_id/children" \
+      -H "Authorization: Bearer $NOTION_API_KEY" \
+      -H "Notion-Version: 2022-06-28" \
+      -H "Content-Type: application/json" \
+      -d "$payload" \
+      -w "%{http_code}" \
+      -o /dev/null 2>/dev/null) || http_code="000"
+
+    if [[ "$http_code" == "200" ]]; then
+      success=true
+    else
+      [[ $retries -lt $max_retries ]] && { log_warn "追加报告到 Notion 失败 (HTTP $http_code)，重试 $retries/$max_retries..."; sleep 2; }
+    fi
+  done
+
+  if [[ "$success" == "true" ]]; then
+    log_info "报告已追加到 Notion 页面: $page_id"
+    return 0
+  else
+    log_error "追加报告到 Notion 失败 (已重试 $max_retries 次)"
     return 1
   fi
 }
@@ -754,7 +918,7 @@ create_feature_branch() {
 export -f _log log_info log_warn log_error log_debug
 export -f is_lock_stale acquire_lock release_lock
 export -f check_disk_space create_run_dir generate_run_id
-export -f load_secrets fetch_notion_task update_notion_status
+export -f load_secrets fetch_notion_task update_notion_status append_report_to_notion
 export -f send_feishu_notification send_feishu_card
 export -f save_env load_env
 export -f check_git_clean create_feature_branch

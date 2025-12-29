@@ -1,0 +1,94 @@
+{
+  "type": "check",
+  "version": "1.0.0",
+  "description": "Feature Check 质检配置",
+  "checks": [
+    {
+      "id": "blocked_by_status",
+      "name": "前置任务状态",
+      "required": true,
+      "weight": 30,
+      "check": "所有 Blocked by Tasks 状态 = AI Done 或 Completed",
+      "verify": "result.completed_deps == result.total_deps"
+    },
+    {
+      "id": "screenshots_exist",
+      "name": "截图完整",
+      "required": true,
+      "weight": 20,
+      "check": "截图数量 >= 定义的节点数量",
+      "verify": "result.screenshot_count >= result.expected_screenshots"
+    },
+    {
+      "id": "report_generated",
+      "name": "报告生成",
+      "required": true,
+      "weight": 15,
+      "check": "汇总报告已生成",
+      "verify": "file_exists(result.report_file)"
+    },
+    {
+      "id": "no_feedback",
+      "name": "无待处理反馈",
+      "required": false,
+      "weight": 15,
+      "check": "页面无 ## 反馈 / ## Feedback 部分",
+      "verify": "result.has_feedback == false"
+    },
+    {
+      "id": "git_tag_created",
+      "name": "Git Tag",
+      "required": false,
+      "weight": 20,
+      "check": "Git tag 已创建（仅当所有前置完成时）",
+      "verify": "result.tag_created == true || result.completed_deps < result.total_deps"
+    },
+    {
+      "id": "score_pass",
+      "name": "打分通过",
+      "required": true,
+      "weight": 0,
+      "check": "总分 >= 80",
+      "verify": "result.scores.total >= 80"
+    }
+  ],
+  "scoring": {
+    "pass_threshold": 80,
+    "dimensions": [
+      {
+        "id": "blocked_by",
+        "name": "前置任务完成",
+        "weight": 30,
+        "description": "所有 blocked_by 任务状态为 AI Done 或 Completed"
+      },
+      {
+        "id": "screenshots",
+        "name": "截图完整性",
+        "weight": 20,
+        "description": "按定义的截图节点完成截图"
+      },
+      {
+        "id": "git_tag",
+        "name": "Git Tag",
+        "weight": 20,
+        "description": "创建并推送 Git tag"
+      },
+      {
+        "id": "no_feedback",
+        "name": "无待处理反馈",
+        "weight": 15,
+        "description": "页面无待处理的反馈内容"
+      },
+      {
+        "id": "report",
+        "name": "报告生成",
+        "weight": 15,
+        "description": "成功生成汇总报告"
+      }
+    ]
+  },
+  "artifacts": {
+    "report_file": "feature-report.md",
+    "screenshots_dir": "screenshots/"
+  }
+}
