@@ -36,7 +36,8 @@ IFS=$' \t\n'
 export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SHARED_DIR="$SCRIPT_DIR/shared"
+# v1.1: 使用固定位置的 shared 脚本，避免 git checkout 影响
+SHARED_DIR="/home/xx/bin/ai-factory-v2"
 
 # 加载工具函数
 source "$SHARED_DIR/utils.sh"

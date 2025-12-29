@@ -7,7 +7,8 @@
 #
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SHARED_DIR="$(dirname "$SCRIPT_DIR")/shared"
+# v1.1: 使用固定位置的 shared 脚本
+SHARED_DIR="/home/xx/bin/ai-factory-v2"
 
 # 加载公共基础
 source "$SHARED_DIR/execute-base.sh"
