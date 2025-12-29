@@ -89,7 +89,6 @@ log_info "[1/4] 创建运行目录..."
 # P1: 检查磁盘空间（至少需要 500MB）
 if ! check_disk_space "${RUNS_DIR:-/home/xx/data/runs}" 500; then
   log_error "磁盘空间不足，无法创建运行目录"
-  send_feishu_notification "AI 工厂准备失败\nTask: $TASK_ID\n原因: 磁盘空间不足"
   exit 1
 fi
 
@@ -120,9 +119,6 @@ else
       log_warn "无法写入 error.json"
     fi
 
-    # 发送通知
-    send_feishu_notification "AI 工厂准备失败\nTask: $TASK_ID\nRun: $RUN_ID\n原因: Git 状态不干净，需要人工清理"
-
     exit 1
   fi
 
@@ -135,8 +131,6 @@ else
     if ! jq -n '{error: "submodule_not_clean", message: "Git submodule 状态异常"}' > "$WORK_DIR/error.json"; then
       log_warn "无法写入 error.json"
     fi
-
-    send_feishu_notification "AI 工厂准备失败\nTask: $TASK_ID\nRun: $RUN_ID\n原因: Git submodule 状态异常"
 
     exit 1
   fi
