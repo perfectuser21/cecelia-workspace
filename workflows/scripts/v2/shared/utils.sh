@@ -424,22 +424,23 @@ fetch_notion_task() {
     fi
   done
 
-  # 提取内容（简化处理，只取 paragraph 类型的文本）
+  # 提取内容（v1.1: 使用 map + join 合并所有 rich_text 元素）
   local content=""
   if [[ -n "$blocks" ]]; then
     content=$(echo "$blocks" | jq -r '
+      def get_text(arr): (arr // []) | map(.plain_text // "") | join("");
       .results[]
       | select(.type == "paragraph" or .type == "heading_1" or .type == "heading_2" or .type == "bulleted_list_item")
-      | if .type == "heading_1" then "# " + (.heading_1.rich_text[0].plain_text // "")
-        elif .type == "heading_2" then "## " + (.heading_2.rich_text[0].plain_text // "")
-        elif .type == "bulleted_list_item" then "- " + (.bulleted_list_item.rich_text[0].plain_text // "")
-        else .paragraph.rich_text[0].plain_text // ""
+      | if .type == "heading_1" then "# " + get_text(.heading_1.rich_text)
+        elif .type == "heading_2" then "## " + get_text(.heading_2.rich_text)
+        elif .type == "bulleted_list_item" then "- " + get_text(.bulleted_list_item.rich_text)
+        else get_text(.paragraph.rich_text)
         end
     ' 2>/dev/null)
   fi
 
-  # 构建 task_info JSON
-  local task_name=$(echo "$response" | jq -r '.properties.Name.title[0].plain_text // "Unknown"')
+  # 构建 task_info JSON (v1.1: rich_text 合并)
+  local task_name=$(echo "$response" | jq -r '.properties.Name.title | map(.plain_text // "") | join("") // "Unknown"')
   local coding_type=$(echo "$response" | jq -r '.properties["Coding Type"].select.name // "n8n"')
   local status=$(echo "$response" | jq -r '.properties.Status.status.name // "Unknown"')
 
