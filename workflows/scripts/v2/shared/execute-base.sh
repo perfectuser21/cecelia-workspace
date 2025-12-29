@@ -21,7 +21,8 @@ set -e
 CALLER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[1]}")" && pwd)"
 SHARED_DIR="$(dirname "$CALLER_SCRIPT_DIR")/shared"
 V2_DIR="$(dirname "$SHARED_DIR")"
-WORKFLOWS_DIR="$(dirname "$V2_DIR")"
+SCRIPTS_DIR="$(dirname "$V2_DIR")"
+WORKFLOWS_DIR="$(dirname "$SCRIPTS_DIR")"
 PROJECT_DIR="$(dirname "$WORKFLOWS_DIR")"
 
 # 加载工具函数
@@ -131,7 +132,7 @@ parse_execute_args() {
   # 导出给子脚本使用
   export RUN_ID TASK_INFO_PATH WORK_DIR LOG_FILE
   export TASK_ID TASK_NAME TASK_CONTENT CODING_TYPE
-  export SHARED_DIR V2_DIR WORKFLOWS_DIR PROJECT_DIR
+  export SHARED_DIR V2_DIR SCRIPTS_DIR WORKFLOWS_DIR PROJECT_DIR
 }
 
 # ============================================================
