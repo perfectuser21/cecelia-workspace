@@ -632,6 +632,95 @@ check_frontend_result() {
 }
 
 # ============================================================
+# 删除检测（防止任务破坏现有功能）
+# ============================================================
+
+check_deletion_regression() {
+  log_info "[6] 删除回归检查..."
+
+  # 只检查 backend 和 frontend 类型
+  if [[ "$CODING_TYPE" != "backend" && "$CODING_TYPE" != "frontend" ]]; then
+    log_info "    跳过（仅适用于 backend/frontend）"
+    return 0
+  fi
+
+  # 需要在项目目录执行
+  if [[ ! -d "$PROJECT_DIR/.git" ]]; then
+    log_warn "项目目录不是 git 仓库，跳过删除检测"
+    return 0
+  fi
+
+  local deletion_issues=()
+
+  # 使用 git diff 检查删除情况
+  local git_diff
+  git_diff=$(cd "$PROJECT_DIR" && git diff --cached --diff-filter=M --unified=0 2>/dev/null || git diff HEAD~1 --diff-filter=M --unified=0 2>/dev/null || echo "")
+
+  if [[ -z "$git_diff" ]]; then
+    pass_check "deletion_regression" "无修改或无法获取 diff"
+    return 0
+  fi
+
+  # 检查删除的函数定义（TypeScript/JavaScript）
+  local deleted_functions
+  deleted_functions=$(echo "$git_diff" | grep -E '^-.*\b(function|const|export)\s+\w+\s*[=(]' | grep -v '^---' | head -20 || true)
+
+  if [[ -n "$deleted_functions" ]]; then
+    local func_count
+    func_count=$(echo "$deleted_functions" | wc -l)
+    if [[ "$func_count" -gt 3 ]]; then
+      deletion_issues+=("删除了 $func_count 个函数/导出（超过阈值 3）")
+    fi
+  fi
+
+  # 检查删除的类定义
+  local deleted_classes
+  deleted_classes=$(echo "$git_diff" | grep -E '^-.*\bclass\s+\w+' | grep -v '^---' | head -10 || true)
+
+  if [[ -n "$deleted_classes" ]]; then
+    deletion_issues+=("删除了类定义: $(echo "$deleted_classes" | head -3 | tr '\n' '; ')")
+  fi
+
+  # 检查删除的 export 语句
+  local deleted_exports
+  deleted_exports=$(echo "$git_diff" | grep -E '^-.*\bexport\s+(default|const|function|class|interface|type)\s+' | grep -v '^---' | head -10 || true)
+
+  if [[ -n "$deleted_exports" ]]; then
+    local export_count
+    export_count=$(echo "$deleted_exports" | wc -l)
+    if [[ "$export_count" -gt 2 ]]; then
+      deletion_issues+=("删除了 $export_count 个导出（超过阈值 2）")
+    fi
+  fi
+
+  # 检查整个文件删除
+  local deleted_files
+  deleted_files=$(cd "$PROJECT_DIR" && git diff --cached --diff-filter=D --name-only 2>/dev/null || git diff HEAD~1 --diff-filter=D --name-only 2>/dev/null || echo "")
+
+  if [[ -n "$deleted_files" ]]; then
+    local file_count
+    file_count=$(echo "$deleted_files" | wc -l)
+    # 排除测试文件和临时文件
+    local important_deleted
+    important_deleted=$(echo "$deleted_files" | grep -v -E '\.(test|spec)\.(ts|js|tsx|jsx)$' | grep -v -E '^\..*' | head -5 || true)
+    if [[ -n "$important_deleted" ]]; then
+      deletion_issues+=("删除了文件: $(echo "$important_deleted" | tr '\n' ', ')")
+    fi
+  fi
+
+  # 汇总结果
+  if [[ ${#deletion_issues[@]} -gt 0 ]]; then
+    local issues_text="${deletion_issues[*]}"
+    fail_check "deletion_regression" "检测到可能的破坏性删除: $issues_text"
+    NEEDS_MANUAL=true
+    return 1
+  fi
+
+  pass_check "deletion_regression" "无异常删除" 15
+  return 0
+}
+
+# ============================================================
 # 执行检查
 # ============================================================
 
@@ -651,9 +740,11 @@ run_checks() {
       ;;
     backend)
       check_backend_result || true
+      check_deletion_regression || true
       ;;
     frontend)
       check_frontend_result || true
+      check_deletion_regression || true
       ;;
     *)
       log_warn "未知的 CODING_TYPE: $CODING_TYPE，跳过类型检查"
