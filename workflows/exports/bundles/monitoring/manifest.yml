@@ -1,0 +1,32 @@
+name: monitoring
+description: 监控巡逻系统：每6小时巡检VPS健康状态
+version: 1.0.0
+status: stable
+
+components:
+  monitoring-patrol:
+    file: monitoring-patrol.json
+    n8n_id: 0qLCksKGKxShGcYH
+    description: 每6小时执行健康检查（网站可用性、SSL证书、磁盘、内存、Docker容器、CDP端口、关键端口）
+    required: true
+
+dependencies: []
+
+config:
+  - name: SSH_CREDENTIAL_ID
+    description: SSH 凭据 ID
+    required: true
+  - name: FEISHU_WEBHOOK
+    description: 飞书通知 Webhook（工作时间告警）
+    required: true
+  - name: CHECK_URLS
+    description: 要检查的网站 URL 列表
+    required: false
+
+changelog:
+  - version: 1.0.0
+    date: 2025-12-27
+    changes:
+      - 创建监控巡逻 workflow
+      - 每6小时执行健康检查
+      - 工作时间（07:30-18:30）发送飞书告警

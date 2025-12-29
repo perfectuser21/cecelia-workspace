@@ -1,0 +1,74 @@
+name: ai-factory
+description: AI工厂：Workflow生产线 + 基座生产线 + Feature Validator
+version: 1.3.0
+status: stable
+
+components:
+  codebase-factory:
+    file: codebase-factory.json
+    n8n_id: cIFvRTzOAxk7GA06
+    description: 根据 PRD 创建代码库（18节点流水线，4路质检）
+    required: true
+
+  vibe-coding-master:
+    file: vibe-coding-master.json
+    n8n_id: BO6V3MYDHVp2bkvd
+    description: Vibe Coding 主控流程
+    required: true
+
+  feature-entry-checker:
+    file: feature-entry-checker-v2.json
+    n8n_id: R2CEgYfomNIamCTn
+    description: Feature 入口检查器，验证 Notion 页面状态
+    required: true
+
+  feature-completion-sync:
+    file: feature-completion-sync-v2.json
+    n8n_id: DKW91iRHOGms2ATK
+    description: Feature 完成同步，更新 Notion 页面状态
+    required: true
+
+  completion-sync:
+    file: completion-sync.json
+    n8n_id: null
+    description: 完成同步辅助流程
+    required: false
+
+  execution-callback:
+    file: execution-callback.json
+    n8n_id: null
+    description: 执行回调处理
+    required: false
+
+dependencies:
+  - shared/claude-executor@1.0.0
+
+config:
+  - name: CLAUDE_API_KEY
+    description: Claude API 密钥
+    required: true
+  - name: NOTION_API_KEY
+    description: Notion API 密钥
+    required: true
+  - name: FEISHU_WEBHOOK
+    description: 飞书通知 Webhook
+    required: false
+
+changelog:
+  - version: 1.3.0
+    date: 2025-12-29
+    changes:
+      - 修复：改用 Notion node + Credentials
+      - 修复 splitInBatches 循环问题
+  - version: 1.2.0
+    date: 2025-12-29
+    changes:
+      - 添加 Feature Validator（入口检查 + 完成同步）
+  - version: 1.1.0
+    date: 2025-12-26
+    changes:
+      - 添加 Vibe Coding 主控 workflow
+  - version: 1.0.0
+    date: 2025-12-26
+    changes:
+      - 初始版本，workflow-factory + codebase-factory

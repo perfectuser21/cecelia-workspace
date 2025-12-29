@@ -1,0 +1,60 @@
+# Instance Stack 模板
+# 复制此文件到新的 Instance 目录，并修改以下内容
+
+instance: instance-name               # 必须：实例名称（与目录名一致）
+description: 实例描述                  # 必须：客户/环境描述
+environment: production               # 必须：production | staging | development
+created_at: YYYY-MM-DD                # 必须：创建日期
+updated_at: YYYY-MM-DD                # 必须：最后更新日期
+
+# n8n 配置
+n8n:
+  server: https://xxx.app.n8n.cloud   # n8n 服务器地址
+  # credentials 在 credentials.yml 中配置（不提交 git）
+
+# Feature 选配（核心配置）
+# 取消注释需要的 feature，并填写版本号
+features:
+  # ai-factory:
+  #   version: 1.3.0
+  #   enabled: true
+  #   components:                     # 可选：组件级控制
+  #     codebase-factory: true
+  #     vibe-coding-master: true
+  #     feature-entry-checker: true
+  #     feature-completion-sync: true
+
+  # content-publish:
+  #   version: 1.0.0
+  #   enabled: true
+
+  # data-collection:
+  #   version: 1.0.0
+  #   enabled: true
+  #   components:
+  #     scheduler: true
+  #     douyin: true
+  #     kuaishou: true
+  #     xiaohongshu: true
+  #     toutiao: true
+  #     weibo: true
+
+  # monitoring:
+  #   version: 1.0.0
+  #   enabled: true
+
+  # nightly-maintenance:
+  #   version: 1.0.0
+  #   enabled: true
+
+# 实例特定配置
+config:
+  timezone: Asia/Shanghai
+  notification_hours: "07:30-22:30"   # 通知时间段（北京时间）
+
+# 交付记录（每次交付后更新）
+deliveries: []
+  # - date: YYYY-MM-DD
+  #   features:
+  #     feature-name: x.x.x
+  #   notes: 交付备注

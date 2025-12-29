@@ -1,0 +1,58 @@
+name: data-collection
+description: 社交媒体数据采集：9平台爬虫
+version: 1.0.0
+status: stable
+
+components:
+  scheduler:
+    file: scheduler.json
+    n8n_id: 4zvOIMtubKNF7QC6
+    description: 采集调度器，统一调度各平台采集任务
+    required: true
+
+  douyin:
+    file: douyin.json
+    n8n_id: wxYIxt8paRz82lbW
+    description: 抖音数据采集
+    required: true
+
+  kuaishou:
+    file: kuaishou.json
+    n8n_id: 8YC1JuIKo0aytgQz
+    description: 快手数据采集
+    required: true
+
+  xiaohongshu:
+    file: xiaohongshu.json
+    n8n_id: I5It7tSAT7HadXYJ
+    description: 小红书数据采集
+    required: true
+
+  toutiao:
+    file: toutiao.json
+    n8n_id: SmJ3WIeVmR69l2dF
+    description: 头条数据采集
+    required: true
+
+  weibo:
+    file: weibo.json
+    n8n_id: VMS9m7rubG5zvyla
+    description: 微博数据采集
+    required: true
+
+dependencies: []
+
+config:
+  - name: SSH_CREDENTIAL_ID
+    description: SSH 凭据 ID（用于连接 Windows node 执行爬虫）
+    required: true
+  - name: DASHBOARD_API_URL
+    description: Dashboard API 地址
+    required: true
+
+changelog:
+  - version: 1.0.0
+    date: 2025-12-26
+    changes:
+      - 初始版本
+      - 支持 6 平台采集（douyin, kuaishou, xiaohongshu, toutiao, weibo, scheduler）

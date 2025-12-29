@@ -1,0 +1,37 @@
+# Feature Manifest 模板
+# 复制此文件到新的 Feature 目录，并修改以下内容
+
+name: feature-name                    # 必须：Feature 名称（与目录名一致）
+description: 一句话描述这个 Feature    # 必须：简短描述
+version: 0.1.0                        # 必须：初始版本
+status: beta                          # 必须：beta | stable | deprecated
+
+components:
+  main-workflow:                      # 组件名（自定义）
+    file: main.json                   # 对应的 workflow JSON 文件
+    n8n_id: null                      # 部署后填写 n8n 中的 workflow ID
+    description: 主工作流描述
+    required: true                    # 是否必须启用
+
+  # 可以添加更多组件
+  # optional-workflow:
+  #   file: optional.json
+  #   n8n_id: null
+  #   description: 可选工作流
+  #   required: false
+
+dependencies: []                      # 依赖的 shared 模块，如：shared/claude-executor@1.0.0
+
+config:                               # 部署时需要的配置项
+  - name: EXAMPLE_API_KEY
+    description: 示例 API 密钥
+    required: true
+  - name: OPTIONAL_WEBHOOK
+    description: 可选的 Webhook URL
+    required: false
+
+changelog:
+  - version: 0.1.0
+    date: YYYY-MM-DD                  # 修改为实际日期
+    changes:
+      - 初始版本

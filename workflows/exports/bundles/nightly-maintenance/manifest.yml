@@ -1,0 +1,48 @@
+name: nightly-maintenance
+description: 夜间维护任务：健康检查、备份、清理
+version: 1.0.0
+status: stable
+
+components:
+  scheduler:
+    file: scheduler.json
+    n8n_id: YFqEplFiSl5Qd3x9
+    description: 夜间调度器，每日 03:00 北京时间串行执行子 workflow
+    required: true
+
+  health-check:
+    file: health-check.json
+    n8n_id: wqeeHpnTcJolnse4
+    description: 夜间健康检查（磁盘/容器/内存）
+    required: true
+
+  backup:
+    file: backup.json
+    n8n_id: 70DVZ55roILCGAMM
+    description: 夜间备份（session/脚本/报告，保留7天）
+    required: true
+
+  cleanup:
+    file: cleanup.json
+    n8n_id: wOg5NRZ2yx0D18nY
+    description: 夜间清理（/tmp/docker/Chrome缓存）
+    required: true
+
+dependencies: []
+
+config:
+  - name: SSH_CREDENTIAL_ID
+    description: SSH 凭据 ID
+    required: true
+  - name: BACKUP_RETENTION_DAYS
+    description: 备份保留天数
+    required: false
+    default: 7
+
+changelog:
+  - version: 1.0.0
+    date: 2025-12-26
+    changes:
+      - 初始版本
+      - 调度器 + 健康检查 + 备份 + 清理
+      - 每日 03:00 北京时间执行

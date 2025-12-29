@@ -1,0 +1,28 @@
+name: content-publish
+description: 内容发布系统：Dashboard → 9平台自动发布
+version: 1.0.0
+status: stable
+
+components:
+  main:
+    file: main.json
+    n8n_id: L0PHKQ1AhMxMlZ2M
+    description: 主发布流程，支持抖音、快手、小红书、头条、微博、视频号、公众号、知乎
+    required: true
+
+dependencies: []
+
+config:
+  - name: SSH_CREDENTIAL_ID
+    description: SSH 凭据 ID（用于连接 VPS 执行发布脚本）
+    required: true
+  - name: FEISHU_WEBHOOK
+    description: 飞书通知 Webhook
+    required: false
+
+changelog:
+  - version: 1.0.0
+    date: 2025-12-26
+    changes:
+      - 初始版本
+      - 支持 9 平台发布（douyin, kuaishou, xiaohongshu, toutiao-main, toutiao-sub, weibo, shipinhao, gongzhonghao, zhihu）

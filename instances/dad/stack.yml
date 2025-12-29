@@ -1,0 +1,48 @@
+instance: dad
+description: 爸爸公司（生产环境）
+environment: production
+created_at: 2025-12-29
+updated_at: 2025-12-29
+
+n8n:
+  server: null  # 待配置
+
+# Feature 选配（待定，根据需求启用）
+features:
+  # ai-factory:
+  #   version: 1.3.0
+  #   enabled: false
+
+  # content-publish:
+  #   version: 1.0.0
+  #   enabled: false
+
+  data-collection:
+    version: 1.0.0
+    enabled: true
+    components:
+      scheduler: true
+      douyin: true
+      kuaishou: true
+      xiaohongshu: true
+      toutiao: true
+      weibo: true
+
+  monitoring:
+    version: 1.0.0
+    enabled: true
+
+  nightly-maintenance:
+    version: 1.0.0
+    enabled: true
+    components:
+      scheduler: true
+      health-check: true
+      backup: true
+      cleanup: true
+
+config:
+  timezone: Asia/Shanghai
+  notification_hours: "08:00-20:00"
+
+deliveries: []
