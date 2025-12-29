@@ -98,7 +98,7 @@ if [[ "$ALL_DONE" == "false" ]]; then
       pending_tasks: $pending,
       completed_count: $completed,
       total_count: $total
-    }' > "$RESULT_PATH"
+    }' > "$WORK_DIR/result.json"
 
   # Feature Check 失败，返回非 0 退出码
   exit 1
@@ -111,7 +111,7 @@ log_info "所有依赖任务已完成"
 # ============================================================
 log_info "[3/4] 检查反馈..."
 
-PAGE_CONTENT_FILE="$RUN_DIR/page_content.md"
+PAGE_CONTENT_FILE="$WORK_DIR/page_content.md"
 HAS_FEEDBACK=false
 FEEDBACK_CONTENT=""
 
@@ -138,7 +138,7 @@ if [[ "$HAS_FEEDBACK" == "true" && -n "$FEEDBACK_CONTENT" ]]; then
       message: $message,
       has_feedback: true,
       feedback: $feedback
-    }' > "$RESULT_PATH"
+    }' > "$WORK_DIR/result.json"
 
   # 将状态改为 Waiting，等待反馈处理
   update_notion_status "$TASK_ID" "Waiting" || log_warn "更新状态失败"
@@ -152,7 +152,7 @@ fi
 # ============================================================
 log_info "[4/4] 生成汇总报告..."
 
-REPORT_FILE="$RUN_DIR/feature-report.md"
+REPORT_FILE="$WORK_DIR/feature-report.md"
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
 
 cat > "$REPORT_FILE" << EOF
@@ -202,7 +202,7 @@ jq -n \
     report_file: $report_file,
     completed_count: $completed,
     total_count: $total
-  }' > "$RESULT_PATH"
+  }' > "$WORK_DIR/result.json"
 
 log_info "=========================================="
 log_info "Feature Check 完成: 通过"

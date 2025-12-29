@@ -213,7 +213,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "Bearer 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"
+              "value": "Bearer {{ $env.NOTION_API_KEY }}"
             },
             {
               "name": "Notion-Version",

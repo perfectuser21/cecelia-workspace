@@ -16,18 +16,17 @@
 # ============================================================
 
 set -e
+set -o pipefail
 
-# 脚本目录（调用者的目录）
-CALLER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[1]}")" && pwd)"
-SHARED_DIR="$(dirname "$CALLER_SCRIPT_DIR")/shared"
-V2_DIR="$(dirname "$SHARED_DIR")"
-SCRIPTS_DIR="$(dirname "$V2_DIR")"
-WORKFLOWS_DIR="$(dirname "$SCRIPTS_DIR")"
-PROJECT_DIR="$(dirname "$WORKFLOWS_DIR")"
+# v1.1: 固定位置的脚本目录
+FIXED_DIR="/home/xx/bin/ai-factory-v2"
+SHARED_DIR="$FIXED_DIR"  # 兼容旧代码引用
+WORKFLOWS_DIR="/home/xx/dev/zenithjoy-autopilot/workflows"
+PROJECT_DIR="/home/xx/dev/zenithjoy-autopilot"
 
 # 加载工具函数
-source "$SHARED_DIR/utils.sh"
-source "$SHARED_DIR/screenshot-utils.sh"
+source "$FIXED_DIR/utils.sh"
+source "$FIXED_DIR/screenshot-utils.sh"
 
 # 加载 secrets
 load_secrets
@@ -41,12 +40,13 @@ load_secrets
 html_escape() {
   local input="$1"
   # 使用 printf + sed 处理特殊字符
-  # 1. 先转义反斜杠（必须第一个处理）
-  # 2. 转义 HTML 特殊字符
-  # 3. 转义换行符为 <br>
+  # 1. 先转义 & 符号（必须第一个处理，否则后续转义产生的 & 会被再次转义）
+  # 2. 转义反斜杠
+  # 3. 转义其他 HTML 特殊字符
+  # 4. 转义换行符为 <br>
   printf '%s' "$input" | sed \
-    -e 's/\\/\&#92;/g' \
     -e 's/&/\&amp;/g' \
+    -e 's/\\/\&#92;/g' \
     -e 's/</\&lt;/g' \
     -e 's/>/\&gt;/g' \
     -e 's/"/\&quot;/g' \
@@ -105,6 +105,7 @@ parse_execute_args() {
 
   if [[ -z "$RUN_ID" || -z "$TASK_INFO_PATH" ]]; then
     log_error "用法: execute.sh <run_id> <task_info_path>"
+    # WORK_DIR 尚未定义，跳过 error.json
     exit 1
   fi
 
@@ -112,6 +113,7 @@ parse_execute_args() {
   # 只允许：字母、数字、下划线、连字符
   if [[ "$RUN_ID" =~ \.\./ ]] || [[ "$RUN_ID" =~ / ]] || [[ ! "$RUN_ID" =~ ^[a-zA-Z0-9_-]+$ ]]; then
     log_error "非法的 RUN_ID (包含路径遍历字符或非法字符): $RUN_ID"
+    # WORK_DIR 尚未定义（因为 RUN_ID 非法），跳过 error.json
     exit 1
   fi
 
@@ -121,6 +123,28 @@ parse_execute_args() {
   # 读取任务信息
   if [[ ! -f "$TASK_INFO_PATH" ]]; then
     log_error "任务信息文件不存在: $TASK_INFO_PATH"
+    # 此时 WORK_DIR 已定义，保存 error.json
+    if [[ -n "${WORK_DIR:-}" ]] && [[ -d "$WORK_DIR" ]]; then
+      printf '{"success":false,"error":"task_info_not_found","message":"任务信息文件不存在: %s"}' "$TASK_INFO_PATH" > "$WORK_DIR/error.json"
+    fi
+    exit 1
+  fi
+
+  # P0: 验证 task_info.json 是有效的 JSON 格式
+  if ! jq empty "$TASK_INFO_PATH" 2>/dev/null; then
+    log_error "task_info.json 格式无效，不是有效的 JSON"
+    log_error "文件路径: $TASK_INFO_PATH"
+    # 记录文件内容前 200 字符用于调试
+    local file_preview
+    file_preview=$(head -c 200 "$TASK_INFO_PATH" 2>/dev/null || echo "[无法读取文件]")
+    log_error "文件内容预览: $file_preview"
+
+    # 保存错误信息
+    if [[ -d "$WORK_DIR" ]]; then
+      jq -n --arg path "$TASK_INFO_PATH" --arg preview "$file_preview" \
+        '{error: "invalid_task_info_json", message: "task_info.json 格式无效", path: $path, preview: $preview}' \
+        > "$WORK_DIR/error.json" 2>/dev/null || true
+    fi
     exit 1
   fi
 
@@ -128,6 +152,25 @@ parse_execute_args() {
   TASK_NAME=$(json_get "$TASK_INFO_PATH" '.task_name')
   TASK_CONTENT=$(json_get "$TASK_INFO_PATH" '.content')
   CODING_TYPE=$(json_get "$TASK_INFO_PATH" '.coding_type' 'unknown')
+
+  # P0: 验证必要字段不为空
+  if [[ -z "$TASK_ID" || "$TASK_ID" == "null" ]]; then
+    log_error "task_info.json 缺少必要字段: task_id"
+    if [[ -d "$WORK_DIR" ]]; then
+      jq -n '{error: "missing_task_id", message: "task_info.json 缺少 task_id 字段"}' \
+        > "$WORK_DIR/error.json" 2>/dev/null || true
+    fi
+    exit 1
+  fi
+
+  if [[ -z "$TASK_NAME" || "$TASK_NAME" == "null" ]]; then
+    log_error "task_info.json 缺少必要字段: task_name"
+    if [[ -d "$WORK_DIR" ]]; then
+      jq -n '{error: "missing_task_name", message: "task_info.json 缺少 task_name 字段"}' \
+        > "$WORK_DIR/error.json" 2>/dev/null || true
+    fi
+    exit 1
+  fi
 
   # 导出给子脚本使用
   export RUN_ID TASK_INFO_PATH WORK_DIR LOG_FILE
@@ -199,69 +242,120 @@ output_skip_result() {
 # ============================================================
 
 # 调用 Claude 执行任务
-# v1.1: 添加 TTY 模拟 (script -q -c) 和重试机制
+# 参数: $1=prompt, $2=timeout_seconds (默认 600)
+# 返回: Claude 输出存储在 CLAUDE_OUTPUT 变量
+# 安全性: 使用临时文件传递 prompt，防止命令注入
 call_claude() {
   local prompt="$1"
   local timeout_sec="${2:-600}"
-  local model="${3:-sonnet}"
-  local max_retries=3
-  local retry_count=0
+  local prompt_file=""
 
   CLAUDE_EXIT=0
   CLAUDE_OUTPUT=""
 
   if [[ "${TEST_MODE:-}" == "1" ]]; then
+    local test_timeout="${TEST_TIMEOUT:-300}"
+    if [[ "$test_timeout" -lt 5 ]]; then
+      log_warn "[TEST_MODE] 模拟 Claude 超时 (TEST_TIMEOUT=$test_timeout < 5)"
+      CLAUDE_OUTPUT='{"success": false, "error": "timeout", "message": "模拟 Claude 调用超时"}'
+      CLAUDE_EXIT=124
+      return 124
+    fi
+
     log_info "[TEST_MODE] 模拟 Claude 调用"
     CLAUDE_OUTPUT='{"success": true, "message": "mock response"}'
     return 0
   fi
 
-  local prompt_file=$(mktemp "$WORK_DIR/claude_prompt.XXXXXX")
-  local cmd_file=$(mktemp "$WORK_DIR/claude_cmd.XXXXXX")
-  local output_file="$WORK_DIR/claude_output.txt"
-  trap 'rm -f "$prompt_file" "$cmd_file" 2>/dev/null' RETURN
+  log_info "调用 Claude (timeout: ${timeout_sec}s)..."
 
+  # 使用 WORK_DIR 存储临时文件，防止 TMPDIR 被注入
+  # WORK_DIR 由 parse_execute_args 设置，是可信的安全路径
+  prompt_file=$(mktemp "$WORK_DIR/claude_prompt.XXXXXX") || {
+    log_error "无法创建临时文件"
+    return 1
+  }
+
+  # 确保临时文件在函数退出时清理
+  trap 'rm -f "$prompt_file" 2>/dev/null' RETURN
+
+  # 写入 prompt 到临时文件
   printf '%s' "$prompt" > "$prompt_file"
-  cat > "$cmd_file" << CMDEOF
-#!/bin/bash
-cd /home/xx/data/factory-workspace
-timeout -k 10 $timeout_sec claude -p "\$(cat '$prompt_file')" --add-dir "$WORKFLOWS_DIR" --model "$model" --allowedTools "Read,Grep,Glob,Bash,Write,Edit"
-CMDEOF
-  chmod +x "$cmd_file"
 
-  while [[ $retry_count -lt $max_retries ]]; do
-    retry_count=$((retry_count + 1))
-    log_info "调用 Claude (尝试 $retry_count/$max_retries, timeout: ${timeout_sec}s)..."
-    CLAUDE_OUTPUT=$(script -q -c "$cmd_file" /dev/null 2>&1 | tee "$output_file") || CLAUDE_EXIT=$?
-    if [[ $CLAUDE_EXIT -eq 0 ]] && [[ -n "$CLAUDE_OUTPUT" ]] && [[ ${#CLAUDE_OUTPUT} -gt 10 ]]; then
-      log_info "Claude 调用成功 (尝试 $retry_count)"
-      return 0
+  # 使用 cat 从文件读取 prompt，避免命令行参数注入
+  CLAUDE_OUTPUT=$(cd /home/xx/data/factory-workspace && \
+    timeout --foreground -k 10 "$timeout_sec" \
+    bash -c 'claude -p "$(cat "$1")" --add-dir "$2" --model "sonnet" 2>&1' \
+    _ "$prompt_file" "$WORKFLOWS_DIR") || CLAUDE_EXIT=$?
+
+  if [[ $CLAUDE_EXIT -ne 0 ]]; then
+    log_error "Claude 调用失败 (exit: $CLAUDE_EXIT)"
+    # 清理敏感信息后保存错误日志
+    # 移除可能的 API 密钥、token、密码、凭据等敏感信息
+    local sanitized_output
+    sanitized_output=$(printf '%s' "$CLAUDE_OUTPUT" | sed \
+      -e 's/\(api[_-]*key["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[a-zA-Z0-9_-]\{20,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(token["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[a-zA-Z0-9_-]\{20,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(password["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[^"\x27[:space:]]\{1,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(secret["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[a-zA-Z0-9_-]\{20,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/Bearer [a-zA-Z0-9._-]\{20,\}/Bearer [REDACTED]/gi' \
+      -e 's/\(AWS_ACCESS_KEY_ID["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[A-Z0-9]\{16,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(AWS_SECRET_ACCESS_KEY["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[a-zA-Z0-9/+=]\{20,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(GITHUB_TOKEN["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[a-zA-Z0-9_-]\{20,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(OPENAI_API_KEY["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*sk-[a-zA-Z0-9]\{20,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(ANTHROPIC_API_KEY["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*sk-ant-[a-zA-Z0-9-]\{20,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(PRIVATE_KEY["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[^"\x27]\{20,\}["\x27]*/\1[REDACTED]/gi' \
+      -e 's/\(credential[s]*["\x27]*[[:space:]]*[:=][[:space:]]*\)["\x27]*[a-zA-Z0-9_-]\{20,\}["\x27]*/\1[REDACTED]/gi')
+    printf '%s\n' "$sanitized_output" > "$WORK_DIR/claude_error_debug.txt"
+    # 设置文件权限为仅所有者可读写
+    chmod 600 "$WORK_DIR/claude_error_debug.txt"
+    return 1
+  fi
+
+  # 检测 Claude 拒绝执行的模式
+  local refusal_detected=false
+  local refusal_patterns=(
+    "I cannot"
+    "I'm unable to"
+    "I won't be able to"
+    "I can't help"
+    "I'm not able to"
+    "无法完成"
+    "不能执行"
+  )
+
+  for pattern in "${refusal_patterns[@]}"; do
+    if echo "$CLAUDE_OUTPUT" | grep -qi "$pattern"; then
+      refusal_detected=true
+      log_warn "检测到 Claude 可能拒绝执行: 匹配模式 '$pattern'"
+      break
     fi
-    [[ $retry_count -lt $max_retries ]] && { log_warn "重试..."; sleep 5; }
   done
 
-  log_error "Claude 调用失败，已重试 $max_retries 次"
-  printf '%s\n' "$CLAUDE_OUTPUT" > "$WORK_DIR/claude_error_debug.txt"
-  chmod 600 "$WORK_DIR/claude_error_debug.txt"
-  return 1
+  if [[ "$refusal_detected" == "true" ]]; then
+    log_error "Claude 拒绝执行任务"
+    # 保存拒绝输出用于调试
+    printf '%s\n' "$CLAUDE_OUTPUT" > "$WORK_DIR/claude_refusal_debug.txt"
+    chmod 600 "$WORK_DIR/claude_refusal_debug.txt"
+    CLAUDE_REFUSAL=true
+    export CLAUDE_REFUSAL
+    return 1
+  fi
+
+  log_info "Claude 调用成功"
+  return 0
 }
 
 # 从 Claude 输出中提取 JSON
-# v1.1: 使用 awk 深度追踪提取嵌套 JSON
-# 策略优先级:
-# 1. 直接解析（纯 JSON 输出）
-# 2. markdown ```json 代码块
-# 3. awk 深度追踪提取最外层 JSON 对象
-# 4. awk 深度追踪提取 JSON 数组
+# 更健壮的 JSON 提取逻辑：
+# 1. 先尝试直接解析整个输出
+# 2. 尝试提取 markdown 代码块中的 JSON
+# 3. 尝试使用正则提取最外层的 JSON 对象/数组
+# 4. 最后尝试 jq -s 'last'（可能不是期望的对象）
+# 5. 检测输出截断情况
 extract_json_from_claude() {
-  local raw_output="$1"
-
-  # v1.1: 清理终端控制字符（script 命令引入的 ANSI 序列和 CRLF）
-  local output
-  output=$(printf '%s' "$raw_output" | \
-    sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' | \
-    tr -d '\r' | \
-    sed 's/\x1b\[?25[hl]//g')
+  local output="$1"
+  local extracted=""
 
   # 先尝试直接解析（Claude 有时只返回纯 JSON）
   if echo "$output" | jq empty 2>/dev/null; then
@@ -277,65 +371,71 @@ extract_json_from_claude() {
     return 0
   fi
 
-  # v1.1: 使用 awk 深度追踪提取 JSON 对象
-  # 这能正确处理嵌套的 { } 而不是简单的正则匹配
+  # 尝试使用 grep 提取以 { 开头到最后一个 } 的内容（最外层对象）
   local json_obj
-  json_obj=$(echo "$output" | awk '
-    BEGIN { depth=0; capture=0; result="" }
-    {
-      for (i=1; i<=length($0); i++) {
-        c = substr($0, i, 1)
-        if (c == "{") {
-          if (depth == 0) capture = 1
-          depth++
-        }
-        if (capture) result = result c
-        if (c == "}") {
-          depth--
-          if (depth == 0 && capture) {
-            print result
-            result = ""
-            capture = 0
-          }
-        }
-      }
-      if (capture) result = result "\n"
-    }
-  ' | tail -1)
-
+  json_obj=$(echo "$output" | grep -ozP '\{[\s\S]*\}' | tr '\0' '\n' | tail -1)
   if [[ -n "$json_obj" ]] && echo "$json_obj" | jq empty 2>/dev/null; then
     echo "$json_obj"
     return 0
   fi
 
-  # 尝试提取 JSON 数组（同样使用深度追踪）
+  # 尝试提取 JSON 数组
   local json_arr
-  json_arr=$(echo "$output" | awk '
-    BEGIN { depth=0; capture=0; result="" }
-    {
-      for (i=1; i<=length($0); i++) {
-        c = substr($0, i, 1)
-        if (c == "[") {
-          if (depth == 0) capture = 1
-          depth++
-        }
-        if (capture) result = result c
-        if (c == "]") {
-          depth--
-          if (depth == 0 && capture) {
-            print result
-            result = ""
-            capture = 0
-          }
-        }
-      }
-      if (capture) result = result "\n"
-    }
-  ' | tail -1)
-
+  json_arr=$(echo "$output" | grep -ozP '\[[\s\S]*\]' | tr '\0' '\n' | tail -1)
   if [[ -n "$json_arr" ]] && echo "$json_arr" | jq empty 2>/dev/null; then
     echo "$json_arr"
     return 0
+  fi
+
+  # 最后尝试移除 markdown 代码块后使用 jq -s 'last'
+  local cleaned
+  cleaned=$(echo "$output" | sed 's/```json//g; s/```//g')
+  extracted=$(echo "$cleaned" | jq -s 'if length > 0 then last else empty end' 2>/dev/null) || true
+
+  if [[ -n "$extracted" ]] && [[ "$extracted" != "null" ]] && echo "$extracted" | jq empty 2>/dev/null; then
+    echo "$extracted"
+    return 0
+  fi
+
+  # 检测输出截断：检查 JSON 是否有未匹配的括号
+  local open_braces close_braces open_brackets close_brackets
+  open_braces=$(echo "$output" | tr -cd '{' | wc -c)
+  close_braces=$(echo "$output" | tr -cd '}' | wc -c)
+  open_brackets=$(echo "$output" | tr -cd '[' | wc -c)
+  close_brackets=$(echo "$output" | tr -cd ']' | wc -c)
+
+  # 检查是否以 { 或 [ 开始但没有匹配的结束符
+  local trimmed_output
+  trimmed_output=$(echo "$output" | sed 's/^[[:space:]]*//' | head -c 1)
+
+  if [[ "$trimmed_output" == "{" && "$open_braces" -gt "$close_braces" ]]; then
+    log_error "检测到 Claude 输出可能被截断: JSON 对象未闭合 (开括号: $open_braces, 闭括号: $close_braces)"
+    CLAUDE_TRUNCATED=true
+    export CLAUDE_TRUNCATED
+    return 1
+  fi
+
+  if [[ "$trimmed_output" == "[" && "$open_brackets" -gt "$close_brackets" ]]; then
+    log_error "检测到 Claude 输出可能被截断: JSON 数组未闭合 (开括号: $open_brackets, 闭括号: $close_brackets)"
+    CLAUDE_TRUNCATED=true
+    export CLAUDE_TRUNCATED
+    return 1
+  fi
+
+  # 检查 markdown 代码块中是否有未闭合的 JSON
+  if echo "$output" | grep -q '```json'; then
+    local json_in_block
+    json_in_block=$(echo "$output" | sed -n '/```json/,/```/p')
+    local block_open_braces block_close_braces
+    block_open_braces=$(echo "$json_in_block" | tr -cd '{' | wc -c)
+    block_close_braces=$(echo "$json_in_block" | tr -cd '}' | wc -c)
+
+    if [[ "$block_open_braces" -gt "$block_close_braces" ]]; then
+      log_error "检测到 Claude 输出可能被截断: 代码块中 JSON 未闭合"
+      CLAUDE_TRUNCATED=true
+      export CLAUDE_TRUNCATED
+      return 1
+    fi
   fi
 
   log_error "无法从 Claude 输出中提取有效 JSON"

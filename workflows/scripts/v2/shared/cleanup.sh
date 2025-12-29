@@ -16,6 +16,7 @@
 #
 
 set -e
+set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -32,6 +33,7 @@ RETRY_COUNT="${4:-0}"
 
 if [[ -z "$RUN_ID" || -z "$TASK_ID" ]]; then
   log_error "用法: cleanup.sh <run_id> <task_id> <passed> [retry_count]"
+  # WORK_DIR 尚未定义，跳过 error.json
   exit 1
 fi
 
@@ -39,9 +41,70 @@ WORK_DIR="/home/xx/data/runs/$RUN_ID"
 LOG_FILE="$WORK_DIR/logs/cleanup.log"
 REPORT_FILE="$WORK_DIR/execution_report.md"
 
-# 加载环境变量
+# 加载环境变量（带安全检查）
 if [[ -f "$WORK_DIR/env.sh" ]]; then
-  source "$WORK_DIR/env.sh" || log_warn "env.sh 加载失败"
+  # P0 安全检查: 禁止危险命令注入
+  # 只允许简单的变量赋值（VAR=value 或 export VAR=value）
+  DANGEROUS_PATTERNS=(
+    'rm '
+    'rm$'
+    'curl '
+    'wget '
+    'eval '
+    'exec '
+    '\$\('
+    '`'
+    '>'
+    '<'
+    '|'
+    ';'
+    '&&'
+    '\|\|'
+    'sudo '
+    'chmod '
+    'chown '
+    'kill '
+    'pkill '
+    'mkfifo '
+    '/dev/'
+    'nc '
+    'netcat '
+    'bash '
+    'sh '
+    'python '
+    'perl '
+    'ruby '
+    'node '
+  )
+
+  ENV_CONTENT=$(cat "$WORK_DIR/env.sh" 2>/dev/null) || {
+    log_warn "无法读取 env.sh"
+    ENV_CONTENT=""
+  }
+
+  SAFE_TO_SOURCE=true
+  for pattern in "${DANGEROUS_PATTERNS[@]}"; do
+    if echo "$ENV_CONTENT" | grep -qE "$pattern"; then
+      log_error "env.sh 包含危险命令模式: $pattern，拒绝加载"
+      SAFE_TO_SOURCE=false
+      break
+    fi
+  done
+
+  # 额外检查：只允许 export VAR=value 或 VAR=value 格式的行
+  if [[ "$SAFE_TO_SOURCE" == "true" ]]; then
+    # 过滤掉空行和注释，检查剩余行是否符合变量赋值格式
+    INVALID_LINES=$(echo "$ENV_CONTENT" | grep -vE '^\s*$|^\s*#|^(export\s+)?[A-Za-z_][A-Za-z0-9_]*=' || true)
+    if [[ -n "$INVALID_LINES" ]]; then
+      log_error "env.sh 包含非变量赋值语句，拒绝加载"
+      log_error "无效行: $(echo "$INVALID_LINES" | head -3)"
+      SAFE_TO_SOURCE=false
+    fi
+  fi
+
+  if [[ "$SAFE_TO_SOURCE" == "true" ]]; then
+    source "$WORK_DIR/env.sh" || log_warn "env.sh 加载失败"
+  fi
 fi
 
 # 验证关键变量
