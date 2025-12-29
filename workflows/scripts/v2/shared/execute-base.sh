@@ -254,7 +254,14 @@ CMDEOF
 # 3. awk 深度追踪提取最外层 JSON 对象
 # 4. awk 深度追踪提取 JSON 数组
 extract_json_from_claude() {
-  local output="$1"
+  local raw_output="$1"
+
+  # v1.1: 清理终端控制字符（script 命令引入的 ANSI 序列和 CRLF）
+  local output
+  output=$(printf '%s' "$raw_output" | \
+    sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' | \
+    tr -d '\r' | \
+    sed 's/\x1b\[?25[hl]//g')
 
   # 先尝试直接解析（Claude 有时只返回纯 JSON）
   if echo "$output" | jq empty 2>/dev/null; then
