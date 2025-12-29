@@ -1,0 +1,10 @@
+{
+  "maxRetries": 3,
+  "baseDelay": 1000,
+  "maxDelay": 30000,
+  "retryableStatusCodes": [429, 500, 502, 503, 504],
+  "nonRetryableStatusCodes": [400, 401, 403, 404],
+  "networkErrors": ["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED", "ENOTFOUND"],
+  "alertThreshold": 2,
+  "logRetryDetails": true
+}

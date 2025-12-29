@@ -1,0 +1,3 @@
+// 在 dependencies 中添加 @notionhq/client 依赖
+// 示例：运行以下命令安装
+// cd /home/xx/dev/zenithjoy-autopilot/apps/dashboard/core/api && pnpm add @notionhq/client
