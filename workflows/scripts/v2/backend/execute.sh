@@ -338,8 +338,8 @@ if [[ "${TEST_MODE:-}" == "1" ]]; then
 else
   # 使用子 shell 隔离目录变更，避免影响后续代码
   if [[ "$PROJECT_TYPE" == "typescript" || "$PROJECT_TYPE" == "javascript" ]]; then
-    # 检查是否有测试文件
-    TEST_FILES=$(find "$TARGET_PROJECT" -name "*.test.ts" -o -name "*.spec.ts" -o -name "*.test.js" -o -name "*.spec.js" 2>/dev/null | head -1)
+    # 检查是否有测试文件（排除 node_modules）
+    TEST_FILES=$(find "$TARGET_PROJECT" -path "*/node_modules" -prune -o \( -name "*.test.ts" -o -name "*.spec.ts" -o -name "*.test.js" -o -name "*.spec.js" \) -print 2>/dev/null | head -1)
     if [[ -f "$TARGET_PROJECT/package.json" ]] && grep -q '"test"' "$TARGET_PROJECT/package.json" && [[ -n "$TEST_FILES" ]]; then
       log_info "运行 npm test (timeout: ${TEST_TIMEOUT}s)..."
       # 使用子 shell 隔离 cd，-k 10 表示超时后 10 秒强制 SIGKILL
