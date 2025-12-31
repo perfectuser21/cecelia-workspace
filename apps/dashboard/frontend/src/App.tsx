@@ -39,6 +39,7 @@ import ClaudeMonitor from './pages/ClaudeMonitor';
 import ClaudeStats from './pages/ClaudeStats';
 import VpsMonitor from './pages/VpsMonitor';
 import N8nWorkflows from './pages/N8nWorkflows';
+import N8nWorkflowDetail from './pages/N8nWorkflowDetail';
 import Tasks from './pages/Tasks';
 import PublishStats from './pages/PublishStats';
 import PlatformStatus from './pages/PlatformStatus';
@@ -497,6 +498,14 @@ function AppContent() {
               element={
                 <PrivateRoute>
                   {isSuperAdmin ? <N8nWorkflows /> : <Navigate to="/" replace />}
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/settings/n8n-workflows/:instance/:id"
+              element={
+                <PrivateRoute>
+                  {isSuperAdmin ? <N8nWorkflowDetail /> : <Navigate to="/" replace />}
                 </PrivateRoute>
               }
             />

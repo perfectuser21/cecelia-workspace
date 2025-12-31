@@ -30,6 +30,8 @@ services:
       - CLOUDFLARE_DEPLOY_HOOK=${CLOUDFLARE_DEPLOY_HOOK:-}
       # n8n 发布 webhook - 触发自动发布到社交平台
       - N8N_PUBLISH_WEBHOOK_URL=https://zenithjoy21xx.app.n8n.cloud/webhook/content-publish
+      # n8n Local 实例 API Key
+      - N8N_LOCAL_API_KEY=${N8N_LOCAL_API_KEY:-}
       # Notion Integration
       - NOTION_API_KEY=${NOTION_API_KEY:-}
       - NOTION_TASKS_DB_ID=${NOTION_TASKS_DB_ID:-}

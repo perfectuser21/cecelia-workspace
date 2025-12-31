@@ -68,6 +68,35 @@ export interface N8nOverview {
   timestamp: number;
 }
 
+// 多实例支持
+export type N8nInstance = 'cloud' | 'local';
+
+export interface InstanceStatus {
+  available: boolean;
+  name: string;
+}
+
+export interface InstancesStatus {
+  cloud: InstanceStatus;
+  local: InstanceStatus;
+}
+
+export interface N8nNode {
+  id: string;
+  name: string;
+  type: string;
+  position: [number, number];
+}
+
+export interface N8nWorkflowDetail extends N8nWorkflow {
+  nodes: N8nNode[];
+  nodeCount: number;
+  triggerType?: 'schedule' | 'webhook' | 'manual' | 'other';
+  triggerInfo?: string;
+  description?: string;
+  instance: N8nInstance;
+}
+
 async function fetchApi<T>(endpoint: string): Promise<T> {
   const response = await fetch(`${API_BASE}${endpoint}`);
   if (!response.ok) {
@@ -102,5 +131,27 @@ export const n8nWorkflowsApi = {
     const queryString = queryParams.toString();
     const endpoint = `/api/v1/n8n-workflows/executions${queryString ? `?${queryString}` : ''}`;
     return fetchApi(endpoint);
+  },
+
+  // 多实例 API
+  getInstancesStatus: (): Promise<InstancesStatus> => {
+    return fetchApi('/api/v1/n8n-workflows/instances/status');
+  },
+
+  getOverviewByInstance: (instance: N8nInstance): Promise<N8nOverview> => {
+    return fetchApi(`/api/v1/n8n-workflows/instances/${instance}/overview`);
+  },
+
+  getWorkflowsByInstance: (instance: N8nInstance): Promise<WorkflowStats> => {
+    return fetchApi(`/api/v1/n8n-workflows/instances/${instance}/workflows`);
+  },
+
+  getWorkflowDetail: (instance: N8nInstance, id: string): Promise<N8nWorkflowDetail> => {
+    return fetchApi(`/api/v1/n8n-workflows/instances/${instance}/workflows/${id}`);
+  },
+
+  getWorkflowExecutions: (instance: N8nInstance, id: string, limit = 50): Promise<ExecutionStats> => {
+    const queryString = `?limit=${limit}`;
+    return fetchApi(`/api/v1/n8n-workflows/instances/${instance}/workflows/${id}/executions${queryString}`);
   },
 };

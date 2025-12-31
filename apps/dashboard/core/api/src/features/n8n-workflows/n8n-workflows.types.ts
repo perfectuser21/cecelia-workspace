@@ -73,3 +73,22 @@ export interface N8nOverview {
   recentExecutions: ExecutionStats;
   timestamp: number;
 }
+
+// 多实例支持
+export type N8nInstance = 'cloud' | 'local';
+
+export interface N8nNode {
+  id: string;
+  name: string;
+  type: string;
+  position: [number, number];
+}
+
+export interface N8nWorkflowDetail extends N8nWorkflow {
+  nodes: N8nNode[];
+  nodeCount: number;
+  triggerType?: 'schedule' | 'webhook' | 'manual' | 'other';
+  triggerInfo?: string;
+  description?: string;
+  instance: N8nInstance;
+}

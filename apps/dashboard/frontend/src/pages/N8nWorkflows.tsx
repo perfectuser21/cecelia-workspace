@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Workflow,
   Play,
@@ -24,11 +25,15 @@ import {
   FolderOpen,
   Timer,
   BarChart3,
+  Cloud,
+  Server,
 } from 'lucide-react';
 import {
   n8nWorkflowsApi,
   N8nOverview,
   N8nWorkflowWithStats,
+  N8nInstance,
+  InstancesStatus,
 } from '../api/n8n-workflows.api';
 
 // 工作流分类配置
@@ -41,6 +46,12 @@ const WORKFLOW_CATEGORIES = [
 ];
 
 export default function N8nWorkflows() {
+  const navigate = useNavigate();
+
+  // Tab 状态
+  const [activeInstance, setActiveInstance] = useState<N8nInstance>('local');
+  const [instancesStatus, setInstancesStatus] = useState<InstancesStatus | null>(null);
+
   const [overview, setOverview] = useState<N8nOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,9 +63,21 @@ export default function N8nWorkflows() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // 获取实例状态
+  useEffect(() => {
+    n8nWorkflowsApi.getInstancesStatus()
+      .then(setInstancesStatus)
+      .catch(() => {
+        setInstancesStatus({
+          cloud: { available: true, name: 'Cloud' },
+          local: { available: false, name: 'Local' },
+        });
+      });
+  }, []);
+
   const fetchData = async () => {
     try {
-      const data = await n8nWorkflowsApi.getOverview();
+      const data = await n8nWorkflowsApi.getOverviewByInstance(activeInstance);
       setOverview(data);
       setLastUpdate(new Date().toLocaleTimeString('zh-CN'));
       setError(null);
@@ -70,11 +93,19 @@ export default function N8nWorkflows() {
     fetchData();
   };
 
+  // 切换实例时重新获取数据
   useEffect(() => {
+    setLoading(true);
+    setOverview(null);
     fetchData();
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [activeInstance]);
+
+  // 点击工作流卡片跳转详情
+  const handleWorkflowClick = (workflowId: string) => {
+    navigate(`/settings/n8n-workflows/${activeInstance}/${workflowId}`);
+  };
 
   // 工作流分类
   const categorizeWorkflow = (workflow: N8nWorkflowWithStats): string => {
@@ -306,7 +337,7 @@ export default function N8nWorkflows() {
         </div>
         <div className="flex items-center gap-3">
           <a
-            href="https://zenithjoy21xx.app.n8n.cloud"
+            href={activeInstance === 'cloud' ? 'https://zenithjoy21xx.app.n8n.cloud' : 'http://localhost:5679'}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition"
@@ -323,6 +354,36 @@ export default function N8nWorkflows() {
             刷新
           </button>
         </div>
+      </div>
+
+      {/* Instance Tabs */}
+      <div className="flex bg-gray-100 dark:bg-slate-700 rounded-xl p-1 w-fit">
+        <button
+          onClick={() => setActiveInstance('local')}
+          disabled={!instancesStatus?.local.available}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            activeInstance === 'local'
+              ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+          } ${!instancesStatus?.local.available ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          <Server className="w-4 h-4" />
+          Local
+          {!instancesStatus?.local.available && <span className="text-xs text-red-500">(未配置)</span>}
+        </button>
+        <button
+          onClick={() => setActiveInstance('cloud')}
+          disabled={!instancesStatus?.cloud.available}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            activeInstance === 'cloud'
+              ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+          } ${!instancesStatus?.cloud.available ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          <Cloud className="w-4 h-4" />
+          Cloud
+          {!instancesStatus?.cloud.available && <span className="text-xs text-red-500">(未配置)</span>}
+        </button>
       </div>
 
       {/* Stats Cards */}
@@ -499,6 +560,7 @@ export default function N8nWorkflows() {
                         getStatusColor={getStatusColor}
                         getStatusIcon={getStatusIcon}
                         getStatusLabel={getStatusLabel}
+                        onClick={() => handleWorkflowClick(workflow.id)}
                       />
                     ))}
                   </div>
@@ -685,6 +747,7 @@ interface WorkflowCardProps {
   getStatusColor: (status: string) => string;
   getStatusIcon: (status: string) => React.ReactNode;
   getStatusLabel: (status: string) => string;
+  onClick?: () => void;
 }
 
 function WorkflowCard({
@@ -693,6 +756,7 @@ function WorkflowCard({
   getStatusColor,
   getStatusIcon,
   getStatusLabel,
+  onClick,
 }: WorkflowCardProps) {
   const { runStats } = workflow;
   const isRunning = runStats?.runningCount > 0;
@@ -701,7 +765,8 @@ function WorkflowCard({
 
   return (
     <div
-      className={`border rounded-xl p-4 transition-all ${
+      onClick={onClick}
+      className={`border rounded-xl p-4 transition-all cursor-pointer ${
         isRunning
           ? 'border-blue-300 dark:border-blue-600 bg-blue-50/50 dark:bg-blue-900/20 shadow-md shadow-blue-500/10'
           : 'border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700/50 hover:shadow-md dark:hover:shadow-slate-900/50 hover:border-gray-300 dark:hover:border-slate-500'

@@ -10,12 +10,82 @@ import {
   N8nOverview,
   N8nWorkflowWithStats,
   WorkflowRunStats,
+  N8nWorkflowDetail,
+  N8nInstance,
 } from './n8n-workflows.types';
 
-const N8N_BASE_URL = 'https://zenithjoy21xx.app.n8n.cloud';
-const N8N_API_KEY = process.env.N8N_REST_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1N2ZhNjM5MC1hNDBjLTQ2MDUtOTdlZC02Y2ExM2YwYjgwYTciLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzY2Mjg2NzU5LCJleHAiOjE4MDE0MTEyMDB9.9691--OtQhS52TVvQ9fYCzkiicWT-j6TnlLO9B95VmE';
+// 多实例配置
+interface InstanceConfig {
+  baseUrl: string;
+  apiKey: string;
+  name: string;
+}
+
+const instances: Record<N8nInstance, InstanceConfig> = {
+  cloud: {
+    baseUrl: 'https://zenithjoy21xx.app.n8n.cloud',
+    apiKey: process.env.N8N_REST_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1N2ZhNjM5MC1hNDBjLTQ2MDUtOTdlZC02Y2ExM2YwYjgwYTciLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzY2Mjg2NzU5LCJleHAiOjE4MDE0MTEyMDB9.9691--OtQhS52TVvQ9fYCzkiicWT-j6TnlLO9B95VmE',
+    name: 'Cloud',
+  },
+  local: {
+    // Use container name since both are on the same docker network
+    baseUrl: process.env.N8N_LOCAL_URL || 'http://n8n-self-hosted:5678',
+    apiKey: process.env.N8N_LOCAL_API_KEY || '',
+    name: 'Local',
+  },
+};
+
+// 兼容原有单实例配置
+const N8N_BASE_URL = instances.cloud.baseUrl;
+const N8N_API_KEY = instances.cloud.apiKey;
 
 class N8nWorkflowsService {
+  /**
+   * 检查实例是否可用（已配置 API Key）
+   */
+  isInstanceAvailable(instance: N8nInstance): boolean {
+    return !!instances[instance]?.apiKey;
+  }
+
+  /**
+   * 获取实例配置
+   */
+  private getInstanceConfig(instance: N8nInstance): InstanceConfig {
+    const config = instances[instance];
+    if (!config) {
+      throw new Error(`Unknown instance: ${instance}`);
+    }
+    return config;
+  }
+
+  /**
+   * 通用 fetch 方法（支持多实例）
+   */
+  private async fetchN8nInstance<T>(instance: N8nInstance, endpoint: string): Promise<T> {
+    const config = this.getInstanceConfig(instance);
+    const url = `${config.baseUrl}${endpoint}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'X-N8N-API-KEY': config.apiKey,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`N8n API error: ${response.status} - ${errorText}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      logger.error('Failed to fetch from n8n API', { instance, endpoint, error });
+      throw error;
+    }
+  }
+
   private async fetchN8n<T>(endpoint: string): Promise<T> {
     const url = `${N8N_BASE_URL}${endpoint}`;
 
@@ -212,6 +282,174 @@ class N8nWorkflowsService {
       };
     } catch (error) {
       logger.error('Failed to get n8n overview', { error });
+      throw error;
+    }
+  }
+
+  // ==================== 多实例方法 ====================
+
+  /**
+   * 获取指定实例的工作流列表（带统计）
+   */
+  async getWorkflowsByInstance(instance: N8nInstance): Promise<WorkflowStats> {
+    try {
+      const [workflowsResponse, executionsResponse] = await Promise.all([
+        this.fetchN8nInstance<WorkflowsResponse>(instance, '/api/v1/workflows'),
+        this.fetchN8nInstance<ExecutionsResponse>(instance, '/api/v1/executions?limit=200'),
+      ]);
+
+      const workflows = workflowsResponse.data || [];
+      const executions = executionsResponse.data || [];
+
+      const workflowsWithStats: N8nWorkflowWithStats[] = workflows.map(workflow => ({
+        ...workflow,
+        runStats: this.calculateWorkflowRunStats(workflow.id, executions),
+      }));
+
+      const activeWorkflows = workflows.filter(w => w.active).length;
+      const inactiveWorkflows = workflows.length - activeWorkflows;
+
+      return {
+        totalWorkflows: workflows.length,
+        activeWorkflows,
+        inactiveWorkflows,
+        workflows: workflowsWithStats,
+        timestamp: Date.now(),
+      };
+    } catch (error) {
+      logger.error('Failed to get workflows by instance', { instance, error });
+      throw error;
+    }
+  }
+
+  /**
+   * 获取指定实例的概览
+   */
+  async getOverviewByInstance(instance: N8nInstance): Promise<N8nOverview> {
+    try {
+      const [workflows, executionsResponse] = await Promise.all([
+        this.getWorkflowsByInstance(instance),
+        this.fetchN8nInstance<ExecutionsResponse>(instance, '/api/v1/executions?limit=50'),
+      ]);
+
+      const executions = executionsResponse.data || [];
+
+      // 获取工作流名称映射
+      const workflowMap = new Map(workflows.workflows.map(w => [w.id, w.name]));
+
+      const executionsWithNames = executions.map(e => ({
+        ...e,
+        workflowName: workflowMap.get(e.workflowId) || e.workflowId,
+      }));
+
+      const successCount = executions.filter(e => e.status === 'success').length;
+      const errorCount = executions.filter(e => e.status === 'error' || e.status === 'crashed').length;
+      const runningCount = executions.filter(e => e.status === 'running' || e.status === 'waiting').length;
+      const total = executions.length;
+
+      return {
+        workflows,
+        recentExecutions: {
+          total,
+          success: successCount,
+          error: errorCount,
+          running: runningCount,
+          successRate: total > 0 ? Math.round((successCount / total) * 100) : 0,
+          executions: executionsWithNames,
+          timestamp: Date.now(),
+        },
+        timestamp: Date.now(),
+      };
+    } catch (error) {
+      logger.error('Failed to get overview by instance', { instance, error });
+      throw error;
+    }
+  }
+
+  /**
+   * 获取单个工作流详情
+   */
+  async getWorkflowDetail(instance: N8nInstance, id: string): Promise<N8nWorkflowDetail> {
+    try {
+      const response = await this.fetchN8nInstance<N8nWorkflow>(instance, `/api/v1/workflows/${id}`);
+
+      // n8n API 直接返回工作流对象（不是 {data: ...} 格式）
+      const workflow = response;
+
+      // 解析节点信息
+      const nodes = (workflow as unknown as { nodes?: Array<{ id?: string; name: string; type: string; position: [number, number] }> }).nodes || [];
+      const nodeCount = nodes.length;
+
+      // 判断触发类型
+      let triggerType: 'schedule' | 'webhook' | 'manual' | 'other' = 'other';
+      let triggerInfo: string | undefined;
+
+      const triggerNode = nodes.find(n =>
+        n.type.includes('trigger') ||
+        n.type.includes('Trigger') ||
+        n.type === 'n8n-nodes-base.scheduleTrigger' ||
+        n.type === 'n8n-nodes-base.webhook'
+      );
+
+      if (triggerNode) {
+        if (triggerNode.type.includes('schedule') || triggerNode.type.includes('Schedule')) {
+          triggerType = 'schedule';
+          triggerInfo = triggerNode.name;
+        } else if (triggerNode.type.includes('webhook') || triggerNode.type.includes('Webhook')) {
+          triggerType = 'webhook';
+          triggerInfo = triggerNode.name;
+        } else if (triggerNode.type.includes('manual') || triggerNode.type.includes('Manual')) {
+          triggerType = 'manual';
+        }
+      }
+
+      return {
+        ...workflow,
+        nodes: nodes.map(n => ({
+          id: n.id || n.name,
+          name: n.name,
+          type: n.type,
+          position: n.position,
+        })),
+        nodeCount,
+        triggerType,
+        triggerInfo,
+        instance,
+      };
+    } catch (error) {
+      logger.error('Failed to get workflow detail', { instance, id, error });
+      throw error;
+    }
+  }
+
+  /**
+   * 获取指定工作流的执行记录
+   */
+  async getWorkflowExecutions(instance: N8nInstance, workflowId: string, limit = 50): Promise<ExecutionStats> {
+    try {
+      const response = await this.fetchN8nInstance<ExecutionsResponse>(
+        instance,
+        `/api/v1/executions?workflowId=${workflowId}&limit=${limit}`
+      );
+
+      const executions = response.data || [];
+
+      const successCount = executions.filter(e => e.status === 'success').length;
+      const errorCount = executions.filter(e => e.status === 'error' || e.status === 'crashed').length;
+      const runningCount = executions.filter(e => e.status === 'running' || e.status === 'waiting').length;
+      const total = executions.length;
+
+      return {
+        total,
+        success: successCount,
+        error: errorCount,
+        running: runningCount,
+        successRate: total > 0 ? Math.round((successCount / total) * 100) : 0,
+        executions,
+        timestamp: Date.now(),
+      };
+    } catch (error) {
+      logger.error('Failed to get workflow executions', { instance, workflowId, error });
       throw error;
     }
   }
