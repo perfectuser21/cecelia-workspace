@@ -14,7 +14,7 @@ if [[ -f "$SECRETS_FILE" ]]; then
   eval $(grep "^N8N_REST_API_KEY=" "$SECRETS_FILE")
 fi
 
-N8N_API_URL="${N8N_API_URL:-https://zenithjoy21xx.app.n8n.cloud/api/v1}"
+N8N_API_URL="${N8N_API_URL:-http://localhost:5679/api/v1}"
 N8N_API_KEY="${N8N_API_KEY:-$N8N_REST_API_KEY}"
 
 # 颜色

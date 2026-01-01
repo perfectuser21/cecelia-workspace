@@ -197,7 +197,7 @@ updated_at: 2025-12-29              # 必须：最后更新日期
 
 # n8n 配置
 n8n:
-  server: https://zenithjoy21xx.app.n8n.cloud
+  server: http://localhost:5679
   # credentials 在 credentials.yml 中，不提交 git
 
 # Feature 选配（核心！）
@@ -429,7 +429,7 @@ created_at: YYYY-MM-DD
 updated_at: YYYY-MM-DD
 
 n8n:
-  server: https://xxx.app.n8n.cloud
+  server: http://localhost:5679
 
 features:
   # 取消注释需要的 feature

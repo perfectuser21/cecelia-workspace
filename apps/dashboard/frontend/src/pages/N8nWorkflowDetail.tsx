@@ -200,9 +200,9 @@ export default function N8nWorkflowDetail() {
     );
   }
 
-  const n8nBaseUrl = instance === 'cloud'
-    ? 'https://zenithjoy21xx.app.n8n.cloud'
-    : 'http://localhost:5679';
+  const n8nBaseUrl = instance === 'local'
+    ? (import.meta.env.VITE_N8N_LOCAL_URL || 'http://localhost:5679')
+    : (import.meta.env.VITE_N8N_CLOUD_URL || '#');
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">

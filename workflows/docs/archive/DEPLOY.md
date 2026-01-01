@@ -1,7 +1,7 @@
 # Deployment Guide: Simple Ping Webhook
 
 **Status**: ✅ **Successfully Deployed**
-**Endpoint**: `https://zenithjoy21xx.app.n8n.cloud/webhook/ping`
+**Endpoint**: `http://localhost:5679/webhook/ping`
 **Last Updated**: 2025-12-25
 
 ---
@@ -11,7 +11,7 @@
 Test the webhook is working:
 
 ```bash
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 ```
 
 Response:
@@ -28,7 +28,7 @@ If this works, deployment is complete. Skip to "Integration" section below.
 If you need to redeploy or modify the workflow, ensure:
 
 ### n8n Cloud Access
-- Account: zenithjoy21xx.app.n8n.cloud
+- Account: localhost:5679
 - API Key: Available in `.secrets` file
 - MCP Server: Online and accessible
 
@@ -42,7 +42,7 @@ grep N8N_MCP_API_KEY ~/.secrets
 ### Connectivity
 ```bash
 # Test n8n Cloud is reachable
-curl -s https://zenithjoy21xx.app.n8n.cloud | head -c 100
+curl -s http://localhost:5679 | head -c 100
 ```
 
 ---
@@ -51,7 +51,7 @@ curl -s https://zenithjoy21xx.app.n8n.cloud | head -c 100
 
 ### Step 1: Access n8n Cloud
 ```
-URL: https://zenithjoy21xx.app.n8n.cloud
+URL: http://localhost:5679
 Open in browser → Log in
 ```
 
@@ -93,7 +93,7 @@ Open in browser → Log in
 
 ### Step 7: Verify
 ```bash
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 ```
 
 Expected: `{"message": "pong"}`
@@ -115,7 +115,7 @@ echo $N8N_API_KEY
 
 ### Step 2: Create Workflow
 ```bash
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows" \
+curl -X POST "http://localhost:5679/api/v1/workflows" \
   -H "X-N8N-API-KEY: $N8N_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -160,7 +160,7 @@ echo $WORKFLOW_ID
 
 ### Step 4: Activate Workflow
 ```bash
-curl -X PATCH "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$WORKFLOW_ID" \
+curl -X PATCH "http://localhost:5679/api/v1/workflows/$WORKFLOW_ID" \
   -H "X-N8N-API-KEY: $N8N_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"active": true}'
@@ -169,11 +169,11 @@ curl -X PATCH "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$WORKFLOW_ID
 ### Step 5: Verify
 ```bash
 # Check if workflow is active
-curl -s "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$WORKFLOW_ID" \
+curl -s "http://localhost:5679/api/v1/workflows/$WORKFLOW_ID" \
   -H "X-N8N-API-KEY: $N8N_API_KEY" | grep "active"
 
 # Test the webhook
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 ```
 
 ---
@@ -185,7 +185,7 @@ Use the automated workflow factory:
 ### Step 1: Create Request
 ```bash
 # Call the factory webhook
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{
     "prd": "创建一个简单的 Ping webhook 返回 pong",
@@ -202,7 +202,7 @@ The factory will:
 
 ### Step 3: Verify
 ```bash
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 ```
 
 ---
@@ -233,45 +233,45 @@ HTTP 200 OK
 
 ### Test 1: Basic GET Request
 ```bash
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 ```
 Expected: `{"message": "pong"}`
 
 ### Test 2: Verbose Output
 ```bash
-curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -v http://localhost:5679/webhook/ping
 ```
 
 ### Test 3: Different HTTP Methods
 ```bash
 # POST
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -X POST http://localhost:5679/webhook/ping
 
 # PUT
-curl -X PUT https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -X PUT http://localhost:5679/webhook/ping
 
 # DELETE
-curl -X DELETE https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -X DELETE http://localhost:5679/webhook/ping
 
 # PATCH
-curl -X PATCH https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -X PATCH http://localhost:5679/webhook/ping
 ```
 
 ### Test 4: With Query Parameters
 ```bash
-curl "https://zenithjoy21xx.app.n8n.cloud/webhook/ping?name=test&v=1.0"
+curl "http://localhost:5679/webhook/ping?name=test&v=1.0"
 ```
 
 ### Test 5: With Request Body
 ```bash
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
+curl -X POST http://localhost:5679/webhook/ping \
   -H "Content-Type: application/json" \
   -d '{"user": "alice", "test": true}'
 ```
 
 ### Test 6: Response Time
 ```bash
-time curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+time curl http://localhost:5679/webhook/ping
 ```
 Expected: < 100ms
 
@@ -300,7 +300,7 @@ After deployment, verify:
 ```bash
 # Example: Add to uptime monitoring
 # Monitoring System → New Check
-# - URL: https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+# - URL: http://localhost:5679/webhook/ping
 # - Method: GET
 # - Expected Status: 200
 # - Interval: 60 seconds
@@ -322,7 +322,7 @@ Health Check Configuration:
 ```bash
 #!/bin/bash
 # Health check script
-if curl -s https://zenithjoy21xx.app.n8n.cloud/webhook/ping | grep -q "pong"; then
+if curl -s http://localhost:5679/webhook/ping | grep -q "pong"; then
   echo "PASS: Service is healthy"
   exit 0
 else
@@ -336,7 +336,7 @@ fi
 # Example: GitHub Actions
 - name: Test Webhook
   run: |
-    response=$(curl -s https://zenithjoy21xx.app.n8n.cloud/webhook/ping)
+    response=$(curl -s http://localhost:5679/webhook/ping)
     if [ "$response" = '{"message": "pong"}' ]; then
       echo "✓ Webhook test passed"
     else
@@ -356,10 +356,10 @@ fi
 **Diagnosis**:
 ```bash
 # 1. Check if endpoint responds
-curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -v http://localhost:5679/webhook/ping
 
 # 2. Check n8n UI for workflow
-# Open https://zenithjoy21xx.app.n8n.cloud
+# Open http://localhost:5679
 # Menu → Workflows → Look for "Ping Webhook"
 ```
 
@@ -368,7 +368,7 @@ curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 2. Find workflow "Ping Webhook"
 3. Click "Active" toggle to enable
 4. Wait a few seconds for activation
-5. Test again: `curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping`
+5. Test again: `curl http://localhost:5679/webhook/ping`
 
 ---
 
@@ -379,10 +379,10 @@ curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 **Diagnosis**:
 ```bash
 # Test n8n connectivity
-curl -v https://zenithjoy21xx.app.n8n.cloud
+curl -v http://localhost:5679
 
 # Check DNS resolution
-nslookup zenithjoy21xx.app.n8n.cloud
+nslookup localhost:5679
 ```
 
 **Solution**:
@@ -400,7 +400,7 @@ nslookup zenithjoy21xx.app.n8n.cloud
 **Diagnosis**:
 ```bash
 # Check n8n execution logs
-# 1. Open https://zenithjoy21xx.app.n8n.cloud
+# 1. Open http://localhost:5679
 # 2. Menu → Executions
 # 3. Find latest execution for "Ping Webhook"
 # 4. Review error details
@@ -422,7 +422,7 @@ nslookup zenithjoy21xx.app.n8n.cloud
 **Solution**:
 ```bash
 # Increase client timeout
-curl --max-time 10 https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl --max-time 10 http://localhost:5679/webhook/ping
 
 # Check n8n system resources
 # - CPU usage
@@ -472,7 +472,7 @@ Example:
 If you need to disable the webhook:
 
 ### Method 1: Via n8n UI
-1. Open https://zenithjoy21xx.app.n8n.cloud
+1. Open http://localhost:5679
 2. Menu → Workflows → Ping Webhook
 3. Click **"Active"** toggle to disable
 4. Click **"Save"**
@@ -482,7 +482,7 @@ If you need to disable the webhook:
 export N8N_API_KEY=$(grep N8N_REST_API_KEY ~/.secrets | cut -d= -f2)
 export WORKFLOW_ID="<workflow-id>"
 
-curl -X PATCH "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$WORKFLOW_ID" \
+curl -X PATCH "http://localhost:5679/api/v1/workflows/$WORKFLOW_ID" \
   -H "X-N8N-API-KEY: $N8N_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"active": false}'
@@ -491,7 +491,7 @@ curl -X PATCH "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$WORKFLOW_ID
 ### Verify Rollback
 ```bash
 # Should return 404 after deactivation
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 ```
 
 ---
@@ -543,7 +543,7 @@ curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 # Example: Simple health check script
 # Save as: check-webhook.sh
 #!/bin/bash
-RESPONSE=$(curl -s https://zenithjoy21xx.app.n8n.cloud/webhook/ping)
+RESPONSE=$(curl -s http://localhost:5679/webhook/ping)
 if [ "$RESPONSE" = '{"message": "pong"}' ]; then
   exit 0  # Success
 else
@@ -596,7 +596,7 @@ If deploying with environment-specific configuration:
 
 ```bash
 # .env example
-N8N_WEBHOOK_URL=https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+N8N_WEBHOOK_URL=http://localhost:5679/webhook/ping
 N8N_API_KEY=<from-.secrets>
 N8N_REST_API_KEY=<from-.secrets>
 ```

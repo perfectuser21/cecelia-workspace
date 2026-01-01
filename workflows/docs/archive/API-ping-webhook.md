@@ -4,7 +4,7 @@
 
 Ping Webhook 是一个轻量级的健康检查端点，用于验证 n8n 服务可用性和响应时间。
 
-**基础 URL**: `https://zenithjoy21xx.app.n8n.cloud`
+**基础 URL**: `http://localhost:5679`
 
 **Webhook 路径**: `/webhook/ping`
 
@@ -26,7 +26,7 @@ Ping Webhook 是一个轻量级的健康检查端点，用于验证 n8n 服务�
 
 ```http
 GET /webhook/ping HTTP/1.1
-Host: zenithjoy21xx.app.n8n.cloud
+Host: localhost:5679
 ```
 
 #### 请求参数
@@ -63,14 +63,14 @@ Host: zenithjoy21xx.app.n8n.cloud
 
 ```bash
 curl -X GET \
-  https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
+  http://localhost:5679/webhook/ping \
   -H 'Content-Type: application/json'
 ```
 
 **JavaScript/Fetch**:
 
 ```javascript
-const response = await fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping', {
+const response = await fetch('http://localhost:5679/webhook/ping', {
   method: 'GET',
   headers: {
     'Content-Type': 'application/json'
@@ -88,7 +88,7 @@ console.log(data);
 import requests
 from datetime import datetime
 
-response = requests.get('https://zenithjoy21xx.app.n8n.cloud/webhook/ping')
+response = requests.get('http://localhost:5679/webhook/ping')
 
 if response.status_code == 200:
     data = response.json()
@@ -103,7 +103,7 @@ else:
 ```javascript
 const axios = require('axios');
 
-axios.get('https://zenithjoy21xx.app.n8n.cloud/webhook/ping')
+axios.get('http://localhost:5679/webhook/ping')
   .then(response => {
     console.log(response.data);
     // { status: 'pong', timestamp: '2025-12-25T12:34:56.789Z' }
@@ -125,7 +125,7 @@ import (
 )
 
 func main() {
-    resp, err := http.Get("https://zenithjoy21xx.app.n8n.cloud/webhook/ping")
+    resp, err := http.Get("http://localhost:5679/webhook/ping")
     if err != nil {
         panic(err)
     }
@@ -189,7 +189,7 @@ n8n 服务不可用
 
 ```http
 POST /webhook/ping HTTP/1.1
-Host: zenithjoy21xx.app.n8n.cloud
+Host: localhost:5679
 Content-Type: application/json
 
 {
@@ -225,7 +225,7 @@ POST 请求可以包含任何 JSON 数据，但不会被处理。
 
 ```bash
 curl -X POST \
-  https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
+  http://localhost:5679/webhook/ping \
   -H 'Content-Type: application/json' \
   -d '{"client_id": "app-1"}'
 ```
@@ -233,7 +233,7 @@ curl -X POST \
 **JavaScript/Fetch**:
 
 ```javascript
-const response = await fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping', {
+const response = await fetch('http://localhost:5679/webhook/ping', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json'
@@ -283,7 +283,7 @@ console.log(data);
 #!/bin/bash
 # 监控脚本
 
-endpoint="https://zenithjoy21xx.app.n8n.cloud/webhook/ping"
+endpoint="http://localhost:5679/webhook/ping"
 timeout=5
 max_retries=3
 
@@ -333,7 +333,7 @@ const failureThreshold = 3;
 
 setInterval(async () => {
   try {
-    const response = await fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping');
+    const response = await fetch('http://localhost:5679/webhook/ping');
 
     if (response.ok && response.status === 200) {
       failureCount = 0; // 重置计数
@@ -360,13 +360,13 @@ setInterval(async () => {
 async function executeWorkflowWithHealthCheck() {
   try {
     // 1. 检查 n8n 服务健康状态
-    const pingResponse = await fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping');
+    const pingResponse = await fetch('http://localhost:5679/webhook/ping');
     if (pingResponse.status !== 200) {
       throw new Error('n8n service is not healthy');
     }
 
     // 2. 服务正常，继续执行业务逻辑
-    const result = await fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/business-workflow', {
+    const result = await fetch('http://localhost:5679/webhook/business-workflow', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ data: 'important' })
@@ -418,7 +418,7 @@ async function executeWorkflowWithHealthCheck() {
 **错误 1: 404 Not Found**
 
 ```bash
-curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -v http://localhost:5679/webhook/ping
 # < HTTP/1.1 404 Not Found
 ```
 
@@ -428,7 +428,7 @@ curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 ```bash
 curl -X PATCH -H "X-N8N-API-KEY: $N8N_API_KEY" \
   -d '{"active": true}' \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/vaOcL9wAjducmP5a
+  http://localhost:5679/api/v1/workflows/vaOcL9wAjducmP5a
 ```
 
 ---
@@ -436,7 +436,7 @@ curl -X PATCH -H "X-N8N-API-KEY: $N8N_API_KEY" \
 **错误 2: 500 Internal Server Error**
 
 ```bash
-curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -v http://localhost:5679/webhook/ping
 # < HTTP/1.1 500 Internal Server Error
 ```
 
@@ -449,7 +449,7 @@ curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 **错误 3: 连接超时**
 
 ```bash
-curl --max-time 5 https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl --max-time 5 http://localhost:5679/webhook/ping
 # curl: (28) Operation timed out
 ```
 
@@ -470,13 +470,13 @@ Ping Webhook **不需要认证**，任何人都可以访问。这是设计特意
 1. **API Key 认证**:
    ```bash
    curl -H "X-API-Key: secret-key" \
-     https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+     http://localhost:5679/webhook/ping
    ```
 
 2. **Basic Auth**:
    ```bash
    curl -u username:password \
-     https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+     http://localhost:5679/webhook/ping
    ```
 
 ### 速率限制
@@ -498,10 +498,10 @@ location /webhook/ping {
 
 ```bash
 # ✓ 正确
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 
 # ✗ 会被重定向
-curl http://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 ```
 
 ---

@@ -123,7 +123,7 @@ templates/
 
 ```bash
 # 基于模板创建 workflow
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{
     "prd": "创建一个接收数据的 API",

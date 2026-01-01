@@ -91,7 +91,7 @@ templates/
 ### 1. 通过 AI 工厂（推荐）
 
 ```bash
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{
     "prd": "创建一个接收数据的 API",
@@ -198,7 +198,7 @@ cat /home/xx/dev/zenithjoy-autopilot/workflows/templates/index.json | jq '.templ
 cat /home/xx/dev/zenithjoy-autopilot/workflows/templates/QUICK_REFERENCE.md
 
 # 使用模板创建 workflow
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{"prd": "创建 API", "template": "webhook-response"}'
 ```

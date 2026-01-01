@@ -17,7 +17,7 @@
 
 ### 调用示例
 ```bash
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/my-webhook" \
+curl -X POST "http://localhost:5679/webhook/my-webhook" \
   -H "Content-Type: application/json" \
   -d '{"name": "test"}'
 ```

@@ -1967,7 +1967,7 @@ create_workflow_via_api() {
   # 调用 API
   local response
   local http_code
-  response=$(curl --max-time 30 -s -w "\n%{http_code}" -X POST 'https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows' \
+  response=$(curl --max-time 30 -s -w "\n%{http_code}" -X POST 'http://localhost:5679/api/v1/workflows' \
     -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
     -H 'Content-Type: application/json' \
     -d "$filtered_json" 2>&1)
@@ -2041,7 +2041,7 @@ activate_workflow() {
   # 调用激活 API
   local response
   local http_code
-  response=$(curl --max-time 30 -s -w "\n%{http_code}" -X PATCH "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$workflow_id" \
+  response=$(curl --max-time 30 -s -w "\n%{http_code}" -X PATCH "http://localhost:5679/api/v1/workflows/$workflow_id" \
     -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
     -H 'Content-Type: application/json' \
     -d '{"active": true}' 2>&1)
@@ -2212,7 +2212,7 @@ execute_single_task() {
     fi
 
     # 调用 API
-    response=$(curl --max-time 30 -s -w "\n%{http_code}" -X POST 'https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows' \
+    response=$(curl --max-time 30 -s -w "\n%{http_code}" -X POST 'http://localhost:5679/api/v1/workflows' \
       -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
       -H 'Content-Type: application/json' \
       -d "$filtered_json" 2>&1)
@@ -2471,7 +2471,7 @@ run_regression_tests() {
         tests_run=$((tests_run + 1))
 
         local wf_content=$(curl --max-time 30 -s -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-          "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$wid" 2>/dev/null)
+          "http://localhost:5679/api/v1/workflows/$wid" 2>/dev/null)
 
         # 检查是否包含Webhook节点（如果是webhook workflow）
         local has_webhook=$(echo "$wf_content" | jq '[.nodes[] | select(.type == "n8n-nodes-base.webhook")] | length > 0' 2>/dev/null || echo "false")
@@ -2494,7 +2494,7 @@ run_regression_tests() {
         tests_run=$((tests_run + 1))
 
         local wf_content=$(curl --max-time 30 -s -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-          "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$wid" 2>/dev/null)
+          "http://localhost:5679/api/v1/workflows/$wid" 2>/dev/null)
 
         # 检查连接数量是否合理（至少1个连接，除非只有1个节点）
         local node_count=$(echo "$wf_content" | jq '.nodes | length' 2>/dev/null || echo 0)
@@ -2549,7 +2549,7 @@ run_regression_tests() {
           for prev_wid in $prev_wf_ids; do
             if [[ -n "$prev_wid" ]]; then
               local response=$(curl --max-time 30 -s -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-                "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$prev_wid" 2>/dev/null)
+                "http://localhost:5679/api/v1/workflows/$prev_wid" 2>/dev/null)
               if ! echo "$response" | jq -e '.id' > /dev/null 2>&1; then
                 all_exist=false
                 break
@@ -2865,7 +2865,7 @@ run_qc_checks() {
   for wid in $workflow_ids; do
     if [[ -n "$wid" ]]; then
       local response=$(curl --max-time 30 -s -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-        "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$wid" 2>/dev/null)
+        "http://localhost:5679/api/v1/workflows/$wid" 2>/dev/null)
       if echo "$response" | jq -e '.id' > /dev/null 2>&1; then
         hard_check=$(echo "$hard_check" | jq --arg wid "$wid" '.results += [{"workflow_id": $wid, "exists": true}]')
       else
@@ -2883,7 +2883,7 @@ run_qc_checks() {
   for wid in $workflow_ids; do
     if [[ -n "$wid" ]]; then
       local wf=$(curl --max-time 30 -s -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-        "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$wid" 2>/dev/null)
+        "http://localhost:5679/api/v1/workflows/$wid" 2>/dev/null)
       workflow_content+="
 --- Workflow: $wid ---
 $(echo "$wf" | jq '{name, nodes: [.nodes[] | {type, name, parameters: (.parameters | keys), credentials}], connections}' 2>/dev/null | head -c 5000)
@@ -3107,7 +3107,7 @@ except: pass
   for wid in $workflow_ids; do
     if [[ -n "$wid" ]]; then
       local wf_content=$(curl --max-time 30 -s -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-        "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$wid" 2>/dev/null)
+        "http://localhost:5679/api/v1/workflows/$wid" 2>/dev/null)
 
       # 1. 检查硬编码密码
       if echo "$wf_content" | grep -qE 'password.*:.*"[A-Za-z0-9]{20,}"'; then
@@ -3166,7 +3166,7 @@ except: pass
   for wid in $workflow_ids; do
     if [[ -n "$wid" ]]; then
       local node_count=$(curl --max-time 30 -s -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-        "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$wid" 2>/dev/null | jq '.nodes | length // 0')
+        "http://localhost:5679/api/v1/workflows/$wid" 2>/dev/null | jq '.nodes | length // 0')
       if [[ "$node_count" -gt 50 ]]; then
         perf_check=$(echo "$perf_check" | jq '.size_ok = false')
       fi
@@ -3230,14 +3230,14 @@ run_execution_test() {
 
     # 获取 workflow 信息
     local wf_info=$(curl --max-time 30 -s -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-      "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$wid" 2>/dev/null)
+      "http://localhost:5679/api/v1/workflows/$wid" 2>/dev/null)
 
     # 检查是否有 webhook 触发器
     local webhook_path=$(echo "$wf_info" | jq -r '.nodes[] | select(.type == "n8n-nodes-base.webhook") | .parameters.path // empty' | head -1)
 
     if [[ -n "$webhook_path" ]]; then
       # 有 webhook，尝试调用
-      local webhook_url="https://zenithjoy21xx.app.n8n.cloud/webhook/${webhook_path}"
+      local webhook_url="http://localhost:5679/webhook/${webhook_path}"
       log "    测试 webhook: $webhook_url"
 
       # 发送测试请求
@@ -3624,7 +3624,7 @@ API_HEADER_EOF
 
     # 获取 workflow 详情
     local wf_data=$(curl --max-time 30 -s -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-      "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$wid" 2>/dev/null)
+      "http://localhost:5679/api/v1/workflows/$wid" 2>/dev/null)
 
     if ! echo "$wf_data" | jq -e '.id' > /dev/null 2>&1; then
       log "  警告: 无法获取 workflow $wid"
@@ -3664,7 +3664,7 @@ EOF
       local webhook_response_mode=$(echo "$webhook" | jq -r '.parameters.responseMode // "onReceived"')
 
       # 构建完整 URL
-      local full_url="https://zenithjoy21xx.app.n8n.cloud/webhook/$webhook_path"
+      local full_url="http://localhost:5679/webhook/$webhook_path"
 
       endpoint_count=$((endpoint_count + 1))
 
@@ -3776,12 +3776,12 @@ EOF
 ### 使用 curl 测试
 ```bash
 # 基本测试
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/your-path \
+curl -X POST http://localhost:5679/webhook/your-path \
   -H "Content-Type: application/json" \
   -d '{"test": true}'
 
 # 带认证的测试
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/your-path \
+curl -X POST http://localhost:5679/webhook/your-path \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{"test": true}'
@@ -3796,7 +3796,7 @@ curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/your-path \
 
 ### 使用 JavaScript 测试
 ```javascript
-fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/your-path', {
+fetch('http://localhost:5679/webhook/your-path', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -3824,7 +3824,7 @@ fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/your-path', {
 ### 使用 n8n API 查询执行记录
 ```bash
 curl -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-  "https://zenithjoy21xx.app.n8n.cloud/api/v1/executions?workflowId={workflow_id}&limit=10"
+  "http://localhost:5679/api/v1/executions?workflowId={workflow_id}&limit=10"
 ```
 
 ---
@@ -3870,12 +3870,12 @@ generate_deploy_docs() {
 "
       # 尝试获取 webhook URL
       local wf_data=$(curl --max-time 30 -s -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-        "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$wid" 2>/dev/null)
+        "http://localhost:5679/api/v1/workflows/$wid" 2>/dev/null)
 
       local webhook_path=$(echo "$wf_data" | jq -r '.nodes[] | select(.type == "n8n-nodes-base.webhook") | .parameters.path // empty' 2>/dev/null | head -1)
 
       if [[ -n "$webhook_path" ]]; then
-        webhook_urls+="- \`https://zenithjoy21xx.app.n8n.cloud/webhook/$webhook_path\`
+        webhook_urls+="- \`http://localhost:5679/webhook/$webhook_path\`
 "
       fi
     done
@@ -3918,22 +3918,22 @@ WORKFLOW_LIST_PLACEHOLDER
 WEBHOOK_URLS_PLACEHOLDER
 
 ### n8n 控制台
-- **URL**: https://zenithjoy21xx.app.n8n.cloud
-- **Workflow 管理**: https://zenithjoy21xx.app.n8n.cloud/workflows
+- **URL**: http://localhost:5679
+- **Workflow 管理**: http://localhost:5679/workflows
 
 ---
 
 ## 部署步骤
 
 ### 1. 登录 n8n Cloud
-访问 [n8n Cloud](https://zenithjoy21xx.app.n8n.cloud) 并使用您的凭据登录。
+访问 [n8n Cloud](http://localhost:5679) 并使用您的凭据登录。
 
 ### 2. 验证 Workflow
 检查 workflow 是否已正确创建/修改：
 ```bash
 # 使用 REST API 验证
 curl -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/{workflow_id}
+  http://localhost:5679/api/v1/workflows/{workflow_id}
 ```
 
 ### 3. 配置凭据
@@ -3952,13 +3952,13 @@ curl -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
 curl -X PATCH -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"active": true}' \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/{workflow_id}
+  http://localhost:5679/api/v1/workflows/{workflow_id}
 ```
 
 ### 5. 测试执行
 发送测试请求到 webhook（如适用）：
 ```bash
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/{your_webhook_path} \
+curl -X POST http://localhost:5679/webhook/{your_webhook_path} \
   -H "Content-Type: application/json" \
   -d '{"test": "data"}'
 ```
@@ -3992,7 +3992,7 @@ curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/{your_webhook_path} \
 ```bash
 # 查看 workflow 是否激活
 curl -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/{workflow_id} \
+  http://localhost:5679/api/v1/workflows/{workflow_id} \
   | jq '.active'
 ```
 
@@ -4010,7 +4010,7 @@ curl -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
     log "警告: Claude D 文档生成超时 (120秒)，使用默认文档"
     echo "# 文档生成超时\n\n请手动完善文档。" > "$STATE_DIR/docs/claude_d_output.txt"
   fi
-  "https://zenithjoy21xx.app.n8n.cloud/api/v1/executions?workflowId={workflow_id}&limit=5"
+  "http://localhost:5679/api/v1/executions?workflowId={workflow_id}&limit=5"
 ```
 
 ### 4. 功能测试

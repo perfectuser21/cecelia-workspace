@@ -8,7 +8,7 @@
 
 - **ID**: `4Ie84ecbq1866yMC`
 - **状态**: 已激活
-- **Webhook URL**: `https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory`
+- **Webhook URL**: `http://localhost:5679/webhook/workflow-factory`
 - **创建时间**: 2025-12-24
 
 ## 架构设计
@@ -121,7 +121,7 @@ HTTP - 飞书通知
 ### 调用示例
 
 ```bash
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory \
+curl -X POST http://localhost:5679/webhook/workflow-factory \
   -H "Content-Type: application/json" \
   -d '{
     "prd": "创建一个简单的数据清洗 workflow，包含以下功能：\n1. 接收 CSV 文件\n2. 去除重复行\n3. 填充空值\n4. 导出到数据库"
@@ -163,7 +163,7 @@ Workflow 生产完成 ✅
 - **用户**: xx
 
 ### n8n REST API
-- **Base URL**: https://zenithjoy21xx.app.n8n.cloud/api/v1
+- **Base URL**: http://localhost:5679/api/v1
 - **API Key**: (在 Bash 节点中硬编码，需要从环境变量读取)
 
 ### 飞书 Webhook

@@ -5,7 +5,7 @@ created_at: 2025-12-29
 updated_at: 2025-12-29
 
 n8n:
-  server: https://zenithjoy21xx.app.n8n.cloud
+  server: http://localhost:5679
 
 # 生产环境：全部功能
 features:

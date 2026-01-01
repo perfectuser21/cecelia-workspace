@@ -89,8 +89,8 @@
 ## 🔗 链接
 
 - **GitHub**: https://github.com/perfectuser21/n8n-workflows
-- **n8n SSH Workflow**: https://zenithjoy21xx.app.n8n.cloud/workflow/3hhrCpZtQjnAmJAz
-- **n8n HTTP Workflow**: https://zenithjoy21xx.app.n8n.cloud/workflow/Ar2BwcAElSsexIKC
+- **n8n SSH Workflow**: http://localhost:5679/workflow/3hhrCpZtQjnAmJAz
+- **n8n HTTP Workflow**: http://localhost:5679/workflow/Ar2BwcAElSsexIKC
 
 ---
 

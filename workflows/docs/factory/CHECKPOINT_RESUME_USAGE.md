@@ -84,7 +84,7 @@ SSH Claude B - 执行任务
 ### 1. 正常启动 (新 Run)
 
 ```bash
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{
     "prd": "创建一个每小时检查磁盘空间的 workflow",
@@ -96,7 +96,7 @@ curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
 
 ```bash
 # 使用之前失败的 run_id
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{
     "resume_run_id": "20251224103045-a3f8x9"

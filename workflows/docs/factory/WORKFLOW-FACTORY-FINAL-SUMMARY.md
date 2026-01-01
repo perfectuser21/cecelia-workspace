@@ -197,7 +197,7 @@ Webhook → 初始化 → Claude A 分解
 
 ### 创建新workflow
 ```bash
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{
     "prd": "创建一个每小时检查VPS磁盘空间的workflow，超过80%发飞书告警"
@@ -206,7 +206,7 @@ curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
 
 ### 修改现有workflow
 ```bash
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{
     "prd": "添加重试逻辑和错误处理",

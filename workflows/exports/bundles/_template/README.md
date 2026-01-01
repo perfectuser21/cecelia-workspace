@@ -28,7 +28,7 @@
 
 ```bash
 # 调用示例
-curl -X POST "https://xxx.app.n8n.cloud/webhook/feature-name" \
+curl -X POST "http://localhost:5679/webhook/feature-name" \
   -H "Content-Type: application/json" \
   -d '{"param": "value"}'
 ```

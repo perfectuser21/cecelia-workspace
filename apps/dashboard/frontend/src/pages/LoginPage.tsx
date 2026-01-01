@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, CheckCircle, AlertCircle, ArrowLeft, RefreshCw } from 'lucide-react';
 import axios from 'axios';
 
-const N8N_WEBHOOK_BASE = import.meta.env.VITE_N8N_WEBHOOK_BASE || 'https://zenithjoy21xx.app.n8n.cloud/webhook';
+const N8N_WEBHOOK_BASE = import.meta.env.VITE_N8N_WEBHOOK_BASE || 'http://localhost:5679/webhook';
 
 export default function LoginPage() {
   const { platform, accountId } = useParams<{ platform: string; accountId: string }>();

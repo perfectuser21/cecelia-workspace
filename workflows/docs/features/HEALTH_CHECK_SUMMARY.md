@@ -94,7 +94,7 @@
 ### 方式 1: cURL 测试（最快）
 
 ```bash
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/health-check | jq
+curl http://localhost:5679/webhook/health-check | jq
 ```
 
 **预期响应**:
@@ -110,7 +110,7 @@ curl https://zenithjoy21xx.app.n8n.cloud/webhook/health-check | jq
 
 ```bash
 # 在现有监控脚本中添加
-check_url="https://zenithjoy21xx.app.n8n.cloud/webhook/health-check"
+check_url="http://localhost:5679/webhook/health-check"
 health_status=$(curl -s "$check_url" | jq -r '.status')
 [ "$health_status" = "ok" ] && echo "✅" || echo "❌"
 ```
@@ -119,7 +119,7 @@ health_status=$(curl -s "$check_url" | jq -r '.status')
 
 ```yaml
 healthcheck:
-  test: ["CMD", "curl", "-f", "https://zenithjoy21xx.app.n8n.cloud/webhook/health-check"]
+  test: ["CMD", "curl", "-f", "http://localhost:5679/webhook/health-check"]
   interval: 30s
   timeout: 5s
   retries: 3
@@ -183,7 +183,7 @@ healthcheck:
 
 **Webhook 路径**: `/webhook/health-check`
 
-**完整 URL**: `https://zenithjoy21xx.app.n8n.cloud/webhook/health-check`
+**完整 URL**: `http://localhost:5679/webhook/health-check`
 
 **支持方法**: GET, POST
 
@@ -249,17 +249,17 @@ Workflow 运行稳定，无需日常维护。系统将自动处理：
 
 ```bash
 # 1. 检查端点可达性
-curl -I https://zenithjoy21xx.app.n8n.cloud/webhook/health-check
+curl -I http://localhost:5679/webhook/health-check
 
 # 2. 检查响应内容
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/health-check
+curl http://localhost:5679/webhook/health-check
 
 # 3. 检查 n8n 服务状态
-curl https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows \
+curl http://localhost:5679/api/v1/workflows \
   -H "X-N8N-API-KEY: $API_KEY"
 
 # 4. 检查 workflow 激活状态
-curl https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows \
+curl http://localhost:5679/api/v1/workflows \
   -H "X-N8N-API-KEY: $API_KEY" | \
   jq '.data[] | select(.name == "Health Check")'
 ```

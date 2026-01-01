@@ -11,15 +11,15 @@ This document covers the attempted deployment of a simple Ping webhook workflow 
 ## Requirements
 
 ### Prerequisites
-- n8n Cloud account (zenithjoy21xx.app.n8n.cloud)
+- n8n Cloud account (localhost:5679)
 - n8n REST API Key (stored in `.secrets`)
 - n8n MCP Server access
 
 ### Environment
 
 ```
-n8n Server: https://zenithjoy21xx.app.n8n.cloud
-MCP Endpoint: https://zenithjoy21xx.app.n8n.cloud/mcp-server/http
+n8n Server: http://localhost:5679
+MCP Endpoint: http://localhost:5679/mcp-server/http
 Region: Cloud
 ```
 
@@ -32,7 +32,7 @@ Region: Cloud
 grep N8N_MCP_API_KEY ~/.secrets
 
 # Test connectivity
-curl -s https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows \
+curl -s http://localhost:5679/api/v1/workflows \
   -H "X-N8N-API-KEY: $(grep N8N_REST_API_KEY ~/.secrets | cut -d= -f2)"
 ```
 
@@ -42,7 +42,7 @@ The workflow creation failed during automated execution. Use one of these approa
 
 #### Option A: Manual Creation via n8n UI
 
-1. Open https://zenithjoy21xx.app.n8n.cloud
+1. Open http://localhost:5679
 2. Click "New Workflow"
 3. Add nodes:
    - **Webhook**: Path `/webhook/ping`, Method `ANY`
@@ -54,7 +54,7 @@ The workflow creation failed during automated execution. Use one of these approa
 
 ```bash
 # Re-execute the factory workflow
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{
     "prd": "创建一个简单的 Ping webhook 返回 pong",
@@ -69,7 +69,7 @@ curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
 export N8N_API_KEY=$(grep N8N_REST_API_KEY ~/.secrets | cut -d= -f2)
 
 # Create workflow
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows" \
+curl -X POST "http://localhost:5679/api/v1/workflows" \
   -H "X-N8N-API-KEY: $N8N_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -112,7 +112,7 @@ After creation, activate the workflow:
 export N8N_API_KEY=$(grep N8N_REST_API_KEY ~/.secrets | cut -d= -f2)
 export WORKFLOW_ID="<copy-from-previous-response>"
 
-curl -X PATCH "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$WORKFLOW_ID" \
+curl -X PATCH "http://localhost:5679/api/v1/workflows/$WORKFLOW_ID" \
   -H "X-N8N-API-KEY: $N8N_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"active": true}'
@@ -122,7 +122,7 @@ curl -X PATCH "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$WORKFLOW_ID
 
 ```bash
 # Test the webhook
-curl -X GET "https://zenithjoy21xx.app.n8n.cloud/webhook/ping"
+curl -X GET "http://localhost:5679/webhook/ping"
 
 # Expected response
 # {"message": "pong"}
@@ -155,17 +155,17 @@ curl -X GET "https://zenithjoy21xx.app.n8n.cloud/webhook/ping"
 
 ### Basic Test
 ```bash
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 ```
 
 ### With Parameters
 ```bash
-curl "https://zenithjoy21xx.app.n8n.cloud/webhook/ping?name=test"
+curl "http://localhost:5679/webhook/ping?name=test"
 ```
 
 ### POST Request
 ```bash
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
+curl -X POST http://localhost:5679/webhook/ping \
   -H "Content-Type: application/json" \
   -d '{"data": "test"}'
 ```
@@ -179,7 +179,7 @@ curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
 
 ### MCP Execution Failed
 - Verify API key in `.secrets` is correct
-- Test n8n connectivity: `curl https://zenithjoy21xx.app.n8n.cloud`
+- Test n8n connectivity: `curl http://localhost:5679`
 - Check firewall/proxy rules
 
 ### Webhook Not Responding
@@ -195,7 +195,7 @@ If issues occur, simply deactivate the workflow:
 export N8N_API_KEY=$(grep N8N_REST_API_KEY ~/.secrets | cut -d= -f2)
 export WORKFLOW_ID="<workflow-id>"
 
-curl -X PATCH "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$WORKFLOW_ID" \
+curl -X PATCH "http://localhost:5679/api/v1/workflows/$WORKFLOW_ID" \
   -H "X-N8N-API-KEY: $N8N_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"active": false}'

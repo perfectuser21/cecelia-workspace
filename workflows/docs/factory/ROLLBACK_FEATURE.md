@@ -68,7 +68,7 @@ return [{
 ### 回滚到历史版本
 
 ```bash
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{
     "rollback_run_id": "20251224030000-abc123"
@@ -152,7 +152,7 @@ for workflow_file in $STATE_DIR/final/*.json; do
     curl -s -X PUT -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
       -H "Content-Type: application/json" \
       -d @"$workflow_file" \
-      "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$workflow_id"
+      "http://localhost:5679/api/v1/workflows/$workflow_id"
   fi
 done
 ```
@@ -185,7 +185,7 @@ ssh xx@146.190.52.84 "ls -lt /home/xx/data/runs/*/final/manifest.json | head -5"
 RUN_ID="20251224030000-abc123"
 
 # 3. 执行回滚
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d "{\"rollback_run_id\": \"$RUN_ID\"}"
 
@@ -197,7 +197,7 @@ curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
 
 ```bash
 # 测试不存在的 run_id
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{"rollback_run_id": "nonexistent-run-id"}'
 # 预期: {"status": "error", "message": "目标版本不存在或没有final产出"}

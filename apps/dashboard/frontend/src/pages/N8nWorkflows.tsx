@@ -337,7 +337,7 @@ export default function N8nWorkflows() {
         </div>
         <div className="flex items-center gap-3">
           <a
-            href={activeInstance === 'cloud' ? 'https://zenithjoy21xx.app.n8n.cloud' : 'http://localhost:5679'}
+            href={activeInstance === 'local' ? (import.meta.env.VITE_N8N_LOCAL_URL || 'http://localhost:5679') : (import.meta.env.VITE_N8N_CLOUD_URL || '#')}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition"

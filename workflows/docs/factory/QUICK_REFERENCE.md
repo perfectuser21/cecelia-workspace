@@ -7,14 +7,14 @@
 
 ### 正常启动
 ```bash
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{"prd": "你的需求描述"}'
 ```
 
 ### 断点续跑
 ```bash
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{"resume_run_id": "失败的run_id"}'
 ```

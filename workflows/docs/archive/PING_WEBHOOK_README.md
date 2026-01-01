@@ -43,10 +43,10 @@ Respond to Webhook (返回 {"message": "pong"})
 
 ```bash
 # GET 请求
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 
 # POST 请求
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -X POST http://localhost:5679/webhook/ping
 ```
 
 预期响应：
@@ -61,7 +61,7 @@ curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 ### JavaScript/Node.js
 
 ```javascript
-const response = await fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping');
+const response = await fetch('http://localhost:5679/webhook/ping');
 const data = await response.json();
 console.log(data.message); // "pong"
 ```
@@ -71,14 +71,14 @@ console.log(data.message); // "pong"
 ```python
 import requests
 
-response = requests.get('https://zenithjoy21xx.app.n8n.cloud/webhook/ping')
+response = requests.get('http://localhost:5679/webhook/ping')
 print(response.json())  # {'message': 'pong'}
 ```
 
 ### Bash
 
 ```bash
-curl -s https://zenithjoy21xx.app.n8n.cloud/webhook/ping | jq .
+curl -s http://localhost:5679/webhook/ping | jq .
 ```
 
 ## 故障排除

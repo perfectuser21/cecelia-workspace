@@ -217,7 +217,7 @@ echo '{"task_id": "{{ $json.id }}", "status": "completed", "wave": {{ $json.wave
 
 ```bash
 # Step 1: 正常启动
-$ curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+$ curl -X POST "http://localhost:5679/webhook/workflow-factory" \
     -d '{"prd": "创建包含 10 个任务的复杂 workflow"}'
 
 Response:
@@ -245,7 +245,7 @@ task_6.json: {"status": "pending", "wave": 2}
 ...
 
 # Step 3: 修复问题后续跑
-$ curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+$ curl -X POST "http://localhost:5679/webhook/workflow-factory" \
     -d '{"resume_run_id": "20251224143000-x9k2p1"}'
 
 # 系统只会执行:

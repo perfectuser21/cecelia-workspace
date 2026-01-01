@@ -2,7 +2,7 @@
 
 **Workflow**: Simple Ping Webhook  
 **Run ID**: `20251225-simple-test`  
-**Endpoint**: `https://zenithjoy21xx.app.n8n.cloud/webhook/ping`
+**Endpoint**: `http://localhost:5679/webhook/ping`
 
 ## Overview
 
@@ -11,7 +11,7 @@ The Ping Webhook is a minimal HTTP endpoint that responds with a simple acknowle
 ## Endpoint Specification
 
 ```
-Base URL: https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+Base URL: http://localhost:5679/webhook/ping
 Methods:  GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
 Response: application/json
 Timeout:  30 seconds (n8n default)
@@ -39,11 +39,11 @@ Standard HTTP headers are accepted. None are required.
 
 ```bash
 # Minimal request (no headers)
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 
 # With custom headers (optional)
 curl -H "X-Custom-Header: value" \
-  https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+  http://localhost:5679/webhook/ping
 ```
 
 ### Query Parameters
@@ -52,7 +52,7 @@ Query parameters are accepted but not required by this workflow.
 
 ```bash
 # With query parameters
-curl "https://zenithjoy21xx.app.n8n.cloud/webhook/ping?name=test&version=1.0"
+curl "http://localhost:5679/webhook/ping?name=test&version=1.0"
 ```
 
 ### Request Body
@@ -60,7 +60,7 @@ curl "https://zenithjoy21xx.app.n8n.cloud/webhook/ping?name=test&version=1.0"
 For POST/PUT/PATCH requests, any JSON body is accepted:
 
 ```bash
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
+curl -X POST http://localhost:5679/webhook/ping \
   -H "Content-Type: application/json" \
   -d '{
     "user": "alice",
@@ -91,7 +91,7 @@ Content-Length: 20
 
 **Request:**
 ```bash
-curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -v http://localhost:5679/webhook/ping
 ```
 
 **Response:**
@@ -106,7 +106,7 @@ Content-Type: application/json
 
 **Request:**
 ```bash
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
+curl -X POST http://localhost:5679/webhook/ping \
   -H "Content-Type: application/json" \
   -d '{"action": "test"}'
 ```
@@ -123,7 +123,7 @@ curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
 **Request:**
 ```bash
 curl --max-time 5 \
-  https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+  http://localhost:5679/webhook/ping
 ```
 
 **Response:**
@@ -141,7 +141,7 @@ Monitor service availability with simple ping requests:
 
 ```bash
 #!/bin/bash
-response=$(curl -s https://zenithjoy21xx.app.n8n.cloud/webhook/ping)
+response=$(curl -s http://localhost:5679/webhook/ping)
 if [ $? -eq 0 ]; then
   echo "Service is UP"
 else
@@ -154,7 +154,7 @@ fi
 Configure as a health check endpoint:
 
 ```
-Health Check URL: https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+Health Check URL: http://localhost:5679/webhook/ping
 Method: GET
 Expected Status: 200
 Interval: 30 seconds
@@ -167,7 +167,7 @@ Periodic monitoring from external service:
 
 ```javascript
 setInterval(async () => {
-  const response = await fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping');
+  const response = await fetch('http://localhost:5679/webhook/ping');
   console.log('Status:', response.status === 200 ? 'UP' : 'DOWN');
 }, 60000); // Every minute
 ```
@@ -178,7 +178,7 @@ Validate webhook connectivity before deploying to production:
 
 ```bash
 # Test webhook from CI/CD pipeline
-if curl -f https://zenithjoy21xx.app.n8n.cloud/webhook/ping > /dev/null 2>&1; then
+if curl -f http://localhost:5679/webhook/ping > /dev/null 2>&1; then
   echo "Webhook is reachable"
   exit 0
 else
@@ -252,7 +252,7 @@ Currently no authentication is configured. For sensitive operations:
 ```bash
 # Add authentication token requirement in future iterations
 curl -H "Authorization: Bearer TOKEN" \
-  https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+  http://localhost:5679/webhook/ping
 ```
 
 ### CORS
@@ -260,7 +260,7 @@ curl -H "Authorization: Bearer TOKEN" \
 CORS headers are handled by n8n. For cross-origin requests:
 
 ```javascript
-fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping', {
+fetch('http://localhost:5679/webhook/ping', {
   method: 'GET',
   mode: 'cors',
   credentials: 'include'
@@ -291,7 +291,7 @@ Menu → Executions → Filter by Webhook
 ### JavaScript/Node.js
 
 ```javascript
-const response = await fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping');
+const response = await fetch('http://localhost:5679/webhook/ping');
 const data = await response.json();
 console.log(data.message); // "pong"
 ```
@@ -301,20 +301,20 @@ console.log(data.message); // "pong"
 ```python
 import requests
 
-response = requests.get('https://zenithjoy21xx.app.n8n.cloud/webhook/ping')
+response = requests.get('http://localhost:5679/webhook/ping')
 print(response.json())  # {'message': 'pong'}
 ```
 
 ### Bash/cURL
 
 ```bash
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 ```
 
 ### Go
 
 ```go
-resp, err := http.Get("https://zenithjoy21xx.app.n8n.cloud/webhook/ping")
+resp, err := http.Get("http://localhost:5679/webhook/ping")
 if err != nil {
   log.Fatal(err)
 }
@@ -347,7 +347,7 @@ Potential improvements for this workflow:
 
 ```bash
 # 1. Verify endpoint is reachable
-curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -v http://localhost:5679/webhook/ping
 
 # 2. Check workflow status in n8n UI
 # Menu → Workflows → Simple Ping Webhook
@@ -356,7 +356,7 @@ curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 # Menu → Executions → Filter by workflow name
 
 # 4. Test connectivity
-ping zenithjoy21xx.app.n8n.cloud
+ping localhost:5679
 ```
 
 ### Related Documentation

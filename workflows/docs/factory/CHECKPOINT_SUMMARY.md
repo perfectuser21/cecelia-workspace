@@ -66,12 +66,12 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. 正常启动:
-   curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+   curl -X POST "http://localhost:5679/webhook/workflow-factory" \
      -H "Content-Type: application/json" \
      -d '{"prd": "创建一个 workflow"}'
 
 2. 断点续跑:
-   curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+   curl -X POST "http://localhost:5679/webhook/workflow-factory" \
      -H "Content-Type: application/json" \
      -d '{"resume_run_id": "20251224143000-x9k2p1"}'
 

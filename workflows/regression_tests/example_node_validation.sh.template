@@ -29,7 +29,7 @@ for wid in $WORKFLOW_IDS; do
 
   # Fetch workflow details
   wf_content=$(curl -s -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-    "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$wid" 2>/dev/null)
+    "http://localhost:5679/api/v1/workflows/$wid" 2>/dev/null)
 
   # Check for SSH nodes
   ssh_nodes=$(echo "$wf_content" | jq -r '.nodes[] | select(.type == "n8n-nodes-base.ssh")')

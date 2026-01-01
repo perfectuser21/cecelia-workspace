@@ -2,7 +2,7 @@
 
 ## 基本信息
 
-- **基础 URL**: `https://zenithjoy21xx.app.n8n.cloud`
+- **基础 URL**: `http://localhost:5679`
 - **Webhook 路径**: `/webhook/ping`
 - **支持方法**: GET, POST
 - **认证**: 无需认证
@@ -16,7 +16,7 @@
 
 **请求**:
 ```bash
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 ```
 
 **响应**:
@@ -40,7 +40,7 @@ Content-Length: 19
 
 **请求**:
 ```bash
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -X POST http://localhost:5679/webhook/ping
 ```
 
 **请求体**: 无（可选）
@@ -60,7 +60,7 @@ curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 
 ```bash
 curl -X GET \
-  https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
+  http://localhost:5679/webhook/ping \
   -H "Accept: application/json"
 ```
 
@@ -75,7 +75,7 @@ curl -X GET \
 
 ```bash
 curl -X POST \
-  https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
+  http://localhost:5679/webhook/ping \
   -H "Content-Type: application/json" \
   -d '{"client": "test-client"}'
 ```
@@ -93,13 +93,13 @@ curl -X POST \
 
 ```javascript
 // GET 请求
-fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping')
+fetch('http://localhost:5679/webhook/ping')
   .then(response => response.json())
   .then(data => console.log(data))
   .catch(error => console.error('Error:', error));
 
 // POST 请求
-fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping', {
+fetch('http://localhost:5679/webhook/ping', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json'
@@ -118,11 +118,11 @@ import requests
 import json
 
 # GET 请求
-response = requests.get('https://zenithjoy21xx.app.n8n.cloud/webhook/ping')
+response = requests.get('http://localhost:5679/webhook/ping')
 print(response.json())  # {'message': 'pong'}
 
 # POST 请求
-response = requests.post('https://zenithjoy21xx.app.n8n.cloud/webhook/ping')
+response = requests.post('http://localhost:5679/webhook/ping')
 print(response.status_code)  # 200
 print(response.json())  # {'message': 'pong'}
 ```
@@ -131,11 +131,11 @@ print(response.json())  # {'message': 'pong'}
 
 ```powershell
 # GET 请求
-$response = Invoke-RestMethod -Uri "https://zenithjoy21xx.app.n8n.cloud/webhook/ping"
+$response = Invoke-RestMethod -Uri "http://localhost:5679/webhook/ping"
 $response | ConvertTo-Json
 
 # POST 请求
-$response = Invoke-RestMethod -Uri "https://zenithjoy21xx.app.n8n.cloud/webhook/ping" -Method POST
+$response = Invoke-RestMethod -Uri "http://localhost:5679/webhook/ping" -Method POST
 $response | ConvertTo-Json
 ```
 
@@ -183,7 +183,7 @@ $response | ConvertTo-Json
 ```bash
 #!/bin/bash
 
-WEBHOOK_URL="https://zenithjoy21xx.app.n8n.cloud/webhook/ping"
+WEBHOOK_URL="http://localhost:5679/webhook/ping"
 MAX_RETRIES=3
 RETRY_DELAY=5
 
@@ -217,7 +217,7 @@ jobs:
     steps:
       - name: Check webhook availability
         run: |
-          curl -f https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+          curl -f http://localhost:5679/webhook/ping
 ```
 
 ### 3. 监控脚本
@@ -229,7 +229,7 @@ from datetime import datetime
 
 def monitor_webhook(interval=60):
     """持续监控 webhook 可用性"""
-    url = "https://zenithjoy21xx.app.n8n.cloud/webhook/ping"
+    url = "http://localhost:5679/webhook/ping"
 
     while True:
         try:
@@ -255,7 +255,7 @@ if __name__ == "__main__":
 ```nginx
 # nginx 配置示例
 upstream n8n {
-    server zenithjoy21xx.app.n8n.cloud;
+    server localhost:5679;
 }
 
 server {

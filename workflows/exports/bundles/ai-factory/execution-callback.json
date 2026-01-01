@@ -34,7 +34,7 @@
       "position": [760, 400],
       "parameters": {
         "method": "POST",
-        "url": "https://zenithjoy21xx.app.n8n.cloud/webhook/task-dispatcher",
+        "url": "http://localhost:5679/webhook/task-dispatcher",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"trigger\": \"execution-callback\",\n  \"completed_task_id\": \"{{ $json.task_id }}\",\n  \"status\": \"{{ $json.status }}\"\n}",

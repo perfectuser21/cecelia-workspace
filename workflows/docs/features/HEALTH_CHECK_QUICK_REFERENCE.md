@@ -3,17 +3,17 @@
 ## 访问端点
 
 ```bash
-https://zenithjoy21xx.app.n8n.cloud/webhook/health-check
+http://localhost:5679/webhook/health-check
 ```
 
 ## 快速测试
 
 ```bash
 # 最简单的测试
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/health-check | jq
+curl http://localhost:5679/webhook/health-check | jq
 
 # 带漂亮的格式化输出
-curl -s https://zenithjoy21xx.app.n8n.cloud/webhook/health-check | \
+curl -s http://localhost:5679/webhook/health-check | \
   jq '{status: .status, time: .timestamp, service: .service}'
 ```
 
@@ -31,11 +31,11 @@ curl -s https://zenithjoy21xx.app.n8n.cloud/webhook/health-check | \
 
 ```bash
 # 一行式检查
-[ "$(curl -s https://zenithjoy21xx.app.n8n.cloud/webhook/health-check | jq -r '.status')" = "ok" ] && echo "✅ OK" || echo "❌ ERROR"
+[ "$(curl -s http://localhost:5679/webhook/health-check | jq -r '.status')" = "ok" ] && echo "✅ OK" || echo "❌ ERROR"
 
 # 定时检查脚本
 while true; do
-  curl -s https://zenithjoy21xx.app.n8n.cloud/webhook/health-check | jq '.'
+  curl -s http://localhost:5679/webhook/health-check | jq '.'
   sleep 30
 done
 ```
@@ -44,7 +44,7 @@ done
 
 ```dockerfile
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-  CMD curl -f https://zenithjoy21xx.app.n8n.cloud/webhook/health-check || exit 1
+  CMD curl -f http://localhost:5679/webhook/health-check || exit 1
 ```
 
 ## Kubernetes 配置
@@ -67,7 +67,7 @@ livenessProbe:
 
 ```bash
 # JavaScript
-fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/health-check')
+fetch('http://localhost:5679/webhook/health-check')
   .then(r => r.json())
   .then(data => console.log(data.status))
 ```
@@ -76,14 +76,14 @@ fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/health-check')
 
 ```bash
 # crontab 配置
-*/5 * * * * curl -s https://zenithjoy21xx.app.n8n.cloud/webhook/health-check >> /var/log/n8n-health.log
+*/5 * * * * curl -s http://localhost:5679/webhook/health-check >> /var/log/n8n-health.log
 ```
 
 ### 场景 3: 告警通知
 
 ```bash
 # 如果服务不健康则发送通知
-status=$(curl -s https://zenithjoy21xx.app.n8n.cloud/webhook/health-check | jq -r '.status')
+status=$(curl -s http://localhost:5679/webhook/health-check | jq -r '.status')
 if [ "$status" != "ok" ]; then
   # 发送告警（邮件/Slack/飞书等）
   notify_admin "n8n 服务异常: $status"
@@ -94,10 +94,10 @@ fi
 
 | 问题 | 排查命令 |
 |------|---------|
-| 无响应 | `curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/health-check` |
+| 无响应 | `curl -v http://localhost:5679/webhook/health-check` |
 | 返回 404 | 检查 workflow 是否激活 |
-| 返回 500 | `curl -s https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows` |
-| 响应慢 | `time curl https://zenithjoy21xx.app.n8n.cloud/webhook/health-check` |
+| 返回 500 | `curl -s http://localhost:5679/api/v1/workflows` |
+| 响应慢 | `time curl http://localhost:5679/webhook/health-check` |
 
 ## 性能指标
 

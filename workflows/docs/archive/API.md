@@ -1,6 +1,6 @@
 # API Documentation: Ping Webhook
 
-**Endpoint**: `https://zenithjoy21xx.app.n8n.cloud/webhook/ping`
+**Endpoint**: `http://localhost:5679/webhook/ping`
 **Status**: ✅ Active and Running
 **Updated**: 2025-12-25
 
@@ -24,7 +24,7 @@ The Ping Webhook is a simple HTTP endpoint that accepts any HTTP method and retu
 
 ### Base URL
 ```
-https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+http://localhost:5679/webhook/ping
 ```
 
 ### Supported HTTP Methods
@@ -37,12 +37,12 @@ No specific headers are required. Standard HTTP headers are accepted:
 
 ```bash
 # Minimal request
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 
 # With custom headers (optional)
 curl -H "Authorization: Bearer token" \
      -H "X-Custom-Header: value" \
-     https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+     http://localhost:5679/webhook/ping
 ```
 
 ### Query Parameters
@@ -50,10 +50,10 @@ Query parameters are accepted but not required:
 
 ```bash
 # Without parameters
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 
 # With parameters
-curl "https://zenithjoy21xx.app.n8n.cloud/webhook/ping?name=test&version=1.0&timestamp=$(date +%s)"
+curl "http://localhost:5679/webhook/ping?name=test&version=1.0&timestamp=$(date +%s)"
 ```
 
 ### Request Body
@@ -61,10 +61,10 @@ For POST, PUT, and PATCH requests, any JSON body is accepted and ignored:
 
 ```bash
 # POST with empty body
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -X POST http://localhost:5679/webhook/ping
 
 # POST with JSON body
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
+curl -X POST http://localhost:5679/webhook/ping \
   -H "Content-Type: application/json" \
   -d '{
     "user": "alice",
@@ -73,7 +73,7 @@ curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
   }'
 
 # PUT with data
-curl -X PUT https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
+curl -X PUT http://localhost:5679/webhook/ping \
   -H "Content-Type: application/json" \
   -d '{"config": "value"}'
 ```
@@ -134,7 +134,7 @@ Workflow is inactive or path is incorrect.
 # 1. Verify workflow is active in n8n UI
 # 2. Check workflow status via API
 curl -H "X-N8N-API-KEY: $API_KEY" \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows | grep -A5 "Ping Webhook"
+  http://localhost:5679/api/v1/workflows | grep -A5 "Ping Webhook"
 
 # 3. Activate workflow if needed
 # (See DEPLOY.md for activation instructions)
@@ -160,7 +160,7 @@ Request takes longer than 30 seconds (n8n default timeout).
 **Solution**:
 ```bash
 # Increase client-side timeout
-curl --max-time 60 https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl --max-time 60 http://localhost:5679/webhook/ping
 
 # Check n8n system resources
 # Look for high CPU/memory usage
@@ -174,7 +174,7 @@ curl --max-time 60 https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 
 **Request**:
 ```bash
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 ```
 
 **Response**:
@@ -186,15 +186,15 @@ curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 
 **Request**:
 ```bash
-curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -v http://localhost:5679/webhook/ping
 ```
 
 **Response**:
 ```
 *   Trying 146.190.52.84...
-* Connected to zenithjoy21xx.app.n8n.cloud (146.190.52.84) port 443 (#0)
+* Connected to localhost:5679 (146.190.52.84) port 443 (#0)
 > GET /webhook/ping HTTP/1.1
-> Host: zenithjoy21xx.app.n8n.cloud
+> Host: localhost:5679
 > User-Agent: curl/7.68.0
 
 < HTTP/1.1 200 OK
@@ -208,7 +208,7 @@ curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 
 **Request**:
 ```bash
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
+curl -X POST http://localhost:5679/webhook/ping \
   -H "Content-Type: application/json" \
   -d '{
     "action": "test",
@@ -226,7 +226,7 @@ curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
 
 **Request**:
 ```bash
-curl "https://zenithjoy21xx.app.n8n.cloud/webhook/ping?service=api&env=prod&version=2.0"
+curl "http://localhost:5679/webhook/ping?service=api&env=prod&version=2.0"
 ```
 
 **Response**:
@@ -238,7 +238,7 @@ curl "https://zenithjoy21xx.app.n8n.cloud/webhook/ping?service=api&env=prod&vers
 
 **Request**:
 ```bash
-curl -I https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -I http://localhost:5679/webhook/ping
 ```
 
 **Response**:
@@ -252,7 +252,7 @@ Content-Length: 20
 
 **Request**:
 ```bash
-curl -X DELETE https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -X DELETE http://localhost:5679/webhook/ping
 ```
 
 **Response**:
@@ -268,7 +268,7 @@ curl -X DELETE https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 
 #### Basic Fetch
 ```javascript
-const response = await fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping');
+const response = await fetch('http://localhost:5679/webhook/ping');
 const data = await response.json();
 console.log(data.message); // "pong"
 ```
@@ -277,7 +277,7 @@ console.log(data.message); // "pong"
 ```javascript
 async function pingWebhook() {
   try {
-    const response = await fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping');
+    const response = await fetch('http://localhost:5679/webhook/ping');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     return data.message === 'pong';
@@ -298,7 +298,7 @@ const controller = new AbortController();
 const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
 try {
-  const response = await fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping', {
+  const response = await fetch('http://localhost:5679/webhook/ping', {
     signal: controller.signal
   });
   const data = await response.json();
@@ -314,7 +314,7 @@ try {
 ```javascript
 setInterval(async () => {
   try {
-    const response = await fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping');
+    const response = await fetch('http://localhost:5679/webhook/ping');
     const status = response.ok ? 'UP' : 'DOWN';
     console.log(`[${new Date().toISOString()}] Service: ${status}`);
   } catch (error) {
@@ -329,7 +329,7 @@ setInterval(async () => {
 ```python
 import requests
 
-response = requests.get('https://zenithjoy21xx.app.n8n.cloud/webhook/ping')
+response = requests.get('http://localhost:5679/webhook/ping')
 print(response.json())  # {'message': 'pong'}
 ```
 
@@ -339,7 +339,7 @@ import requests
 
 try:
   response = requests.get(
-    'https://zenithjoy21xx.app.n8n.cloud/webhook/ping',
+    'http://localhost:5679/webhook/ping',
     timeout=5
   )
   response.raise_for_status()  # Raise for bad status codes
@@ -359,7 +359,7 @@ def monitor_webhook(interval=60):
   while True:
     try:
       response = requests.get(
-        'https://zenithjoy21xx.app.n8n.cloud/webhook/ping',
+        'http://localhost:5679/webhook/ping',
         timeout=5
       )
       status = 'UP' if response.status_code == 200 else 'DOWN'
@@ -376,14 +376,14 @@ monitor_webhook()
 
 #### Simple Check
 ```bash
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 ```
 
 #### With Status Check
 ```bash
 #!/bin/bash
 response=$(curl -s -w "\n%{http_code}" \
-  https://zenithjoy21xx.app.n8n.cloud/webhook/ping)
+  http://localhost:5679/webhook/ping)
 
 status_code=$(echo "$response" | tail -1)
 body=$(echo "$response" | head -1)
@@ -400,7 +400,7 @@ fi
 ```bash
 #!/bin/bash
 while true; do
-  if curl -s https://zenithjoy21xx.app.n8n.cloud/webhook/ping | grep -q "pong"; then
+  if curl -s http://localhost:5679/webhook/ping | grep -q "pong"; then
     echo "[$(date)] Service UP"
   else
     echo "[$(date)] Service DOWN"
@@ -422,7 +422,7 @@ import (
 )
 
 func main() {
-  resp, err := http.Get("https://zenithjoy21xx.app.n8n.cloud/webhook/ping")
+  resp, err := http.Get("http://localhost:5679/webhook/ping")
   if err != nil {
     log.Fatal(err)
   }
@@ -439,7 +439,7 @@ client := &http.Client{
   Timeout: 5 * time.Second,
 }
 
-resp, err := client.Get("https://zenithjoy21xx.app.n8n.cloud/webhook/ping")
+resp, err := client.Get("http://localhost:5679/webhook/ping")
 if err != nil {
   log.Printf("Request failed: %v", err)
   return
@@ -465,7 +465,7 @@ Simple health check to verify service availability:
 #!/bin/bash
 # health-check.sh
 
-if curl -s https://zenithjoy21xx.app.n8n.cloud/webhook/ping | grep -q "pong"; then
+if curl -s http://localhost:5679/webhook/ping | grep -q "pong"; then
   echo "OK"
   exit 0
 else
@@ -479,7 +479,7 @@ Add to Nagios/Icinga:
 define service {
   service_name  webhook_health
   host_name     n8n-cloud
-  check_command check_http!zenithjoy21xx.app.n8n.cloud!/webhook/ping
+  check_command check_http!localhost:5679!/webhook/ping
   interval      5
 }
 ```
@@ -503,7 +503,7 @@ Unhealthy Threshold: 2
 **NGINX Configuration**:
 ```nginx
 upstream webhook {
-  server zenithjoy21xx.app.n8n.cloud:443;
+  server localhost:5679:443;
   check interval=3000 rise=2 fall=5 timeout=1000 type=http;
   check_http_send "GET /webhook/ping HTTP/1.0\r\n\r\n";
   check_http_expect_alive http_2xx;
@@ -516,7 +516,7 @@ upstream webhook {
 # GitHub Actions
 - name: Check Webhook Health
   run: |
-    response=$(curl -s https://zenithjoy21xx.app.n8n.cloud/webhook/ping)
+    response=$(curl -s http://localhost:5679/webhook/ping)
     if [ "$response" = '{"message": "pong"}' ]; then
       echo "✓ Webhook is healthy"
     else
@@ -527,7 +527,7 @@ upstream webhook {
 # GitLab CI
 check_webhook:
   script:
-    - curl -f https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+    - curl -f http://localhost:5679/webhook/ping
   only:
     - merge_requests
 ```
@@ -542,7 +542,7 @@ fetch('https://pushgateway:9091/metrics/job/webhook_check', {
 });
 
 // DataDog Custom Metric
-const response = await fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping');
+const response = await fetch('http://localhost:5679/webhook/ping');
 const status = response.ok ? 1 : 0;
 console.log(`webhook.health:${status}|g`);
 ```
@@ -656,7 +656,7 @@ Currently no enforced limits, but recommended client-side limits:
 
 **Diagnosis**:
 ```bash
-curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -v http://localhost:5679/webhook/ping
 ```
 
 **Causes**:
@@ -672,7 +672,7 @@ See DEPLOY.md § Troubleshooting
 
 **Check**:
 ```bash
-time curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+time curl http://localhost:5679/webhook/ping
 ```
 
 **Causes**:
@@ -690,7 +690,7 @@ time curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 
 **Check**:
 ```bash
-timeout 10 curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+timeout 10 curl http://localhost:5679/webhook/ping
 ```
 
 **Solution**:

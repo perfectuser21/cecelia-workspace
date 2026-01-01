@@ -83,8 +83,8 @@ bash ~/scrape_and_sync.sh
 
 | 服务 | 地址 |
 |------|------|
-| n8n Cloud | https://zenithjoy21xx.app.n8n.cloud |
-| MCP Server | https://zenithjoy21xx.app.n8n.cloud/mcp-server/http |
+| n8n Cloud | http://localhost:5679 |
+| MCP Server | http://localhost:5679/mcp-server/http |
 | VPS | 146.190.52.84 (user: xx) |
 | Windows node | 100.97.242.124 (Tailscale) |
 

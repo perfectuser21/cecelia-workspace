@@ -373,7 +373,7 @@ check_n8n_workflow_exists() {
   # 禁用调试输出，避免 API Key 泄露到日志
   local response
   { set +x; } 2>/dev/null
-  response=$(curl -sf "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$workflow_id" \
+  response=$(curl -sf "http://localhost:5679/api/v1/workflows/$workflow_id" \
     -H "X-N8N-API-KEY: $N8N_REST_API_KEY" 2>/dev/null) || true
   # 如果之前开启了调试，这里不自动恢复（安全优先）
 

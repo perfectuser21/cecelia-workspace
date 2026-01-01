@@ -61,10 +61,10 @@
 
 ```bash
 # 测试 GET 请求
-curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -v http://localhost:5679/webhook/ping
 
 # 测试 POST 请求
-curl -v -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -v -X POST http://localhost:5679/webhook/ping
 ```
 
 预期输出:
@@ -77,7 +77,7 @@ curl -v -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 
 ### 方式 2: n8n UI 验证
 
-1. 登录 n8n: https://zenithjoy21xx.app.n8n.cloud
+1. 登录 n8n: http://localhost:5679
 2. 打开 Workflow 列表
 3. 搜索 "Ping Webhook"
 4. 确认 workflow 状态为 **Active**（绿色）
@@ -89,7 +89,7 @@ curl -v -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 #!/bin/bash
 
 # 测试脚本
-WEBHOOK_URL="https://zenithjoy21xx.app.n8n.cloud/webhook/ping"
+WEBHOOK_URL="http://localhost:5679/webhook/ping"
 
 # 测试 GET
 echo "Testing GET request..."
@@ -135,7 +135,7 @@ echo "✅ All tests passed"
 
 1. **禁用 Workflow**
    ```bash
-   curl -X PATCH https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/{id} \
+   curl -X PATCH http://localhost:5679/api/v1/workflows/{id} \
      -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
      -H "Content-Type: application/json" \
      -d '{"active": false}'
@@ -143,7 +143,7 @@ echo "✅ All tests passed"
 
 2. **删除 Workflow**
    ```bash
-   curl -X DELETE https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/{id} \
+   curl -X DELETE http://localhost:5679/api/v1/workflows/{id} \
      -H "X-N8N-API-KEY: $N8N_REST_API_KEY"
    ```
 

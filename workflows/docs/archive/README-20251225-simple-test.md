@@ -97,7 +97,7 @@ The automated creation failed. Possible causes:
 
 Fastest approach - create directly in n8n UI:
 
-1. Open https://zenithjoy21xx.app.n8n.cloud
+1. Open http://localhost:5679
 2. Click "New Workflow"
 3. Add **Webhook** node:
    - Path: `ping`
@@ -108,7 +108,7 @@ Fastest approach - create directly in n8n UI:
 5. Connect nodes
 6. Click "Save"
 7. Click "Activate"
-8. Test: `curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping`
+8. Test: `curl http://localhost:5679/webhook/ping`
 
 See `DEPLOY-20251225-simple-test.md` → "Option A" for detailed steps.
 
@@ -117,7 +117,7 @@ See `DEPLOY-20251225-simple-test.md` → "Option A" for detailed steps.
 Re-execute through the automated workflow factory:
 
 ```bash
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{
     "prd": "创建一个简单的 Ping webhook 返回 pong",
@@ -127,7 +127,7 @@ curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
 
 Before retrying, verify prerequisites:
 - Check `.secrets` has correct API keys
-- Test n8n connectivity: `curl https://zenithjoy21xx.app.n8n.cloud`
+- Test n8n connectivity: `curl http://localhost:5679`
 - Review recent error logs
 
 See `DEPLOY-20251225-simple-test.md` → "Option B" for more details.
@@ -139,7 +139,7 @@ Use n8n's REST API directly:
 ```bash
 export N8N_API_KEY=$(grep N8N_REST_API_KEY ~/.secrets | cut -d= -f2)
 
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows" \
+curl -X POST "http://localhost:5679/api/v1/workflows" \
   -H "X-N8N-API-KEY: $N8N_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -207,7 +207,7 @@ API reference documentation including:
 
 ```bash
 # Check if workflow is already created
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 
 # Expected response if active:
 # {"message": "pong"}
@@ -217,19 +217,19 @@ curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 
 ### Create Webhook (Fastest Method)
 
-1. Go to https://zenithjoy21xx.app.n8n.cloud
+1. Go to http://localhost:5679
 2. New Workflow → Add Webhook node (path: `ping`) → Add Response node
 3. Connect → Save → Activate
-4. Test: `curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping`
+4. Test: `curl http://localhost:5679/webhook/ping`
 
 ### Verify It Works
 
 ```bash
 # GET request
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 
 # POST request
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
+curl -X POST http://localhost:5679/webhook/ping \
   -H "Content-Type: application/json" \
   -d '{"test": true}'
 
@@ -254,8 +254,8 @@ This branch is dedicated to this simple test project. Can be kept or merged into
 
 ```
 Server: 146.190.52.84
-n8n Cloud: https://zenithjoy21xx.app.n8n.cloud
-MCP Endpoint: https://zenithjoy21xx.app.n8n.cloud/mcp-server/http
+n8n Cloud: http://localhost:5679
+MCP Endpoint: http://localhost:5679/mcp-server/http
 Region: Cloud-hosted (not VPS)
 ```
 
@@ -309,34 +309,34 @@ Region: Cloud-hosted (not VPS)
 ### Basic Test
 
 ```bash
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 ```
 
 ### Verbose Output
 
 ```bash
-curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -v http://localhost:5679/webhook/ping
 ```
 
 ### With Timeout
 
 ```bash
-curl --max-time 5 https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl --max-time 5 http://localhost:5679/webhook/ping
 ```
 
 ### From Different Methods
 
 ```bash
 # GET
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 
 # POST
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/ping \
+curl -X POST http://localhost:5679/webhook/ping \
   -H "Content-Type: application/json" \
   -d '{}'
 
 # DELETE
-curl -X DELETE https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -X DELETE http://localhost:5679/webhook/ping
 ```
 
 ## Troubleshooting
@@ -350,7 +350,7 @@ curl -X DELETE https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 ### "Connection refused"
 - n8n service not running
 - Firewall blocking
-→ Check: `curl https://zenithjoy21xx.app.n8n.cloud`
+→ Check: `curl http://localhost:5679`
 
 ### "Timeout"
 - n8n overloaded
@@ -407,4 +407,4 @@ For factory system info → see `AI-FACTORY-README.md`
 ---
 
 **Created by**: AI Factory Workflow Production Line
-**System**: n8n Cloud at zenithjoy21xx.app.n8n.cloud
+**System**: n8n Cloud at localhost:5679

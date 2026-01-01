@@ -9,7 +9,7 @@ updated_at: YYYY-MM-DD                # 必须：最后更新日期
 
 # n8n 配置
 n8n:
-  server: https://xxx.app.n8n.cloud   # n8n 服务器地址
+  server: http://localhost:5679       # n8n 服务器地址（本地部署）
   # credentials 在 credentials.yml 中配置（不提交 git）
 
 # Feature 选配（核心配置）

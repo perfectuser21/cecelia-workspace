@@ -41,13 +41,13 @@
 ### 1. 健康检查
 
 ```bash
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 ```
 
 ### 2. 监控集成
 
 在监控系统中配置：
-- 端点：`https://zenithjoy21xx.app.n8n.cloud/webhook/ping`
+- 端点：`http://localhost:5679/webhook/ping`
 - 间隔：30 秒或 1 分钟
 - 期望状态码：200
 - 期望响应：`"status": "pong"`
@@ -56,7 +56,7 @@ curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 
 ```nginx
 upstream n8n {
-    server zenithjoy21xx.app.n8n.cloud;
+    server localhost:5679;
 
     check interval=3000 rise=2 fall=5 timeout=1000 type=http;
     check_http_send "GET /webhook/ping HTTP/1.0\r\n\r\n";
@@ -89,16 +89,16 @@ Cache-Control: no-cache
 
 ```bash
 # GET 请求
-curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -v http://localhost:5679/webhook/ping
 
 # POST 请求
-curl -X POST -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -X POST -v http://localhost:5679/webhook/ping
 ```
 
 ### JavaScript/Node.js
 
 ```javascript
-const response = await fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping');
+const response = await fetch('http://localhost:5679/webhook/ping');
 const data = await response.json();
 console.log(data); // { status: "pong", timestamp: "..." }
 ```
@@ -108,7 +108,7 @@ console.log(data); // { status: "pong", timestamp: "..." }
 ```python
 import requests
 
-response = requests.get('https://zenithjoy21xx.app.n8n.cloud/webhook/ping')
+response = requests.get('http://localhost:5679/webhook/ping')
 print(response.json())  # {'status': 'pong', 'timestamp': '...'}
 ```
 

@@ -4,7 +4,7 @@
 
 ```bash
 # 回滚到指定版本
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{"rollback_run_id": "YOUR_RUN_ID"}'
 ```
@@ -67,7 +67,7 @@ ssh xx@146.190.52.84 "ls -lt /home/xx/data/runs/*/final/manifest.json | head -3"
 RUN_ID="20251224020000-xyz789"
 
 # 3. 执行回滚
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d "{\"rollback_run_id\": \"$RUN_ID\"}"
 ```
@@ -86,12 +86,12 @@ EOF
 
 ```bash
 # 1. 先回滚
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{"rollback_run_id": "20251224020000-xyz789"}'
 
 # 2. 然后重新提交修改（会创建新的 run_id）
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{
     "prd": "修复之前的问题，添加正确的重试逻辑",
@@ -131,12 +131,12 @@ ssh xx@146.190.52.84 "cat /home/xx/data/runs/YOUR_RUN_ID/state.json"
 # 检查 API Key 是否有效
 ssh xx@146.190.52.84 "source /home/xx/dev/zenithjoy-autopilot/workflows/.secrets && \
   curl -H \"X-N8N-API-KEY: \$N8N_REST_API_KEY\" \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows | jq '.data | length'"
+  http://localhost:5679/api/v1/workflows | jq '.data | length'"
 
 # 检查具体 workflow
 ssh xx@146.190.52.84 "source /home/xx/dev/zenithjoy-autopilot/workflows/.secrets && \
   curl -H \"X-N8N-API-KEY: \$N8N_REST_API_KEY\" \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/WORKFLOW_ID | jq '.name'"
+  http://localhost:5679/api/v1/workflows/WORKFLOW_ID | jq '.name'"
 ```
 
 ## 注意事项
@@ -159,7 +159,7 @@ source /home/xx/dev/zenithjoy-autopilot/workflows/.secrets
 
 # 导出所有 workflows
 curl -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows \
+  http://localhost:5679/api/v1/workflows \
   > $BACKUP_DIR/all-workflows.json
 
 echo "备份已保存到: $BACKUP_DIR"

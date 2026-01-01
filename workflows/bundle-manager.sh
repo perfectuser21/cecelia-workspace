@@ -16,7 +16,7 @@ REPO_DIR="$(dirname "$WORKFLOWS_DIR")"
 source "$REPO_DIR/.secrets" 2>/dev/null || true
 
 # API 配置（可通过环境变量覆盖）
-N8N_API_URL="${N8N_API_URL:-https://zenithjoy21xx.app.n8n.cloud/api/v1}"
+N8N_API_URL="${N8N_API_URL:-http://localhost:5679/api/v1}"
 N8N_API_KEY="${N8N_API_KEY:-$N8N_REST_API_KEY}"
 
 # 颜色
@@ -605,7 +605,7 @@ Shared 组件命令:
   bundle-manager.sh dependents claude-executor
 
 环境变量:
-  N8N_API_URL   n8n API 地址 (默认: https://zenithjoy21xx.app.n8n.cloud/api/v1)
+  N8N_API_URL   n8n API 地址 (默认: http://localhost:5679/api/v1)
   N8N_API_KEY   n8n API Key
 EOF
 }

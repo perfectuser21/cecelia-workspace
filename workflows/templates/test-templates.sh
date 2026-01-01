@@ -98,6 +98,6 @@ echo "  - 快速参考: $TEMPLATES_DIR/QUICK_REFERENCE.md"
 echo "  - 示例: $TEMPLATES_DIR/EXAMPLES.md"
 echo
 echo "使用方式:"
-echo "  curl -X POST 'https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory' \\"
+echo "  curl -X POST 'http://localhost:5679/webhook/workflow-factory' \\"
 echo "    -H 'Content-Type: application/json' \\"
 echo "    -d '{\"prd\": \"创建 API\", \"template\": \"webhook-response\"}'"

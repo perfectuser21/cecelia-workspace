@@ -94,7 +94,7 @@ All files located in: `/home/xx/dev/zenithjoy-autopilot/workflows/`
 ## Import to n8n
 
 ### Via UI
-1. Open n8n Cloud: https://zenithjoy21xx.app.n8n.cloud
+1. Open n8n Cloud: http://localhost:5679
 2. Navigate to Workflows
 3. Click Import from File
 4. Select `workflow-factory-v4-qc.json`
@@ -104,7 +104,7 @@ All files located in: `/home/xx/dev/zenithjoy-autopilot/workflows/`
 ### Via API
 ```bash
 source /home/xx/dev/zenithjoy-autopilot/workflows/.secrets
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows" \
+curl -X POST "http://localhost:5679/api/v1/workflows" \
   -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
   -H "Content-Type: application/json" \
   -d @workflow-factory-v4-qc.json
@@ -114,7 +114,7 @@ curl -X POST "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows" \
 
 ### Simple Test
 ```bash
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{
     "prd": "创建一个测试 workflow",
@@ -161,7 +161,7 @@ Edit these values in the workflow if needed:
 
 ## Support Resources
 
-- n8n Cloud: https://zenithjoy21xx.app.n8n.cloud
+- n8n Cloud: http://localhost:5679
 - VPS: ssh xx@146.190.52.84
 - Docs: See files listed above
 - Logs: `/home/xx/data/runs/{run_id}/`

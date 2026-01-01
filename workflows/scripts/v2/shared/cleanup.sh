@@ -355,7 +355,7 @@ fi
 # ============================================================
 log_info "[5/6] 发送 Webhook 通知..."
 
-WEBHOOK_URL="https://zenithjoy21xx.app.n8n.cloud/webhook/execution-callback"
+WEBHOOK_URL="http://localhost:5679/webhook/execution-callback"
 
 # 检查是否是 Feature Check (Daily Highlight = true 的任务)
 IS_FEATURE_CHECK=false

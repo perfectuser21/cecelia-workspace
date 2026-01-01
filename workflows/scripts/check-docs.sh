@@ -118,7 +118,7 @@ check_claude_md() {
   fi
 
   # 检查 n8n URL
-  if ! grep -q "zenithjoy21xx.app.n8n.cloud" "$claude_md"; then
+  if ! grep -q "localhost:5679" "$claude_md"; then
     missing_configs+=("n8n URL")
   fi
 

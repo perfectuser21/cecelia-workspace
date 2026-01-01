@@ -17,7 +17,7 @@
 
 #### 1.1 登录 n8n Cloud
 ```
-访问: https://zenithjoy21xx.app.n8n.cloud
+访问: http://localhost:5679
 账户: 使用已配置的 n8n 账户登录
 ```
 
@@ -248,7 +248,7 @@ docker restart n8n
 docker logs n8n | tail -100
 
 # 手动触发测试
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/scheduled-cleanup
+curl -X POST http://localhost:5679/webhook/scheduled-cleanup
 ```
 
 ### 问题: 清理命令执行失败

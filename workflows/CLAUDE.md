@@ -51,7 +51,7 @@ Dashboard → Webhook → 逐平台循环 → SSH 调用 vps_publisher.js → �
 **调用方式**:
 ```bash
 # Dashboard 自动调用，也可手动测试
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/content-publish" \
+curl -X POST "http://localhost:5679/webhook/content-publish" \
   -H "Content-Type: application/json" \
   -d '{
     "taskId": "xxx",
@@ -91,8 +91,8 @@ curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/content-publish" \
 ### n8n Cloud
 
 ```
-Server: https://zenithjoy21xx.app.n8n.cloud
-MCP: https://zenithjoy21xx.app.n8n.cloud/mcp-server/http
+Server: http://localhost:5679
+MCP: http://localhost:5679/mcp-server/http
 API Keys: 见 .secrets
 ```
 
@@ -160,19 +160,19 @@ VPS (所有逻辑)                        Windows node (瘦客户端)
 ```bash
 # 获取 workflow
 curl -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/{id}
+  http://localhost:5679/api/v1/workflows/{id}
 
 # 更新 workflow
 curl -X PATCH -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"nodes": [...]}' \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/{id}
+  http://localhost:5679/api/v1/workflows/{id}
 
 # 激活/停用 workflow
 curl -X PATCH -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"active": true}' \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/{id}
+  http://localhost:5679/api/v1/workflows/{id}
 ```
 
 ### Keys 配置
@@ -317,7 +317,7 @@ pkill -u $(whoami) -f "claude.*-p"
 
 ```bash
 # 调用方式
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{
     "prd": "创建一个每小时检查 VPS 磁盘空间的 workflow，超过 80% 发飞书告警",
@@ -325,7 +325,7 @@ curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
   }'
 
 # 修改现有 workflow
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{
     "prd": "给这个 workflow 添加重试逻辑",
@@ -352,7 +352,7 @@ curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
 
 ```bash
 # 调用方式
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/codebase-factory" \
+curl -X POST "http://localhost:5679/webhook/codebase-factory" \
   -H "Content-Type: application/json" \
   -d '{
     "prd": "添加一个 API 端点 GET /api/health，返回服务状态",

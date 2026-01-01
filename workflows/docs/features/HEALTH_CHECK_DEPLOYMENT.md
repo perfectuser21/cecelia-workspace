@@ -99,7 +99,7 @@ Claude 会自动通过 MCP 创建和激活 workflow。
 ```bash
 # 设置环境变量
 export N8N_API_KEY="sk_xxxxx"
-export N8N_BASE="https://zenithjoy21xx.app.n8n.cloud/api/v1"
+export N8N_BASE="http://localhost:5679/api/v1"
 
 # 1. 创建 workflow
 curl -X POST "$N8N_BASE/workflows" \
@@ -161,10 +161,10 @@ Webhook Trigger → Set → Respond to Webhook
 
 ```bash
 # GET 请求
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/health-check
+curl http://localhost:5679/webhook/health-check
 
 # POST 请求
-curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/health-check \
+curl -X POST http://localhost:5679/webhook/health-check \
   -H "Content-Type: application/json" \
   -d '{}'
 ```
@@ -186,7 +186,7 @@ curl -X POST https://zenithjoy21xx.app.n8n.cloud/webhook/health-check \
 
 # 定义健康检查函数
 check_n8n_health() {
-  local url="https://zenithjoy21xx.app.n8n.cloud/webhook/health-check"
+  local url="http://localhost:5679/webhook/health-check"
   local timeout=5
 
   response=$(curl -s -m $timeout "$url")
@@ -245,7 +245,7 @@ class HealthChecker:
 # 使用示例
 if __name__ == "__main__":
     checker = HealthChecker(
-        "https://zenithjoy21xx.app.n8n.cloud/webhook/health-check"
+        "http://localhost:5679/webhook/health-check"
     )
 
     result = checker.check()
@@ -271,7 +271,7 @@ if __name__ == "__main__":
 #!/bin/bash
 
 # Prometheus metrics exporter
-WEBHOOK_URL="https://zenithjoy21xx.app.n8n.cloud/webhook/health-check"
+WEBHOOK_URL="http://localhost:5679/webhook/health-check"
 METRICS_FILE="/tmp/n8n_health_check.prom"
 
 # 执行健康检查
@@ -380,11 +380,11 @@ spec:
 
 ```bash
 # 1. 检查 n8n 服务状态
-curl -s https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows \
+curl -s http://localhost:5679/api/v1/workflows \
   -H "X-N8N-API-KEY: $N8N_REST_API_KEY" | jq '.data | length'
 
 # 2. 检查网络连接
-ping zenithjoy21xx.app.n8n.cloud
+ping localhost:5679
 
 # 3. 查看 n8n 日志
 # 登录 n8n Cloud 控制台检查服务状态
@@ -398,13 +398,13 @@ ping zenithjoy21xx.app.n8n.cloud
 
 ```bash
 # 检查 workflow 是否激活
-curl -s https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows \
+curl -s http://localhost:5679/api/v1/workflows \
   -H "X-N8N-API-KEY: $N8N_REST_API_KEY" | \
   jq '.data[] | select(.name == "Health Check")'
 
 # 如果未激活，激活 workflow
 WORKFLOW_ID="your-workflow-id"
-curl -X PATCH https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$WORKFLOW_ID \
+curl -X PATCH http://localhost:5679/api/v1/workflows/$WORKFLOW_ID \
   -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"active": true}'
@@ -418,7 +418,7 @@ curl -X PATCH https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$WORKFLOW_ID 
 
 ```bash
 # 测试响应时间
-time curl https://zenithjoy21xx.app.n8n.cloud/webhook/health-check
+time curl http://localhost:5679/webhook/health-check
 
 # 检查 n8n 资源使用
 # 通过 n8n Cloud 控制台查看 CPU/内存使用
@@ -437,7 +437,7 @@ time curl https://zenithjoy21xx.app.n8n.cloud/webhook/health-check
 
 ```bash
 # 1. 检查 n8n 服务器时间
-curl -s https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows \
+curl -s http://localhost:5679/api/v1/workflows \
   -H "X-N8N-API-KEY: $N8N_REST_API_KEY" | \
   jq '.[0].createdAt'
 
@@ -468,7 +468,7 @@ sudo ntpdate -s time.nist.gov  # Linux/Mac
 ```bash
 # 使用 Apache Bench 进行压力测试
 ab -n 10000 -c 100 \
-  https://zenithjoy21xx.app.n8n.cloud/webhook/health-check
+  http://localhost:5679/webhook/health-check
 
 # 结果示例:
 # Requests per second: 2500

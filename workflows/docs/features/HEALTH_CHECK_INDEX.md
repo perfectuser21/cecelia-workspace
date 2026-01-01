@@ -18,7 +18,7 @@
    - 一行式查询
 
    ```bash
-   curl https://zenithjoy21xx.app.n8n.cloud/webhook/health-check | jq
+   curl http://localhost:5679/webhook/health-check | jq
    ```
 
 ### 深度理解
@@ -71,7 +71,7 @@
 
 ```bash
 # 最简单的测试
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/health-check | jq
+curl http://localhost:5679/webhook/health-check | jq
 ```
 
 ---
@@ -86,7 +86,7 @@ curl https://zenithjoy21xx.app.n8n.cloud/webhook/health-check | jq
 
 **示例 (Bash)**:
 ```bash
-status=$(curl -s https://zenithjoy21xx.app.n8n.cloud/webhook/health-check | jq -r '.status')
+status=$(curl -s http://localhost:5679/webhook/health-check | jq -r '.status')
 if [ "$status" = "ok" ]; then
   echo "✅ 服务正常"
 else
@@ -260,7 +260,7 @@ fi
 ### Webhook 访问
 
 ```
-🔗 URL: https://zenithjoy21xx.app.n8n.cloud/webhook/health-check
+🔗 URL: http://localhost:5679/webhook/health-check
 📝 方法: GET / POST
 🔑 认证: 无需认证
 📤 格式: JSON
@@ -281,7 +281,7 @@ fi
 ### 快速测试
 
 ```bash
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/health-check | jq
+curl http://localhost:5679/webhook/health-check | jq
 ```
 
 ---
@@ -381,7 +381,7 @@ curl https://zenithjoy21xx.app.n8n.cloud/webhook/health-check | jq
 **问**: 如何测试 Health Check？
 **答**:
 ```bash
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/health-check | jq
+curl http://localhost:5679/webhook/health-check | jq
 ```
 
 ### 集成问题

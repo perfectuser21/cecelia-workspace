@@ -7,7 +7,7 @@ Master scheduler workflow that orchestrates 4 sub-workflows daily at 19:00 UTC w
 ## Workflow Details
 
 **Workflow ID**: `YFqEplFiSl5Qd3x9`
-**URL**: https://zenithjoy21xx.app.n8n.cloud/workflow/YFqEplFiSl5Qd3x9
+**URL**: http://localhost:5679/workflow/YFqEplFiSl5Qd3x9
 **Status**: Active
 **MCP Availability**: Enabled
 **Schedule**: Daily at 19:00 UTC (cron: `0 19 * * *`)
@@ -148,7 +148,7 @@ You can manually trigger the workflow via:
 ## Monitoring
 
 Check execution history at:
-https://zenithjoy21xx.app.n8n.cloud/workflow/YFqEplFiSl5Qd3x9/executions
+http://localhost:5679/workflow/YFqEplFiSl5Qd3x9/executions
 
 ## Future Enhancements
 

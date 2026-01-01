@@ -22,22 +22,23 @@ interface InstanceConfig {
 }
 
 const instances: Record<N8nInstance, InstanceConfig> = {
-  cloud: {
-    baseUrl: 'https://zenithjoy21xx.app.n8n.cloud',
-    apiKey: process.env.N8N_REST_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1N2ZhNjM5MC1hNDBjLTQ2MDUtOTdlZC02Y2ExM2YwYjgwYTciLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzY2Mjg2NzU5LCJleHAiOjE4MDE0MTEyMDB9.9691--OtQhS52TVvQ9fYCzkiicWT-j6TnlLO9B95VmE',
-    name: 'Cloud',
-  },
+  // 本地部署的 n8n（当前使用）
   local: {
-    // Use container name since both are on the same docker network
-    baseUrl: process.env.N8N_LOCAL_URL || 'http://n8n-self-hosted:5678',
+    baseUrl: process.env.N8N_LOCAL_URL || 'http://localhost:5679',
     apiKey: process.env.N8N_LOCAL_API_KEY || '',
-    name: 'Local',
+    name: 'Self-hosted',
+  },
+  // Cloud 实例（备用，需要时配置）
+  cloud: {
+    baseUrl: process.env.N8N_CLOUD_URL || '',
+    apiKey: process.env.N8N_CLOUD_API_KEY || '',
+    name: 'Cloud',
   },
 };
 
-// 兼容原有单实例配置
-const N8N_BASE_URL = instances.cloud.baseUrl;
-const N8N_API_KEY = instances.cloud.apiKey;
+// 默认使用 local 实例
+const N8N_BASE_URL = instances.local.baseUrl;
+const N8N_API_KEY = instances.local.apiKey;
 
 class N8nWorkflowsService {
   /**

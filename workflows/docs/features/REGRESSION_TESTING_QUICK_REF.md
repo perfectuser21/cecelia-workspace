@@ -144,7 +144,7 @@ for wid in $WORKFLOW_IDS; do
 
   # Fetch workflow
   wf=$(curl -s -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-    "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/$wid")
+    "http://localhost:5679/api/v1/workflows/$wid")
 
   # Your validation here
   # ...

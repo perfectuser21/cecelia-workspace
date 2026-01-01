@@ -15,7 +15,7 @@
 
 ```bash
 # 测试 Ping Webhook
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 
 # 预期输出
 # {"status": "pong", "timestamp": "2025-12-25T..."}
@@ -29,11 +29,11 @@ curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 
 ```bash
 # 方式 1: 通过 n8n Web UI
-# 访问 https://zenithjoy21xx.app.n8n.cloud/workflows
+# 访问 http://localhost:5679/workflows
 
 # 方式 2: 通过 n8n API
 curl -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/vaOcL9wAjducmP5a
+  http://localhost:5679/api/v1/workflows/vaOcL9wAjducmP5a
 ```
 
 ### 步骤 2: 配置 Nginx Proxy Manager (可选)
@@ -43,7 +43,7 @@ curl -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
 ```bash
 # 在 Nginx Proxy Manager 中添加代理规则
 # 域名: ping.zenjoymedia.media
-# 上游服务: https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+# 上游服务: http://localhost:5679/webhook/ping
 # SSL: 使用 Nginx 管理的证书
 ```
 
@@ -55,7 +55,7 @@ curl -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
 {
   "name": "n8n Ping Webhook",
   "type": "http",
-  "url": "https://zenithjoy21xx.app.n8n.cloud/webhook/ping",
+  "url": "http://localhost:5679/webhook/ping",
   "interval": 60,
   "timeout": 5000,
   "expected_status": 200,
@@ -69,10 +69,10 @@ curl -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
 
 ```javascript
 // 在 HTTP Request 节点中
-GET https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+GET http://localhost:5679/webhook/ping
 
 // 在 JavaScript 节点中验证
-const response = await fetch('https://zenithjoy21xx.app.n8n.cloud/webhook/ping');
+const response = await fetch('http://localhost:5679/webhook/ping');
 if (!response.ok) throw new Error('n8n service is down');
 ```
 
@@ -96,23 +96,23 @@ if (!response.ok) throw new Error('n8n service is down');
 
 ```bash
 # 简单的 ping 测试
-curl https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl http://localhost:5679/webhook/ping
 
 # 显示响应头和响应体
-curl -i https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -i http://localhost:5679/webhook/ping
 
 # JSON 格式化输出
-curl -s https://zenithjoy21xx.app.n8n.cloud/webhook/ping | jq .
+curl -s http://localhost:5679/webhook/ping | jq .
 ```
 
 ### 负载测试
 
 ```bash
 # 使用 Apache Bench 进行负载测试 (100 并发请求)
-ab -n 1000 -c 100 https://zenithjoy21xx.app.n8n.cloud/webhook/ping/
+ab -n 1000 -c 100 http://localhost:5679/webhook/ping/
 
 # 使用 wrk 进行性能测试 (4 个线程, 100 个连接, 30 秒)
-wrk -t4 -c100 -d30s https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+wrk -t4 -c100 -d30s http://localhost:5679/webhook/ping
 ```
 
 ### 监控响应时间
@@ -123,7 +123,7 @@ for i in {1..10}; do
   echo "Request $i:"
   curl -w "HTTP Code: %{http_code}, Time: %{time_total}s\n" \
     -o /dev/null -s \
-    https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+    http://localhost:5679/webhook/ping
   sleep 1
 done
 ```
@@ -135,7 +135,7 @@ done
 ### 症状 1: 404 Not Found
 
 ```bash
-curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -v http://localhost:5679/webhook/ping
 # < HTTP/1.1 404 Not Found
 ```
 
@@ -145,20 +145,20 @@ curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
 ```bash
 # 1. 检查 workflow 是否已激活
 curl -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/vaOcL9wAjducmP5a \
+  http://localhost:5679/api/v1/workflows/vaOcL9wAjducmP5a \
   | jq .active
 
 # 2. 如果返回 false，激活 workflow
 curl -X PATCH -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"active": true}' \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/vaOcL9wAjducmP5a
+  http://localhost:5679/api/v1/workflows/vaOcL9wAjducmP5a
 ```
 
 ### 症状 2: 500 Internal Error
 
 ```bash
-curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -v http://localhost:5679/webhook/ping
 # < HTTP/1.1 500 Internal Server Error
 ```
 
@@ -178,7 +178,7 @@ docker logs social-metrics-n8n | tail -50
 ### 症状 3: 连接超时
 
 ```bash
-curl --max-time 5 https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl --max-time 5 http://localhost:5679/webhook/ping
 # curl: (28) Operation timed out after 5000 milliseconds
 ```
 
@@ -197,13 +197,13 @@ docker logs social-metrics-n8n
 docker restart social-metrics-n8n
 
 # 4. 检查网络连接
-ping zenithjoy21xx.app.n8n.cloud
+ping localhost:5679
 ```
 
 ### 症状 4: 503 Service Unavailable
 
 ```bash
-curl -v https://zenithjoy21xx.app.n8n.cloud/webhook/ping
+curl -v http://localhost:5679/webhook/ping
 # < HTTP/1.1 503 Service Unavailable
 ```
 
@@ -241,7 +241,7 @@ docker exec nginx-proxy-manager nginx -s reload
 # 使用脚本收集 24 小时的响应时间数据
 cat > monitor-ping.sh << 'EOF'
 #!/bin/bash
-endpoint="https://zenithjoy21xx.app.n8n.cloud/webhook/ping"
+endpoint="http://localhost:5679/webhook/ping"
 duration=86400  # 24 小时
 interval=60     # 每 60 秒采样一次
 
@@ -285,11 +285,11 @@ chmod +x monitor-ping.sh
 curl -X PATCH -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"active": false}' \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/vaOcL9wAjducmP5a
+  http://localhost:5679/api/v1/workflows/vaOcL9wAjducmP5a
 
 # 验证已停用
 curl -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/vaOcL9wAjducmP5a \
+  http://localhost:5679/api/v1/workflows/vaOcL9wAjducmP5a \
   | jq .active
 # 应该返回 false
 ```

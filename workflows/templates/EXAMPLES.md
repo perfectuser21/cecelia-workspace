@@ -279,7 +279,7 @@
 ### 1. 通过 webhook 测试
 
 ```bash
-curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+curl -X POST "http://localhost:5679/webhook/workflow-factory" \
   -H "Content-Type: application/json" \
   -d '{
     "prd": "创建一个 API 端点接收飞书 webhook，解析消息内容，保存到数据库，返回成功响应",

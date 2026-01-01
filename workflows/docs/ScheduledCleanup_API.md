@@ -266,13 +266,13 @@ Content-Type: application/json
 2. 配置路径: `/cleanup-trigger`
 3. 获取 Webhook URL:
    ```
-   https://zenithjoy21xx.app.n8n.cloud/webhook/cleanup-trigger
+   http://localhost:5679/webhook/cleanup-trigger
    ```
 
 #### 请求
 
 ```http
-POST https://zenithjoy21xx.app.n8n.cloud/webhook/cleanup-trigger
+POST http://localhost:5679/webhook/cleanup-trigger
 Content-Type: application/json
 
 {
@@ -429,7 +429,7 @@ import json
 
 API_KEY = "your-n8n-api-key"
 WORKFLOW_ID = "GVzOCR4c1MRpcZkO"
-API_URL = "https://zenithjoy21xx.app.n8n.cloud/api/v1"
+API_URL = "http://localhost:5679/api/v1"
 
 def trigger_cleanup():
     url = f"{API_URL}/workflows/{WORKFLOW_ID}/execute"
@@ -458,7 +458,7 @@ if __name__ == "__main__":
 
 API_KEY="your-n8n-api-key"
 WORKFLOW_ID="GVzOCR4c1MRpcZkO"
-BASE_URL="https://zenithjoy21xx.app.n8n.cloud"
+BASE_URL="http://localhost:5679"
 
 curl -X POST \
   "${BASE_URL}/api/v1/workflows/${WORKFLOW_ID}/execute" \
@@ -474,7 +474,7 @@ curl -X POST \
 
 API_KEY="your-n8n-api-key"
 WORKFLOW_ID="GVzOCR4c1MRpcZkO"
-BASE_URL="https://zenithjoy21xx.app.n8n.cloud"
+BASE_URL="http://localhost:5679"
 
 # 获取最近 5 次执行
 curl -X GET \
@@ -491,7 +491,7 @@ from datetime import datetime
 
 API_KEY = "your-n8n-api-key"
 WORKFLOW_ID = "GVzOCR4c1MRpcZkO"
-API_URL = "https://zenithjoy21xx.app.n8n.cloud/api/v1"
+API_URL = "http://localhost:5679/api/v1"
 
 def check_cleanup_status():
     """检查最近一次清理任务状态"""
@@ -546,7 +546,7 @@ if __name__ == "__main__":
 
 ```bash
 curl -X GET \
-  https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows/GVzOCR4c1MRpcZkO \
+  http://localhost:5679/api/v1/workflows/GVzOCR4c1MRpcZkO \
   -H "Authorization: Bearer sk_prod_xxxxxxxxxxxxx"
 ```
 

@@ -49,7 +49,7 @@ This version adds comprehensive integration and performance quality checks to th
 ## Deployment
 
 ### Prerequisites
-- n8n Cloud account: `zenithjoy21xx.app.n8n.cloud`
+- n8n Cloud account: `localhost:5679`
 - VPS SSH access: `146.190.52.84`
 - Required credentials: SSH key `vvJsQOZ95sqzemla`
 
@@ -62,7 +62,7 @@ This version adds comprehensive integration and performance quality checks to th
    # - Upload workflow-factory-v4-qc.json
    
    # Option B: Via API
-   curl -X POST "https://zenithjoy21xx.app.n8n.cloud/api/v1/workflows" \
+   curl -X POST "http://localhost:5679/api/v1/workflows" \
      -H "X-N8N-API-KEY: $N8N_REST_API_KEY" \
      -H "Content-Type: application/json" \
      -d @workflow-factory-v4-qc.json
@@ -75,7 +75,7 @@ This version adds comprehensive integration and performance quality checks to th
 
 3. **Test Run**
    ```bash
-   curl -X POST "https://zenithjoy21xx.app.n8n.cloud/webhook/workflow-factory" \
+   curl -X POST "http://localhost:5679/webhook/workflow-factory" \
      -H "Content-Type: application/json" \
      -d '{
        "prd": "创建一个简单的测试 workflow，包含 1 个 webhook 和 1 个 code 节点",

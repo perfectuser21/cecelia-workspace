@@ -331,7 +331,7 @@ else
     exit 1
   fi
 
-  N8N_API_URL="${N8N_API_URL:-https://zenithjoy21xx.app.n8n.cloud/api/v1}"
+  N8N_API_URL="${N8N_API_URL:-http://localhost:5679/api/v1}"
 
   # 过滤 JSON，只保留 API 接受的字段
   FILTERED_JSON=$(echo "$WORKFLOW_JSON" | jq '{
@@ -571,7 +571,7 @@ screenshot_html_report "$RUN_ID" "n8n-execute-result" "$REPORT_HTML" || log_warn
 
 # 如果是真实模式且有 Workflow ID，截取 n8n 编辑器页面
 if [[ "${TEST_MODE:-}" != "1" && -n "$WORKFLOW_ID" ]]; then
-  N8N_WORKFLOW_URL="https://zenithjoy21xx.app.n8n.cloud/workflow/${WORKFLOW_ID}"
+  N8N_WORKFLOW_URL="http://localhost:5679/workflow/${WORKFLOW_ID}"
   log_info "截取 n8n Workflow 页面: $N8N_WORKFLOW_URL"
   save_screenshot "$RUN_ID" "n8n-workflow-editor" "$N8N_WORKFLOW_URL" --delay 3000 || log_warn "Workflow 页面截图失败"
 fi
