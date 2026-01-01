@@ -56,3 +56,4 @@ uploads/
 # Claude
 .claude/
 workflows/scripts/v2/test-evidence/
+workflows/.secrets.bak
