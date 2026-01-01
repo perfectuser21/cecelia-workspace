@@ -53,7 +53,7 @@
     {
       "parameters": {
         "authentication": "privateKey",
-        "command": "=cd {{ $json.projectPath }} && claude -p '你是架构师。分析以下PRD，将其分解为可执行的任务列表。返回JSON格式：{\"tasks\": [{\"id\": \"task-1\", \"name\": \"任务名\", \"description\": \"详细描述\", \"depends_on\": [], \"files_expected\": [\"file1.ts\"], \"complexity\": \"low|medium|high\"}]}。\n\nPRD内容：\n{{ $json.prd }}' --model sonnet --allowedTools \"Read,Write,Edit,Glob,Grep,Bash\" 2>&1 | tail -100"
+        "command": "=cd {{ $json.projectPath }} && timeout -k 10 1800 claude -p '你是架构师。分析以下PRD，将其分解为可执行的任务列表。返回JSON格式：{\"tasks\": [{\"id\": \"task-1\", \"name\": \"任务名\", \"description\": \"详细描述\", \"depends_on\": [], \"files_expected\": [\"file1.ts\"], \"complexity\": \"low|medium|high\"}]}。\n\nPRD内容：\n{{ $json.prd }}' --model sonnet --allowedTools \"Read,Write,Edit,Glob,Grep,Bash\" 2>&1 | tail -100"
       },
       "id": "claude-a-decompose",
       "name": "SSH Claude A - 分解PRD",
@@ -100,7 +100,7 @@
     {
       "parameters": {
         "authentication": "privateKey",
-        "command": "=cd {{ $json.projectPath }} && echo '{\"task_id\": \"{{ $json.id }}\", \"status\": \"executing\", \"started_at\": \"'$(date -Iseconds)'\"}' > {{ $json.state_dir }}/tasks/{{ $json.id }}.json && claude -p '你是开发工程师。执行以下任务：\n\n任务ID: {{ $json.id }}\n任务名: {{ $json.name }}\n描述: {{ $json.description }}\n预期文件: {{ $json.files_expected }}\n\n要求：\n1. 创建/修改必要的代码文件\n2. 确保代码符合TypeScript最佳实践\n3. 添加必要的类型定义和错误处理\n4. 完成后输出 JSON：{\"task_id\": \"{{ $json.id }}\", \"status\": \"success\", \"files_created\": [...], \"files_modified\": [...]}' --model sonnet --allowedTools \"Read,Write,Edit,Glob,Grep,Bash\" 2>&1 | tail -100"
+        "command": "=cd {{ $json.projectPath }} && echo '{\"task_id\": \"{{ $json.id }}\", \"status\": \"executing\", \"started_at\": \"'$(date -Iseconds)'\"}' > {{ $json.state_dir }}/tasks/{{ $json.id }}.json && timeout -k 10 1800 claude -p '你是开发工程师。执行以下任务：\n\n任务ID: {{ $json.id }}\n任务名: {{ $json.name }}\n描述: {{ $json.description }}\n预期文件: {{ $json.files_expected }}\n\n要求：\n1. 创建/修改必要的代码文件\n2. 确保代码符合TypeScript最佳实践\n3. 添加必要的类型定义和错误处理\n4. 完成后输出 JSON：{\"task_id\": \"{{ $json.id }}\", \"status\": \"success\", \"files_created\": [...], \"files_modified\": [...]}' --model sonnet --allowedTools \"Read,Write,Edit,Glob,Grep,Bash\" 2>&1 | tail -100"
       },
       "id": "claude-b-execute",
       "name": "SSH Claude B - 执行任务",
@@ -153,7 +153,7 @@
     {
       "parameters": {
         "authentication": "privateKey",
-        "command": "=cd {{ $json.projectPath }} && claude -p '你是代码审查员。快速检查本次修改的代码质量：\n\n修改的文件：\n{{ JSON.stringify($json.results.map(r => [...(r.files_created || []), ...(r.files_modified || [])].flat()), null, 2) }}\n\n只检查以下几点：\n1. 是否有明显的 bug\n2. 是否有未处理的错误\n3. 是否有安全问题\n\n返回 JSON：{\"check\": \"quality\", \"pass\": true/false, \"issues\": [{\"file\": \"xxx\", \"line\": 10, \"issue\": \"描述\"}]}' --model sonnet --allowedTools \"Read,Grep\" 2>&1 | tail -50"
+        "command": "=cd {{ $json.projectPath }} && timeout -k 10 1800 claude -p '你是代码审查员。快速检查本次修改的代码质量：\n\n修改的文件：\n{{ JSON.stringify($json.results.map(r => [...(r.files_created || []), ...(r.files_modified || [])].flat()), null, 2) }}\n\n只检查以下几点：\n1. 是否有明显的 bug\n2. 是否有未处理的错误\n3. 是否有安全问题\n\n返回 JSON：{\"check\": \"quality\", \"pass\": true/false, \"issues\": [{\"file\": \"xxx\", \"line\": 10, \"issue\": \"描述\"}]}' --model sonnet --allowedTools \"Read,Grep\" 2>&1 | tail -50"
       },
       "id": "claude-c-soft-check",
       "name": "SSH Claude C - 软检查",
@@ -258,7 +258,7 @@
     {
       "parameters": {
         "authentication": "privateKey",
-        "command": "=cd {{ $json.projectPath }} && claude -p '你是技术文档工程师。为本次代码变更创建简短文档：\n\n变更摘要：\n- 成功任务: {{ $json.successCount }}\n- 失败任务: {{ $json.errorCount }}\n- 结果: {{ $json.decision }}\n\n在项目根目录的 CHANGELOG.md 添加一条记录（如果文件不存在则创建）。\n格式：\n## [Unreleased] - {{ $json.timestamp.slice(0,10) }}\n- 变更说明\n\n完成后输出：DOCS_COMPLETE' --model sonnet --allowedTools \"Read,Write,Edit\" 2>&1 | tail -30"
+        "command": "=cd {{ $json.projectPath }} && timeout -k 10 1800 claude -p '你是技术文档工程师。为本次代码变更创建简短文档：\n\n变更摘要：\n- 成功任务: {{ $json.successCount }}\n- 失败任务: {{ $json.errorCount }}\n- 结果: {{ $json.decision }}\n\n在项目根目录的 CHANGELOG.md 添加一条记录（如果文件不存在则创建）。\n格式：\n## [Unreleased] - {{ $json.timestamp.slice(0,10) }}\n- 变更说明\n\n完成后输出：DOCS_COMPLETE' --model sonnet --allowedTools \"Read,Write,Edit\" 2>&1 | tail -30"
       },
       "id": "claude-d-docs",
       "name": "SSH Claude D - 文档生成",
