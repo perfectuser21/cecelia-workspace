@@ -23,11 +23,13 @@ import {
   X,
   TrendingUp,
   Radio,
+  Map,
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import PrivateRoute from './components/PrivateRoute';
 import Dashboard from './pages/Dashboard';
+import ProjectPanorama from './pages/ProjectPanorama';
 import LoginPage from './pages/LoginPage';
 import FeishuLogin from './pages/FeishuLogin';
 import ContentPublish from './pages/ContentPublish';
@@ -91,7 +93,10 @@ function AppContent() {
       title: '系统',
       items: [
         { path: '/tools', icon: Sparkles, label: '工具箱' },
-        ...(isSuperAdmin ? [{ path: '/settings', icon: Settings, label: '设置' }] : []),
+        ...(isSuperAdmin ? [
+          { path: '/panorama', icon: Map, label: '我的空间' },
+          { path: '/settings', icon: Settings, label: '管理员' },
+        ] : []),
       ]
     }
   ];
@@ -316,6 +321,14 @@ function AppContent() {
               element={
                 <PrivateRoute>
                   <Dashboard />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/panorama"
+              element={
+                <PrivateRoute>
+                  <ProjectPanorama />
                 </PrivateRoute>
               }
             />
