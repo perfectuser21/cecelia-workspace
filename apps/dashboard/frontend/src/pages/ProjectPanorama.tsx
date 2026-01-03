@@ -380,19 +380,39 @@ const NODE_W = 180, NODE_H = 64;
 const PREVIEW_NODE_W = 160, PREVIEW_NODE_H = 56;
 
 // 维度定义
-type ViewDimension = 'blueprint' | 'runtime' | 'code' | 'dataflow';
+type ViewDimension = 'blueprint' | 'runtime' | 'code' | 'dataflow' | 'workspace';
 
 const dimensionLabels: Record<ViewDimension, { name: string; desc: string }> = {
   blueprint: { name: '蓝图', desc: '我想做什么' },
   runtime: { name: '运行', desc: '机器人们在干嘛' },
   code: { name: '代码', desc: '我的项目们' },
   dataflow: { name: '数据流', desc: '任务怎么流转' },
+  workspace: { name: '工作区', desc: 'Claude 协作' },
 };
+
+// 工作区类型定义
+interface WorkspaceNode extends ArchNode {
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+interface WorkspaceData {
+  nodes: WorkspaceNode[];
+  edges: ArchEdge[];
+  title: string;
+  subtitle: string;
+  lastUpdated: number;
+}
 
 // 静态数据（蓝图维度）
 const blueprintData = allData;
 
-export default function ProjectPanorama() {
+interface ProjectPanoramaProps {
+  embedded?: boolean;
+  hideControls?: boolean;
+}
+
+export default function ProjectPanorama({ embedded = false, hideControls = false }: ProjectPanoramaProps) {
   // 当前维度
   const [dimension, setDimension] = useState<ViewDimension>('blueprint');
   const [path, setPath] = useState<string[]>(['root']);
@@ -413,8 +433,34 @@ export default function ProjectPanorama() {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
 
+  // 工作区数据
+  const [workspaceData, setWorkspaceData] = useState<WorkspaceData | null>(null);
+  const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingNode, setEditingNode] = useState<string | null>(null);
+  const [newNodeName, setNewNodeName] = useState('');
+
+  // 连线编辑状态
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
+  const [connectingMousePos, setConnectingMousePos] = useState({ x: 0, y: 0 });
+
   // 根据维度选择数据源
-  const allDataSource = dimension === 'blueprint' ? blueprintData : (dynamicData || {});
+  const getDataSource = (): Record<string, LayerData> => {
+    if (dimension === 'blueprint') return blueprintData;
+    if (dimension === 'workspace' && workspaceData) {
+      return {
+        'workspace-root': {
+          title: workspaceData.title,
+          subtitle: workspaceData.subtitle,
+          nodes: workspaceData.nodes,
+          edges: workspaceData.edges,
+        },
+      };
+    }
+    return dynamicData || {};
+  };
+  const allDataSource = getDataSource();
 
   // 画布平移和缩放
   const [canvasZoom, setCanvasZoom] = useState(1);
@@ -457,12 +503,149 @@ export default function ProjectPanorama() {
     }
   }, []);
 
+  // 从 API 获取工作区数据
+  const fetchWorkspaceData = useCallback(async () => {
+    try {
+      setIsWorkspaceLoading(true);
+      const res = await fetch(`${API_BASE}/api/v1/panorama/workspace`);
+      if (!res.ok) throw new Error('Failed to fetch workspace');
+      const data = await res.json();
+      setWorkspaceData(data);
+    } catch (error) {
+      console.warn('Failed to fetch workspace data:', error);
+    } finally {
+      setIsWorkspaceLoading(false);
+    }
+  }, []);
+
+  // 保存工作区数据
+  const saveWorkspace = useCallback(async (updates: Partial<WorkspaceData>) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/panorama/workspace`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) throw new Error('Failed to save workspace');
+      const data = await res.json();
+      if (data.workspace) setWorkspaceData(data.workspace);
+    } catch (error) {
+      console.warn('Failed to save workspace:', error);
+    }
+  }, []);
+
+  // 添加节点到工作区
+  const addWorkspaceNode = useCallback(async (name: string) => {
+    if (!name.trim()) return;
+    const newNode: WorkspaceNode = {
+      id: `node-${Date.now()}`,
+      name: name.trim(),
+      x: 60 + (workspaceData?.nodes.length || 0) % 4 * 210,
+      y: 60 + Math.floor((workspaceData?.nodes.length || 0) / 4) * 100,
+      status: 'not_started',
+      type: 'feature',
+    };
+    const nodes = [...(workspaceData?.nodes || []), newNode];
+    await saveWorkspace({ nodes });
+    setNewNodeName('');
+  }, [workspaceData, saveWorkspace]);
+
+  // 删除工作区节点
+  const deleteWorkspaceNode = useCallback(async (nodeId: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/panorama/workspace/node/${nodeId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to delete node');
+      await fetchWorkspaceData();
+    } catch (error) {
+      console.warn('Failed to delete node:', error);
+    }
+  }, [fetchWorkspaceData]);
+
+  // 更新工作区节点
+  const updateWorkspaceNode = useCallback(async (nodeId: string, updates: Partial<WorkspaceNode>) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/panorama/workspace/node/${nodeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) throw new Error('Failed to update node');
+      await fetchWorkspaceData();
+    } catch (error) {
+      console.warn('Failed to update node:', error);
+    }
+  }, [fetchWorkspaceData]);
+
+  // 清空工作区
+  const clearWorkspace = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/panorama/workspace`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to clear workspace');
+      await fetchWorkspaceData();
+    } catch (error) {
+      console.warn('Failed to clear workspace:', error);
+    }
+  }, [fetchWorkspaceData]);
+
+  // 添加连线
+  const addWorkspaceEdge = useCallback(async (from: string, to: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/panorama/workspace/edge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from, to }),
+      });
+      if (!res.ok) throw new Error('Failed to add edge');
+      await fetchWorkspaceData();
+    } catch (error) {
+      console.warn('Failed to add edge:', error);
+    }
+  }, [fetchWorkspaceData]);
+
+  // 删除连线
+  const deleteWorkspaceEdge = useCallback(async (from: string, to: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/panorama/workspace/edge`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from, to }),
+      });
+      if (!res.ok) throw new Error('Failed to delete edge');
+      await fetchWorkspaceData();
+    } catch (error) {
+      console.warn('Failed to delete edge:', error);
+    }
+  }, [fetchWorkspaceData]);
+
+  // 开始连线
+  const startConnecting = useCallback((nodeId: string) => {
+    setConnectingFrom(nodeId);
+  }, []);
+
+  // 完成连线
+  const finishConnecting = useCallback(async (toNodeId: string) => {
+    if (connectingFrom && connectingFrom !== toNodeId) {
+      await addWorkspaceEdge(connectingFrom, toNodeId);
+    }
+    setConnectingFrom(null);
+  }, [connectingFrom, addWorkspaceEdge]);
+
+  // 取消连线
+  const cancelConnecting = useCallback(() => {
+    setConnectingFrom(null);
+  }, []);
+
   // 各维度的根节点 ID
   const dimensionRootIds: Record<ViewDimension, string> = {
     blueprint: 'root',           // 蓝图用静态数据的 root
     runtime: 'runtime-root',     // 运行：机器人状态
     code: 'code-root',           // 代码：项目列表
     dataflow: 'dataflow-root',   // 数据流：任务流转
+    workspace: 'workspace-root', // 工作区：Claude 协作
   };
 
   // 切换维度时加载数据
@@ -475,12 +658,18 @@ export default function ProjectPanorama() {
     setSelectedNodes(new Set());
     setCanvasZoom(1);
     setCanvasPan({ x: 0, y: 0 });
+    setIsEditing(false);
+    setEditingNode(null);
+    setIsConnecting(false);
+    setConnectingFrom(null);
 
-    // 非蓝图维度需要加载数据
-    if (newDim !== 'blueprint' && !dynamicData) {
+    // 加载对应维度数据
+    if (newDim === 'workspace') {
+      fetchWorkspaceData();
+    } else if (newDim !== 'blueprint' && !dynamicData) {
       fetchDynamicData();
     }
-  }, [dynamicData, fetchDynamicData]);
+  }, [dynamicData, fetchDynamicData, fetchWorkspaceData]);
 
   const currentId = path[path.length - 1];
   const currentData = allDataSource[currentId];
@@ -605,6 +794,12 @@ export default function ProjectPanorama() {
   // 开始框选或平移
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
     if (e.target !== svgRef.current && (e.target as Element).tagName !== 'rect') return;
+
+    // 取消连线模式
+    if (connectingFrom) {
+      cancelConnecting();
+      return;
+    }
 
     // 关闭侧边栏
     if (sidebarOpen) setSidebarOpen(false);
@@ -780,16 +975,22 @@ export default function ProjectPanorama() {
   };
 
   return (
-    // 根据 isFullscreen 切换：全屏覆盖 vs 嵌入Dashboard
+    // 根据 isFullscreen 或 embedded 切换样式
     <div
-      className={isFullscreen
-        ? "fixed inset-0 z-50 flex"
-        : "flex -m-8 rounded-none"  // 抵消父容器的 p-8
+      className={
+        embedded
+          ? "flex w-full h-full"  // 嵌入模式：填满父容器
+          : isFullscreen
+            ? "fixed inset-0 z-50 flex"
+            : "flex -m-8 rounded-none"  // 抵消父容器的 p-8
       }
       style={{
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
-        // 嵌入模式：占满内容区（100vh - 顶部栏64px）
-        ...(isFullscreen ? {} : { height: 'calc(100vh - 64px)' })
+        // 嵌入模式使用透明背景，由父容器控制背景色
+        ...(embedded ? {} : {
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
+        }),
+        // 非嵌入非全屏模式：占满内容区（100vh - 顶部栏64px）
+        ...(!embedded && !isFullscreen ? { height: 'calc(100vh - 64px)' } : {})
       }}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -876,7 +1077,7 @@ export default function ProjectPanorama() {
       {/* 主内容区 */}
       <div className="flex-1 flex flex-col">
         {/* 顶部导航 */}
-        <div className="h-14 flex items-center gap-3 px-16">
+        <div className={`h-14 flex items-center gap-3 ${embedded ? 'px-4' : 'px-16'}`}>
           {/* 维度切换标签 */}
           <div className="flex items-center gap-1 p-1 bg-slate-800/50 border border-slate-700/50 rounded-xl">
             {(Object.keys(dimensionLabels) as ViewDimension[]).map(dim => (
@@ -925,8 +1126,73 @@ export default function ProjectPanorama() {
 
           {/* 工具栏 */}
           <div className="flex items-center gap-2 ml-auto">
-            {/* 数据源指示器 - 只在非蓝图维度显示 */}
-            {dimension !== 'blueprint' && (
+            {/* 工作区工具栏 */}
+            {dimension === 'workspace' && (
+              <div className="flex items-center gap-2">
+                {/* 添加节点输入框 */}
+                <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/50 border border-slate-700/50 rounded-lg">
+                  <input
+                    type="text"
+                    value={newNodeName}
+                    onChange={e => setNewNodeName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addWorkspaceNode(newNodeName)}
+                    placeholder="新节点名称..."
+                    className="w-32 bg-transparent text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={() => addWorkspaceNode(newNodeName)}
+                    disabled={!newNodeName.trim()}
+                    className="px-2 py-0.5 text-xs bg-blue-500/20 text-blue-300 rounded hover:bg-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    添加
+                  </button>
+                </div>
+                {/* 编辑模式开关 */}
+                <button
+                  onClick={() => { setIsEditing(!isEditing); setIsConnecting(false); setConnectingFrom(null); }}
+                  className={`px-3 py-1.5 text-xs rounded-lg transition-all ${
+                    isEditing
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      : 'text-slate-400 bg-slate-800/50 border border-slate-700/50 hover:text-slate-200'
+                  }`}
+                >
+                  {isEditing ? '退出编辑' : '编辑模式'}
+                </button>
+                {/* 连线模式开关 */}
+                <button
+                  onClick={() => { setIsConnecting(!isConnecting); setIsEditing(false); setConnectingFrom(null); }}
+                  className={`px-3 py-1.5 text-xs rounded-lg transition-all ${
+                    isConnecting
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : 'text-slate-400 bg-slate-800/50 border border-slate-700/50 hover:text-slate-200'
+                  }`}
+                >
+                  {isConnecting ? (connectingFrom ? '选择目标...' : '选择起点...') : '连线模式'}
+                </button>
+                {/* 清空 */}
+                {workspaceData?.nodes && workspaceData.nodes.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (confirm('确定清空工作区？')) clearWorkspace();
+                    }}
+                    className="px-2 py-1.5 text-xs text-red-400 bg-slate-800/50 border border-slate-700/50 rounded-lg hover:bg-red-500/10 hover:border-red-500/30"
+                  >
+                    清空
+                  </button>
+                )}
+                {/* 刷新 */}
+                <button
+                  onClick={fetchWorkspaceData}
+                  disabled={isWorkspaceLoading}
+                  className="p-1.5 text-slate-400 bg-slate-800/50 border border-slate-700/50 rounded-lg hover:text-slate-200 disabled:opacity-50"
+                  title="刷新工作区"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isWorkspaceLoading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            )}
+            {/* 数据源指示器 - 只在运行/代码/数据流维度显示 */}
+            {dimension !== 'blueprint' && dimension !== 'workspace' && (
               <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-800/50 border border-slate-700/50 rounded-lg">
                 {isLoading ? (
                   <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin" />
@@ -977,15 +1243,17 @@ export default function ProjectPanorama() {
                 <div className="w-px h-6 bg-slate-700/50 mx-1" />
               </>
             )}
-            {/* 全屏按钮 - 始终显示 */}
-            <button
-              onClick={toggleFullscreen}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-300 bg-slate-800/50 border border-slate-700/50 rounded-lg hover:bg-slate-700/50 transition-colors"
-              title={isFullscreen ? "退出全屏 (Esc)" : "进入全屏 (F)"}
-            >
-              {isFullscreen ? <X className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
-              {isFullscreen ? '退出' : '全屏'}
-            </button>
+            {/* 全屏按钮 - 非嵌入模式显示 */}
+            {!embedded && (
+              <button
+                onClick={toggleFullscreen}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-300 bg-slate-800/50 border border-slate-700/50 rounded-lg hover:bg-slate-700/50 transition-colors"
+                title={isFullscreen ? "退出全屏 (Esc)" : "进入全屏 (F)"}
+              >
+                {isFullscreen ? <X className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
+                {isFullscreen ? '退出' : '全屏'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -1135,12 +1403,59 @@ export default function ProjectPanorama() {
 
               {/* 主内容组 - 应用缩放和平移 */}
               <g transform={`translate(${canvasPan.x}, ${canvasPan.y}) scale(${canvasZoom})`}>
+              {/* 工作区空状态 */}
+              {dimension === 'workspace' && (!currentData?.nodes || currentData.nodes.length === 0) && (
+                <g transform="translate(200, 150)">
+                  <rect x={-150} y={-80} width={300} height={160} rx={16} fill="rgba(30,41,59,0.8)" stroke="rgba(71,85,105,0.5)" strokeWidth={1} strokeDasharray="4 2" />
+                  <text x={0} y={-20} fill="#94a3b8" fontSize={14} textAnchor="middle">工作区是空的</text>
+                  <text x={0} y={10} fill="#64748b" fontSize={12} textAnchor="middle">在上方输入名称添加节点</text>
+                  <text x={0} y={40} fill="#64748b" fontSize={12} textAnchor="middle">或等待 Claude 推送架构方案</text>
+                </g>
+              )}
               {currentData?.edges?.map((e, i) => {
                 const from = currentData.nodes?.find(n => n.id === e.from), to = currentData.nodes?.find(n => n.id === e.to);
                 if (!from || !to) return null;
                 const fp = getNodePos(from), tp = getNodePos(to);
-                return <path key={i} d={`M ${fp.x + NODE_W} ${fp.y + NODE_H/2} C ${(fp.x + NODE_W + tp.x)/2} ${fp.y + NODE_H/2}, ${(fp.x + NODE_W + tp.x)/2} ${tp.y + NODE_H/2}, ${tp.x} ${tp.y + NODE_H/2}`} fill="none" stroke="#475569" strokeWidth={2} />;
+                const pathD = `M ${fp.x + NODE_W} ${fp.y + NODE_H/2} C ${(fp.x + NODE_W + tp.x)/2} ${fp.y + NODE_H/2}, ${(fp.x + NODE_W + tp.x)/2} ${tp.y + NODE_H/2}, ${tp.x} ${tp.y + NODE_H/2}`;
+                const isWorkspaceEditing = dimension === 'workspace' && isEditing;
+                return (
+                  <g key={i}>
+                    {/* 点击区域（更宽，便于点击） */}
+                    {isWorkspaceEditing && (
+                      <path
+                        d={pathD}
+                        fill="none"
+                        stroke="transparent"
+                        strokeWidth={12}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => {
+                          if (confirm(`删除连线 ${from.name} → ${to.name}?`)) {
+                            deleteWorkspaceEdge(e.from, e.to);
+                          }
+                        }}
+                      />
+                    )}
+                    <path d={pathD} fill="none" stroke={isWorkspaceEditing ? '#ef4444' : '#475569'} strokeWidth={2} pointerEvents="none" />
+                  </g>
+                );
               })}
+              {/* 连线预览 */}
+              {dimension === 'workspace' && isConnecting && connectingFrom && hovered && connectingFrom !== hovered.id && (() => {
+                const fromNode = currentData?.nodes?.find(n => n.id === connectingFrom);
+                if (!fromNode) return null;
+                const fp = getNodePos(fromNode);
+                const tp = getNodePos(hovered);
+                return (
+                  <path
+                    d={`M ${fp.x + NODE_W} ${fp.y + NODE_H/2} C ${(fp.x + NODE_W + tp.x)/2} ${fp.y + NODE_H/2}, ${(fp.x + NODE_W + tp.x)/2} ${tp.y + NODE_H/2}, ${tp.x} ${tp.y + NODE_H/2}`}
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    strokeDasharray="6 3"
+                    pointerEvents="none"
+                  />
+                );
+              })()}
               {currentData?.nodes?.map(node => {
                 const pos = getNodePos(node);
                 const tc = typeColors[node.type] || typeColors.feature;
@@ -1155,6 +1470,15 @@ export default function ProjectPanorama() {
                     onMouseLeave={() => setHovered(null)}
                     onClick={e => {
                       e.stopPropagation();
+                      // 工作区连线模式
+                      if (dimension === 'workspace' && isConnecting) {
+                        if (!connectingFrom) {
+                          startConnecting(node.id);
+                        } else {
+                          finishConnecting(node.id);
+                        }
+                        return;
+                      }
                       if (e.ctrlKey || e.metaKey) {
                         // Ctrl+Click: 切换多选
                         toggleNodeSelection(node.id);
@@ -1166,6 +1490,13 @@ export default function ProjectPanorama() {
                     }}
                     onDoubleClick={() => canDrill && goTo(node.id)}
                   >
+                    {/* 连线起点高亮 */}
+                    {dimension === 'workspace' && isConnecting && connectingFrom === node.id && (
+                      <>
+                        <rect x={-8} y={-8} width={NODE_W+16} height={NODE_H+16} rx={16} fill="none" stroke="rgba(16,185,129,0.3)" strokeWidth={1} />
+                        <rect x={-4} y={-4} width={NODE_W+8} height={NODE_H+8} rx={12} fill="none" stroke="#10b981" strokeWidth={2} />
+                      </>
+                    )}
                     {/* 多选高亮 - 柔和蓝色光晕 */}
                     {isMultiSel && (
                       <>
@@ -1174,7 +1505,7 @@ export default function ProjectPanorama() {
                       </>
                     )}
                     {/* 单选/悬停高亮 */}
-                    {(isHov || isSel) && !isMultiSel && <rect x={-4} y={-4} width={NODE_W+8} height={NODE_H+8} rx={12} fill="none" stroke={isSel ? '#fbbf24' : '#60a5fa'} strokeWidth={2} />}
+                    {(isHov || isSel) && !isMultiSel && connectingFrom !== node.id && <rect x={-4} y={-4} width={NODE_W+8} height={NODE_H+8} rx={12} fill="none" stroke={isSel ? '#fbbf24' : '#60a5fa'} strokeWidth={2} />}
                     <rect width={NODE_W} height={NODE_H} rx={10} fill={isMultiSel ? 'rgba(96,165,250,0.08)' : node.current ? 'rgba(96,165,250,0.15)' : tc.bg} stroke={isMultiSel ? 'rgba(96,165,250,0.5)' : tc.border} strokeWidth={isMultiSel ? 1.5 : node.current ? 2 : 1.5} style={{ cursor: dragging === node.id ? 'grabbing' : 'grab' }} />
                     <rect width={4} height={NODE_H} rx={2} fill={tc.fill} />
                     <circle cx={18} cy={NODE_H/2} r={5} fill={statusColors[node.status]} />
@@ -1205,6 +1536,22 @@ export default function ProjectPanorama() {
                     </foreignObject>
                     {canDrill && <text x={NODE_W-14} y={NODE_H-12} fill="#64748b" fontSize={14}>→</text>}
                     {node.current && <g transform={`translate(${NODE_W-32}, ${NODE_H-16})`}><rect width={26} height={12} rx={3} fill="#60a5fa" /><text x={13} y={9} fill="#fff" fontSize={8} textAnchor="middle" fontWeight={500}>NOW</text></g>}
+                    {/* 工作区编辑模式下的删除按钮 */}
+                    {dimension === 'workspace' && isEditing && (
+                      <g
+                        transform={`translate(${NODE_W - 20}, 4)`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`删除节点 "${node.name}"?`)) {
+                            deleteWorkspaceNode(node.id);
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <circle r={8} fill="rgba(239, 68, 68, 0.2)" stroke="rgba(239, 68, 68, 0.5)" strokeWidth={1} />
+                        <text x={0} y={4} fill="#ef4444" fontSize={12} textAnchor="middle" fontWeight="bold">×</text>
+                      </g>
+                    )}
                   </g>
                 );
               })}

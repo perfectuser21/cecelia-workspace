@@ -9,12 +9,17 @@ import {
   ProjectInfo,
   ServiceInfo,
   PanoramaResponse,
+  WhiteboardProject,
 } from './panorama.types';
 import logger from '../../shared/utils/logger';
 
 const DEV_ROOT = '/home/xx/dev';
 const NODE_W = 180;  // 与前端 NODE_W 保持一致
 const NODE_H = 64;   // 与前端 NODE_H 保持一致
+
+// 白板项目存储路径（使用应用程序目录下的 data 目录）
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
+const PROJECTS_FILE = path.join(DATA_DIR, 'whiteboard-projects.json');
 
 // Layout constants for auto-positioning
 const GRID_X = 210;  // 节点间距（NODE_W + 30）
@@ -51,10 +56,34 @@ const SERVICE_GROUPS: Record<string, { name: string; desc: string; containers: s
   },
 };
 
+// 工作区节点类型
+interface WorkspaceNode extends PanoramaNode {
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+// 工作区数据
+interface WorkspaceData {
+  nodes: WorkspaceNode[];
+  edges: PanoramaEdge[];
+  title: string;
+  subtitle: string;
+  lastUpdated: number;
+}
+
 class PanoramaService {
   private cache: PanoramaResponse | null = null;
   private cacheTime: number = 0;
   private readonly CACHE_TTL = 60 * 1000; // 1 minute cache
+
+  // 工作区数据（内存存储，后续可持久化）
+  private workspace: WorkspaceData = {
+    nodes: [],
+    edges: [],
+    title: '工作区',
+    subtitle: '实时规划中',
+    lastUpdated: Date.now(),
+  };
 
   /**
    * Get all panorama data (with caching)
@@ -701,6 +730,288 @@ class PanoramaService {
   private truncateName(name: string, maxLen: number = 15): string {
     if (name.length <= maxLen) return name;
     return name.slice(0, maxLen - 2) + '..';
+  }
+
+  // ========== 工作区 CRUD 方法 ==========
+
+  /**
+   * 获取工作区数据
+   */
+  getWorkspace(): WorkspaceData & { layerData: LayerData } {
+    return {
+      ...this.workspace,
+      layerData: {
+        title: this.workspace.title,
+        subtitle: this.workspace.subtitle,
+        nodes: this.workspace.nodes,
+        edges: this.workspace.edges,
+      },
+    };
+  }
+
+  /**
+   * 推送节点到工作区（Claude 调用）
+   */
+  pushNodes(nodes: Partial<WorkspaceNode>[], edges?: PanoramaEdge[], options?: { replace?: boolean; title?: string; subtitle?: string }): WorkspaceData {
+    const now = Date.now();
+
+    if (options?.replace) {
+      // 替换模式：清空后添加
+      this.workspace.nodes = [];
+      this.workspace.edges = [];
+    }
+
+    // 添加节点，自动布局
+    const existingCount = this.workspace.nodes.length;
+    const newNodes: WorkspaceNode[] = nodes.map((n, i) => {
+      const idx = existingCount + i;
+      const cols = 4;
+      return {
+        id: n.id || `node-${now}-${i}`,
+        x: n.x ?? START_X + (idx % cols) * GRID_X,
+        y: n.y ?? START_Y + Math.floor(idx / cols) * GRID_Y,
+        name: n.name || '未命名',
+        desc: n.desc || '',
+        status: n.status || 'not_started',
+        type: n.type || 'feature',
+        hasChildren: n.hasChildren || false,
+        createdAt: now,
+        updatedAt: now,
+      };
+    });
+
+    this.workspace.nodes.push(...newNodes);
+    if (edges) {
+      this.workspace.edges.push(...edges);
+    }
+    if (options?.title) this.workspace.title = options.title;
+    if (options?.subtitle) this.workspace.subtitle = options.subtitle;
+    this.workspace.lastUpdated = now;
+
+    logger.info('Workspace nodes pushed', { count: newNodes.length, total: this.workspace.nodes.length });
+    return this.workspace;
+  }
+
+  /**
+   * 更新工作区（前端编辑）
+   */
+  updateWorkspace(data: { nodes?: WorkspaceNode[]; edges?: PanoramaEdge[]; title?: string; subtitle?: string }): WorkspaceData {
+    const now = Date.now();
+
+    if (data.nodes) {
+      this.workspace.nodes = data.nodes.map(n => ({
+        ...n,
+        updatedAt: now,
+      }));
+    }
+    if (data.edges) {
+      this.workspace.edges = data.edges;
+    }
+    if (data.title) this.workspace.title = data.title;
+    if (data.subtitle) this.workspace.subtitle = data.subtitle;
+    this.workspace.lastUpdated = now;
+
+    logger.info('Workspace updated', { nodes: this.workspace.nodes.length, edges: this.workspace.edges.length });
+    return this.workspace;
+  }
+
+  /**
+   * 更新单个节点
+   */
+  updateNode(nodeId: string, updates: Partial<WorkspaceNode>): WorkspaceNode | null {
+    const idx = this.workspace.nodes.findIndex(n => n.id === nodeId);
+    if (idx === -1) return null;
+
+    this.workspace.nodes[idx] = {
+      ...this.workspace.nodes[idx],
+      ...updates,
+      updatedAt: Date.now(),
+    };
+    this.workspace.lastUpdated = Date.now();
+    return this.workspace.nodes[idx];
+  }
+
+  /**
+   * 删除节点
+   */
+  deleteNode(nodeId: string): boolean {
+    const idx = this.workspace.nodes.findIndex(n => n.id === nodeId);
+    if (idx === -1) return false;
+
+    this.workspace.nodes.splice(idx, 1);
+    // 删除相关的边
+    this.workspace.edges = this.workspace.edges.filter(e => e.from !== nodeId && e.to !== nodeId);
+    this.workspace.lastUpdated = Date.now();
+    return true;
+  }
+
+  /**
+   * 添加边
+   */
+  addEdge(from: string, to: string): PanoramaEdge | null {
+    // 检查节点是否存在
+    const fromExists = this.workspace.nodes.some(n => n.id === from);
+    const toExists = this.workspace.nodes.some(n => n.id === to);
+    if (!fromExists || !toExists) return null;
+
+    // 检查边是否已存在
+    const exists = this.workspace.edges.some(e => e.from === from && e.to === to);
+    if (exists) return null;
+
+    const edge = { from, to };
+    this.workspace.edges.push(edge);
+    this.workspace.lastUpdated = Date.now();
+    return edge;
+  }
+
+  /**
+   * 删除边
+   */
+  deleteEdge(from: string, to: string): boolean {
+    const idx = this.workspace.edges.findIndex(e => e.from === from && e.to === to);
+    if (idx === -1) return false;
+
+    this.workspace.edges.splice(idx, 1);
+    this.workspace.lastUpdated = Date.now();
+    return true;
+  }
+
+  /**
+   * 清空工作区
+   */
+  clearWorkspace(): void {
+    this.workspace = {
+      nodes: [],
+      edges: [],
+      title: '工作区',
+      subtitle: '实时规划中',
+      lastUpdated: Date.now(),
+    };
+    logger.info('Workspace cleared');
+  }
+
+  // ========== 白板项目管理方法 ==========
+
+  /**
+   * 从文件加载项目数据
+   */
+  private loadProjects(): WhiteboardProject[] {
+    try {
+      if (fs.existsSync(PROJECTS_FILE)) {
+        const data = fs.readFileSync(PROJECTS_FILE, 'utf-8');
+        const projects = JSON.parse(data) as WhiteboardProject[];
+        // 转换日期字符串为 Date 对象
+        return projects.map(p => ({
+          ...p,
+          createdAt: new Date(p.createdAt),
+          updatedAt: new Date(p.updatedAt),
+        }));
+      }
+    } catch (error) {
+      logger.error('Failed to load projects', { error });
+    }
+    return [];
+  }
+
+  /**
+   * 保存项目数据到文件
+   */
+  private saveProjects(projects: WhiteboardProject[]): void {
+    try {
+      // 确保目录存在
+      const dir = path.dirname(PROJECTS_FILE);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(PROJECTS_FILE, JSON.stringify(projects, null, 2), 'utf-8');
+      logger.info('Projects saved', { count: projects.length });
+    } catch (error) {
+      logger.error('Failed to save projects', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * 获取所有项目列表（不包含 nodes 和 edges）
+   */
+  getAllProjects(): Omit<WhiteboardProject, 'nodes' | 'edges'>[] {
+    const projects = this.loadProjects();
+    return projects.map(({ id, name, createdAt, updatedAt }) => ({
+      id,
+      name,
+      createdAt,
+      updatedAt,
+    }));
+  }
+
+  /**
+   * 获取单个项目（包含 nodes 和 edges）
+   */
+  getProject(id: string): WhiteboardProject | null {
+    const projects = this.loadProjects();
+    return projects.find(p => p.id === id) || null;
+  }
+
+  /**
+   * 创建新项目
+   */
+  createProject(name: string): WhiteboardProject {
+    const projects = this.loadProjects();
+    const now = new Date();
+    const newProject: WhiteboardProject = {
+      id: `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name,
+      nodes: [],
+      edges: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    projects.push(newProject);
+    this.saveProjects(projects);
+    logger.info('Project created', { id: newProject.id, name });
+    return newProject;
+  }
+
+  /**
+   * 更新项目（保存 nodes 和 edges）
+   */
+  updateProject(id: string, data: { name?: string; nodes?: PanoramaNode[]; edges?: PanoramaEdge[] }): WhiteboardProject | null {
+    const projects = this.loadProjects();
+    const idx = projects.findIndex(p => p.id === id);
+    if (idx === -1) return null;
+
+    const updated: WhiteboardProject = {
+      ...projects[idx],
+      ...(data.name && { name: data.name }),
+      ...(data.nodes && { nodes: data.nodes }),
+      ...(data.edges && { edges: data.edges }),
+      updatedAt: new Date(),
+    };
+    projects[idx] = updated;
+    this.saveProjects(projects);
+    logger.info('Project updated', { id, name: updated.name });
+    return updated;
+  }
+
+  /**
+   * 重命名项目
+   */
+  renameProject(id: string, name: string): WhiteboardProject | null {
+    return this.updateProject(id, { name });
+  }
+
+  /**
+   * 删除项目
+   */
+  deleteProject(id: string): boolean {
+    const projects = this.loadProjects();
+    const idx = projects.findIndex(p => p.id === id);
+    if (idx === -1) return false;
+
+    projects.splice(idx, 1);
+    this.saveProjects(projects);
+    logger.info('Project deleted', { id });
+    return true;
   }
 }
 

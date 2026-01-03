@@ -23,13 +23,13 @@ import {
   X,
   TrendingUp,
   Radio,
-  Map,
+  Palette,
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import PrivateRoute from './components/PrivateRoute';
 import Dashboard from './pages/Dashboard';
-import ProjectPanorama from './pages/ProjectPanorama';
+import Canvas from './pages/Canvas';
 import LoginPage from './pages/LoginPage';
 import FeishuLogin from './pages/FeishuLogin';
 import ContentPublish from './pages/ContentPublish';
@@ -94,7 +94,7 @@ function AppContent() {
       items: [
         { path: '/tools', icon: Sparkles, label: '工具箱' },
         ...(isSuperAdmin ? [
-          { path: '/panorama', icon: Map, label: '我的空间' },
+          { path: '/canvas', icon: Palette, label: '画布' },
           { path: '/settings', icon: Settings, label: '管理员' },
         ] : []),
       ]
@@ -325,13 +325,16 @@ function AppContent() {
               }
             />
             <Route
-              path="/panorama"
+              path="/canvas"
               element={
                 <PrivateRoute>
-                  <ProjectPanorama />
+                  {isSuperAdmin ? <Canvas /> : <Navigate to="/" replace />}
                 </PrivateRoute>
               }
             />
+            {/* 兼容旧路由 */}
+            <Route path="/panorama" element={<Navigate to="/canvas" replace />} />
+            <Route path="/whiteboard" element={<Navigate to="/canvas" replace />} />
             <Route
               path="/data-center"
               element={

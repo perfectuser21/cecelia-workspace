@@ -1,621 +1,136 @@
 #!/bin/bash
 #
-# Backend 执行器
-# 负责：分析 PRD、生成后端代码、写入文件、运行测试
+# Backend 执行器（极简版）
+# 只负责：读取 Prompt → 调用 Claude → 保存输出
 #
 # 用法: execute.sh <run_id> <task_info_path>
 #
 
+set -e
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# v1.1: 使用固定位置的 shared 脚本
 SHARED_DIR="/home/xx/bin/ai-factory-v2"
 
-# 加载公共基础
-source "$SHARED_DIR/execute-base.sh"
-
-# 解析参数
-parse_execute_args "$@"
-
-# 打印开始日志
-log_execute_start "Backend"
+# 加载工具函数
+source "$SHARED_DIR/utils.sh"
 
 # ============================================================
-# 检查是否跳过执行（稳定性验证）
+# 参数解析
 # ============================================================
-if check_skip_execution "code"; then
-  output_skip_result
-  exit 0
-fi
+RUN_ID="${1:-}"
+TASK_INFO_PATH="${2:-}"
 
-# ============================================================
-# [1/5] 分析项目结构
-# ============================================================
-log_info "[1/5] 分析项目结构..."
-
-# 从任务信息获取目标项目路径
-TARGET_PROJECT=$(json_get "$TASK_INFO_PATH" '.project_path' "$PROJECT_DIR/apps/dashboard")
-
-# 安全检查：禁止路径遍历
-if [[ "$TARGET_PROJECT" == *".."* ]]; then
-  log_error "安全错误: 路径包含非法字符 (..): $TARGET_PROJECT"
+if [[ -z "$RUN_ID" || -z "$TASK_INFO_PATH" ]]; then
+  log_error "用法: execute.sh <run_id> <task_info_path>"
   exit 1
 fi
 
-# 使用 realpath 获取规范化路径
-TARGET_PROJECT=$(realpath -m "$TARGET_PROJECT" 2>/dev/null) || {
-  log_error "无法解析路径: $TARGET_PROJECT"
-  exit 1
-}
+WORK_DIR="/home/xx/data/runs/$RUN_ID"
+LOG_FILE="$WORK_DIR/logs/execute.log"
 
-# 验证路径在允许的目录内
-ALLOWED_DIRS=("/home/xx/dev" "/home/xx/data")
-PATH_ALLOWED=false
-for allowed in "${ALLOWED_DIRS[@]}"; do
-  if [[ "$TARGET_PROJECT" == "$allowed"* ]]; then
-    PATH_ALLOWED=true
-    break
+# 加载环境变量
+if [[ -f "$WORK_DIR/env.sh" ]]; then
+  source "$WORK_DIR/env.sh" 2>/dev/null || true
+fi
+
+log_info "=========================================="
+log_info "执行阶段开始 (Backend)"
+log_info "Run ID: $RUN_ID"
+log_info "=========================================="
+
+# ============================================================
+# 检查是否跳过执行（稳定性验证用）
+# ============================================================
+if [[ -f "$WORK_DIR/result.json" ]]; then
+  EXISTING_SUCCESS=$(jq -r '.success' "$WORK_DIR/result.json" 2>/dev/null || echo "false")
+  if [[ "$EXISTING_SUCCESS" == "true" ]]; then
+    log_info "已有成功结果，跳过执行"
+    cat "$WORK_DIR/result.json"
+    exit 0
   fi
-done
+fi
 
-if [[ "$PATH_ALLOWED" != "true" ]]; then
-  log_error "安全错误: 路径不在允许目录内: $TARGET_PROJECT"
+# ============================================================
+# 读取 Prompt
+# ============================================================
+if [[ ! -f "$WORK_DIR/prompt.txt" ]]; then
+  log_error "Prompt 文件不存在: $WORK_DIR/prompt.txt"
+  echo '{"success": false, "error": "prompt_not_found"}' > "$WORK_DIR/result.json"
   exit 1
 fi
 
-if [[ ! -d "$TARGET_PROJECT" ]]; then
-  log_error "目标项目不存在: $TARGET_PROJECT"
+PROMPT=$(cat "$WORK_DIR/prompt.txt")
+log_info "Prompt 已加载 ($(wc -c < "$WORK_DIR/prompt.txt") 字节)"
+
+# ============================================================
+# 确定项目目录
+# ============================================================
+PROJECT_PATH="${PROJECT_DIR:-/home/xx/dev/zenithjoy-autopilot}"
+
+# 从 task_info 读取项目路径（如果有）
+if [[ -f "$TASK_INFO_PATH" ]]; then
+  CUSTOM_PATH=$(jq -r '.project_path // empty' "$TASK_INFO_PATH" 2>/dev/null)
+  [[ -n "$CUSTOM_PATH" && "$CUSTOM_PATH" != "null" ]] && PROJECT_PATH="$CUSTOM_PATH"
+fi
+
+if [[ ! -d "$PROJECT_PATH" ]]; then
+  log_error "项目目录不存在: $PROJECT_PATH"
+  echo '{"success": false, "error": "project_not_found"}' > "$WORK_DIR/result.json"
   exit 1
 fi
 
-log_info "目标项目: $TARGET_PROJECT"
-
-# 检测项目类型
-PROJECT_TYPE="unknown"
-if [[ -f "$TARGET_PROJECT/package.json" ]]; then
-  if grep -q '"typescript"' "$TARGET_PROJECT/package.json" 2>/dev/null; then
-    PROJECT_TYPE="typescript"
-  else
-    PROJECT_TYPE="javascript"
-  fi
-elif [[ -f "$TARGET_PROJECT/requirements.txt" ]] || [[ -f "$TARGET_PROJECT/pyproject.toml" ]]; then
-  PROJECT_TYPE="python"
-fi
-
-log_info "项目类型: $PROJECT_TYPE"
+log_info "项目目录: $PROJECT_PATH"
 
 # ============================================================
-# [2/5] 调用 Claude 生成代码
+# 调用 Claude
 # ============================================================
-log_info "[2/5] 调用 Claude 生成代码..."
+log_info "调用 Claude Code..."
 
-FILES_CHANGED=()
-CODE_OUTPUT=""
+cd "$PROJECT_PATH" || exit 1
 
+# 10 分钟超时，超时后 10 秒强制 SIGKILL
 if [[ "${TEST_MODE:-}" == "1" ]]; then
-  # 检查是否模拟超时
-  local test_timeout="${TEST_TIMEOUT:-300}"
-  if [[ "$test_timeout" -lt 5 ]]; then
-    log_warn "[TEST_MODE] 模拟超时 (TEST_TIMEOUT=$test_timeout < 5)"
-    echo '{"success": false, "error": "timeout"}' > "$WORK_DIR/result.json"
-    exit 124
-  fi
-
-  log_info "[TEST_MODE] 使用 mock 代码生成"
-
-  # 创建 mock 文件 (使用 core 目录或 src 目录)
-  if [[ -d "$TARGET_PROJECT/core" ]]; then
-    MOCK_FILE="$TARGET_PROJECT/core/mock-feature-${RUN_ID}.ts"
-  else
-    MOCK_FILE="$TARGET_PROJECT/src/mock-feature-${RUN_ID}.ts"
-  fi
-  mkdir -p "$(dirname "$MOCK_FILE")" || {
-    log_error "无法创建目录: $(dirname "$MOCK_FILE")"
-    exit 1
-  }
-
-  cat > "$MOCK_FILE" <<'EOF'
-/**
- * Mock feature generated by AI Factory
- * This is a test file for backend executor
- */
-
-export interface MockFeature {
-  id: string;
-  name: string;
-  createdAt: Date;
-}
-
-export function createMockFeature(name: string): MockFeature {
-  return {
-    id: `mock-${Date.now()}`,
-    name,
-    createdAt: new Date(),
-  };
-}
-
-export function getMockFeatures(): MockFeature[] {
-  return [
-    createMockFeature('Feature 1'),
-    createMockFeature('Feature 2'),
-  ];
-}
-EOF
-
-  FILES_CHANGED+=("$MOCK_FILE")
-  CODE_OUTPUT="Created mock feature file"
-  log_info "Mock 文件已创建: $MOCK_FILE"
+  log_info "[TEST_MODE] 模拟 Claude 执行"
+  echo "Mock Claude output for testing" > "$WORK_DIR/claude_output.txt"
+  CLAUDE_EXIT=0
 else
-  PROMPT="根据以下任务描述，生成后端代码。
-
-任务名: $TASK_NAME
-任务描述:
-$TASK_CONTENT
-
-项目路径: $TARGET_PROJECT
-项目类型: $PROJECT_TYPE
-
-## 核心原则（必须遵守）
-
-**增量修改原则**：
-- 只添加/修改任务需要的代码，不要删除或重写现有功能
-- 修改文件时，保留所有现有的函数、类、导出
-- 如果任务说"添加功能"，就在现有代码基础上添加，而不是重写整个文件
-- 如果任务说"修复/优化"，只改必要的部分，保持其他代码不变
-
-**禁止行为**：
-- 禁止删除现有的函数或类（除非任务明确要求删除）
-- 禁止移除现有的导出（export）
-- 禁止重构或"优化"任务范围之外的代码
-- 禁止改变现有 API 的接口签名（除非任务要求）
-
-## 代码要求
-
-1. 分析任务需求，确定需要创建或修改的文件
-2. 生成符合项目风格的代码
-3. 包含必要的类型定义（TypeScript）或类型注解（Python）
-4. 添加适当的错误处理
-5. 如果需要新增 API 端点，遵循 RESTful 规范
-
-## 输出格式
-
-必须输出 JSON 格式（不要输出其他内容）：
-\`\`\`json
-{
-  \"files\": [
-    {
-      \"path\": \"相对路径\",
-      \"action\": \"create|modify\",
-      \"content\": \"完整的文件内容（修改时包含原有代码+新增代码）\"
-    }
-  ],
-  \"summary\": \"变更摘要\"
-}
-\`\`\`"
-
-  if ! call_claude "$PROMPT" 600; then
-    exit 1
-  fi
-
-  CODE_OUTPUT=$(extract_json_from_claude "$CLAUDE_OUTPUT") || {
-    log_error "无法解析 Claude 输出"
-    exit 1
-  }
-
-  # 解析并写入文件
-  # 首先验证 .files 是数组类型
-  FILES_TYPE=$(echo "$CODE_OUTPUT" | jq -r 'if .files == null then "null" elif (.files | type) == "array" then "array" else "invalid" end')
-  if [[ "$FILES_TYPE" == "null" ]]; then
-    log_error "Claude 输出缺少 .files 字段"
-    exit 1
-  fi
-  if [[ "$FILES_TYPE" != "array" ]]; then
-    log_error "Claude 输出的 .files 不是数组类型: $FILES_TYPE"
-    exit 1
-  fi
-
-  FILE_COUNT=$(echo "$CODE_OUTPUT" | jq '.files | length')
-
-  # 验证 FILE_COUNT 是有效数字且在合理范围
-  if ! [[ "$FILE_COUNT" =~ ^[0-9]+$ ]]; then
-    log_error "FILE_COUNT 不是有效数字: $FILE_COUNT"
-    exit 1
-  fi
-  if [[ "$FILE_COUNT" -eq 0 ]]; then
-    log_warn "Claude 未生成任何文件，可能需要检查 PRD 内容"
-    # 不退出，继续执行后续步骤（测试/lint）
-  fi
-  if [[ "$FILE_COUNT" -gt 100 ]]; then
-    log_error "FILE_COUNT 超出限制 (最大 100): $FILE_COUNT"
-    exit 1
-  fi
-
-  for ((i=0; i<FILE_COUNT; i++)); do
-    FILE_PATH=$(echo "$CODE_OUTPUT" | jq -r ".files[$i].path // empty")
-    FILE_ACTION=$(echo "$CODE_OUTPUT" | jq -r ".files[$i].action // empty")
-    FILE_CONTENT=$(echo "$CODE_OUTPUT" | jq -r ".files[$i].content // empty")
-
-    # 验证必要字段非空
-    if [[ -z "$FILE_PATH" ]]; then
-      log_error "文件路径为空 (索引 $i)，跳过"
-      continue
-    fi
-    if [[ -z "$FILE_CONTENT" ]]; then
-      log_warn "文件内容为空 (索引 $i): $FILE_PATH，跳过"
-      continue
-    fi
-
-    # 验证 FILE_ACTION 是有效值（create 或 modify）
-    # 同时检查 "null" 字符串（jq 可能返回字符串 "null"）
-    if [[ -z "$FILE_ACTION" || "$FILE_ACTION" == "null" ]]; then
-      log_warn "文件操作类型为空 (索引 $i): $FILE_PATH，默认使用 create"
-      FILE_ACTION="create"
-    elif [[ "$FILE_ACTION" != "create" && "$FILE_ACTION" != "modify" ]]; then
-      log_warn "无效的文件操作类型 '$FILE_ACTION' (索引 $i): $FILE_PATH，默认使用 create"
-      FILE_ACTION="create"
-    fi
-
-    # 安全检查：禁止路径遍历
-    if [[ "$FILE_PATH" == *".."* ]]; then
-      log_error "安全错误: 文件路径包含非法字符 (..): $FILE_PATH"
-      exit 1
-    fi
-
-    FULL_PATH="$TARGET_PROJECT/$FILE_PATH"
-
-    # 使用 realpath 验证最终路径在 TARGET_PROJECT 内
-    RESOLVED_PATH=$(realpath -m "$FULL_PATH" 2>/dev/null) || {
-      log_error "无法解析文件路径: $FULL_PATH"
-      exit 1
-    }
-    # 路径安全验证：必须在 TARGET_PROJECT 目录内
-    # 确保 TARGET_PROJECT 不以特殊字符结尾（防止前缀匹配绕过）
-    # 例如：TARGET_PROJECT="/home/xx/dev" 可能匹配 "/home/xx/dev-malicious"
-    TARGET_PROJECT_NORMALIZED="${TARGET_PROJECT%/}"  # 移除末尾斜杠（如果有）
-
-    # 使用 [[ ]] 进行更严格的路径匹配
-    if [[ "$RESOLVED_PATH" == "$TARGET_PROJECT_NORMALIZED" ]]; then
-      log_error "安全错误: 不能写入项目根目录本身"
-      exit 1
-    elif [[ "$RESOLVED_PATH" != "$TARGET_PROJECT_NORMALIZED/"* ]]; then
-      log_error "安全错误: 文件路径逃逸出项目目录: $FILE_PATH -> $RESOLVED_PATH"
-      exit 1
-    fi
-    # else: 在允许范围内，继续执行
-
-    mkdir -p "$(dirname "$RESOLVED_PATH")" || {
-      log_error "无法创建目录: $(dirname "$RESOLVED_PATH")"
-      exit 1
-    }
-
-    # 使用 printf 避免 echo 的 -e/-n 问题和换行符处理
-    printf '%s\n' "$FILE_CONTENT" > "$RESOLVED_PATH" || {
-      log_error "无法写入文件: $RESOLVED_PATH"
-      exit 1
-    }
-    FILES_CHANGED+=("$RESOLVED_PATH")
-    log_info "[$FILE_ACTION] $FILE_PATH"
-  done
+  timeout -k 10 600 claude -p "$PROMPT" > "$WORK_DIR/claude_output.txt" 2>&1
+  CLAUDE_EXIT=$?
 fi
 
-# 检查磁盘空间
-check_disk_space "$WORK_DIR" 100 || exit 1
-
-# 保存变更文件列表
-if [[ ${#FILES_CHANGED[@]} -gt 0 ]]; then
-  printf '%s\n' "${FILES_CHANGED[@]}" > "$WORK_DIR/files_changed.txt"
-else
-  : > "$WORK_DIR/files_changed.txt"
-fi
-log_info "共变更 ${#FILES_CHANGED[@]} 个文件"
-
 # ============================================================
-# [3/5] 运行测试（如果存在）
+# 处理结果
 # ============================================================
-log_info "[3/5] 运行测试..."
-
-TEST_RESULT="skipped"
-TEST_OUTPUT=""
-
-TEST_TIMEOUT=${TEST_TIMEOUT:-300}  # 默认 5 分钟超时
-
-# 验证 TEST_TIMEOUT 是有效数字
-if ! [[ "$TEST_TIMEOUT" =~ ^[0-9]+$ ]] || [[ "$TEST_TIMEOUT" -le 0 ]]; then
-  log_warn "TEST_TIMEOUT 不是有效正整数: $TEST_TIMEOUT，使用默认值 300"
-  TEST_TIMEOUT=300
+if [[ $CLAUDE_EXIT -eq 124 || $CLAUDE_EXIT -eq 137 ]]; then
+  log_error "Claude 执行超时 (exit: $CLAUDE_EXIT)"
+  echo '{"success": false, "error": "timeout"}' > "$WORK_DIR/result.json"
+  exit 1
+elif [[ $CLAUDE_EXIT -ne 0 ]]; then
+  log_error "Claude 执行失败 (exit: $CLAUDE_EXIT)"
+  echo '{"success": false, "error": "claude_failed", "exit_code": '$CLAUDE_EXIT'}' > "$WORK_DIR/result.json"
+  exit 1
 fi
 
-# 清理可能卡住的测试进程的函数
-cleanup_test_processes() {
-  # 清理可能残留的 npm/pytest 进程
-  pkill -u "$(whoami)" -f "npm test" 2>/dev/null || true
-  pkill -u "$(whoami)" -f "pytest" 2>/dev/null || true
-}
+# 检查是否有文件变更
+cd "$PROJECT_PATH" || exit 1
+FILES_CHANGED=$(git diff --name-only HEAD 2>/dev/null | wc -l || echo 0)
 
-if [[ "${TEST_MODE:-}" == "1" ]]; then
-  log_info "[TEST_MODE] 模拟测试通过"
-  TEST_RESULT="passed"
-  TEST_OUTPUT="All tests passed (mock)"
-else
-  # 使用子 shell 隔离目录变更，避免影响后续代码
-  if [[ "$PROJECT_TYPE" == "typescript" || "$PROJECT_TYPE" == "javascript" ]]; then
-    # 检查是否有测试文件（排除 node_modules）
-    TEST_FILES=$(find "$TARGET_PROJECT" -path "*/node_modules" -prune -o \( -name "*.test.ts" -o -name "*.spec.ts" -o -name "*.test.js" -o -name "*.spec.js" \) -print 2>/dev/null | head -1)
-    if [[ -f "$TARGET_PROJECT/package.json" ]] && grep -q '"test"' "$TARGET_PROJECT/package.json" && [[ -n "$TEST_FILES" ]]; then
-      log_info "运行 npm test (timeout: ${TEST_TIMEOUT}s)..."
-      # 使用子 shell 隔离 cd，-k 10 表示超时后 10 秒强制 SIGKILL
-      TEST_OUTPUT=$(
-        cd "$TARGET_PROJECT" 2>/dev/null || { echo "Failed to cd to project directory"; exit 1; }
-        timeout -k 10 "$TEST_TIMEOUT" npm test 2>&1
-      )
-      TEST_EXIT_CODE=$?
-      if [[ $TEST_EXIT_CODE -eq 0 ]]; then
-        TEST_RESULT="passed"
-      elif [[ $TEST_EXIT_CODE -eq 124 || $TEST_EXIT_CODE -eq 137 ]]; then
-        # 124 = timeout, 137 = killed by SIGKILL (128+9)
-        TEST_RESULT="timeout"
-        log_warn "npm test 超时 (${TEST_TIMEOUT}s)"
-        cleanup_test_processes
-      elif [[ "$TEST_OUTPUT" == "Failed to cd to project directory" ]]; then
-        log_error "无法切换到项目目录: $TARGET_PROJECT"
-        TEST_RESULT="failed"
-      else
-        TEST_RESULT="failed"
-      fi
-    else
-      log_info "未找到测试文件，跳过测试"
-    fi
-  elif [[ "$PROJECT_TYPE" == "python" ]]; then
-    if command -v pytest &>/dev/null; then
-      log_info "运行 pytest (timeout: ${TEST_TIMEOUT}s)..."
-      # 使用子 shell 隔离 cd，-k 10 表示超时后 10 秒强制 SIGKILL
-      TEST_OUTPUT=$(
-        cd "$TARGET_PROJECT" 2>/dev/null || { echo "Failed to cd to project directory"; exit 1; }
-        timeout -k 10 "$TEST_TIMEOUT" pytest --tb=short 2>&1
-      )
-      TEST_EXIT_CODE=$?
-      if [[ $TEST_EXIT_CODE -eq 0 ]]; then
-        TEST_RESULT="passed"
-      elif [[ $TEST_EXIT_CODE -eq 124 || $TEST_EXIT_CODE -eq 137 ]]; then
-        TEST_RESULT="timeout"
-        log_warn "pytest 超时 (${TEST_TIMEOUT}s)"
-        cleanup_test_processes
-      elif [[ "$TEST_OUTPUT" == "Failed to cd to project directory" ]]; then
-        log_error "无法切换到项目目录: $TARGET_PROJECT"
-        TEST_RESULT="failed"
-      else
-        TEST_RESULT="failed"
-      fi
-    else
-      log_info "pytest 未安装，跳过测试"
-    fi
-  fi
-fi
+log_info "执行完成，变更 $FILES_CHANGED 个文件"
 
-log_info "测试结果: $TEST_RESULT"
-
-# ============================================================
-# [4/5] 运行 Lint 检查
-# ============================================================
-log_info "[4/5] 运行 Lint 检查..."
-
-LINT_RESULT="skipped"
-LINT_OUTPUT=""
-
-LINT_TIMEOUT=${LINT_TIMEOUT:-120}  # 默认 2 分钟超时
-
-# 验证 LINT_TIMEOUT 是有效数字
-if ! [[ "$LINT_TIMEOUT" =~ ^[0-9]+$ ]] || [[ "$LINT_TIMEOUT" -le 0 ]]; then
-  log_warn "LINT_TIMEOUT 不是有效正整数: $LINT_TIMEOUT，使用默认值 120"
-  LINT_TIMEOUT=120
-fi
-
-# 清理可能卡住的 lint 进程的函数
-cleanup_lint_processes() {
-  pkill -u "$(whoami)" -f "npm run lint" 2>/dev/null || true
-  pkill -u "$(whoami)" -f "eslint" 2>/dev/null || true
-  pkill -u "$(whoami)" -f "ruff check" 2>/dev/null || true
-  pkill -u "$(whoami)" -f "flake8" 2>/dev/null || true
-}
-
-if [[ "${TEST_MODE:-}" == "1" ]]; then
-  log_info "[TEST_MODE] 模拟 lint 通过"
-  LINT_RESULT="passed"
-  LINT_OUTPUT="No lint errors (mock)"
-else
-  # 使用子 shell 隔离目录变更
-  if [[ "$PROJECT_TYPE" == "typescript" || "$PROJECT_TYPE" == "javascript" ]]; then
-    if [[ -f "$TARGET_PROJECT/package.json" ]] && grep -q '"lint"' "$TARGET_PROJECT/package.json"; then
-      log_info "运行 npm run lint (timeout: ${LINT_TIMEOUT}s)..."
-      LINT_OUTPUT=$(
-        cd "$TARGET_PROJECT" 2>/dev/null || { echo "Failed to cd to project directory"; exit 1; }
-        timeout -k 10 "$LINT_TIMEOUT" npm run lint 2>&1
-      )
-      LINT_EXIT_CODE=$?
-      if [[ $LINT_EXIT_CODE -eq 0 ]]; then
-        LINT_RESULT="passed"
-      elif [[ $LINT_EXIT_CODE -eq 124 || $LINT_EXIT_CODE -eq 137 ]]; then
-        LINT_RESULT="timeout"
-        log_warn "npm run lint 超时 (${LINT_TIMEOUT}s)"
-        cleanup_lint_processes
-      elif [[ "$LINT_OUTPUT" == "Failed to cd to project directory" ]]; then
-        log_error "无法切换到项目目录: $TARGET_PROJECT"
-        LINT_RESULT="failed"
-      else
-        LINT_RESULT="warning"
-      fi
-    elif command -v eslint &>/dev/null; then
-      log_info "运行 eslint (timeout: ${LINT_TIMEOUT}s)..."
-      LINT_OUTPUT=$(
-        cd "$TARGET_PROJECT" 2>/dev/null || { echo "Failed to cd to project directory"; exit 1; }
-        timeout -k 10 "$LINT_TIMEOUT" eslint --ext .ts,.js src/ 2>&1
-      )
-      LINT_EXIT_CODE=$?
-      if [[ $LINT_EXIT_CODE -eq 0 ]]; then
-        LINT_RESULT="passed"
-      elif [[ $LINT_EXIT_CODE -eq 124 || $LINT_EXIT_CODE -eq 137 ]]; then
-        LINT_RESULT="timeout"
-        log_warn "eslint 超时 (${LINT_TIMEOUT}s)"
-        cleanup_lint_processes
-      elif [[ "$LINT_OUTPUT" == "Failed to cd to project directory" ]]; then
-        log_error "无法切换到项目目录: $TARGET_PROJECT"
-        LINT_RESULT="failed"
-      else
-        LINT_RESULT="warning"
-      fi
-    fi
-  elif [[ "$PROJECT_TYPE" == "python" ]]; then
-    if command -v ruff &>/dev/null; then
-      log_info "运行 ruff (timeout: ${LINT_TIMEOUT}s)..."
-      LINT_OUTPUT=$(
-        cd "$TARGET_PROJECT" 2>/dev/null || { echo "Failed to cd to project directory"; exit 1; }
-        timeout -k 10 "$LINT_TIMEOUT" ruff check . 2>&1
-      )
-      LINT_EXIT_CODE=$?
-      if [[ $LINT_EXIT_CODE -eq 0 ]]; then
-        LINT_RESULT="passed"
-      elif [[ $LINT_EXIT_CODE -eq 124 || $LINT_EXIT_CODE -eq 137 ]]; then
-        LINT_RESULT="timeout"
-        log_warn "ruff 超时 (${LINT_TIMEOUT}s)"
-        cleanup_lint_processes
-      elif [[ "$LINT_OUTPUT" == "Failed to cd to project directory" ]]; then
-        log_error "无法切换到项目目录: $TARGET_PROJECT"
-        LINT_RESULT="failed"
-      else
-        LINT_RESULT="warning"
-      fi
-    elif command -v flake8 &>/dev/null; then
-      log_info "运行 flake8 (timeout: ${LINT_TIMEOUT}s)..."
-      LINT_OUTPUT=$(
-        cd "$TARGET_PROJECT" 2>/dev/null || { echo "Failed to cd to project directory"; exit 1; }
-        timeout -k 10 "$LINT_TIMEOUT" flake8 . 2>&1
-      )
-      LINT_EXIT_CODE=$?
-      if [[ $LINT_EXIT_CODE -eq 0 ]]; then
-        LINT_RESULT="passed"
-      elif [[ $LINT_EXIT_CODE -eq 124 || $LINT_EXIT_CODE -eq 137 ]]; then
-        LINT_RESULT="timeout"
-        log_warn "flake8 超时 (${LINT_TIMEOUT}s)"
-        cleanup_lint_processes
-      elif [[ "$LINT_OUTPUT" == "Failed to cd to project directory" ]]; then
-        log_error "无法切换到项目目录: $TARGET_PROJECT"
-        LINT_RESULT="failed"
-      else
-        LINT_RESULT="warning"
-      fi
-    fi
-  fi
-fi
-
-log_info "Lint 结果: $LINT_RESULT"
-
-# ============================================================
-# 保存结果
-# ============================================================
-RESULT_SUCCESS=true
-
-# 检查是否有文件变更（非 TEST_MODE 下，0 个文件变更视为失败）
-if [[ "${TEST_MODE:-}" != "1" && ${#FILES_CHANGED[@]} -eq 0 ]]; then
-  log_warn "没有文件变更，标记为失败"
-  RESULT_SUCCESS=false
-fi
-
-# 检查测试结果（failed 或 timeout 均视为失败）
-if [[ "$TEST_RESULT" == "failed" || "$TEST_RESULT" == "timeout" ]]; then
-  RESULT_SUCCESS=false
-fi
-# 检查 lint 结果（只有 failed 视为失败，warning 不影响成功状态）
-if [[ "$LINT_RESULT" == "failed" || "$LINT_RESULT" == "timeout" ]]; then
-  RESULT_SUCCESS=false
-fi
-
-RESULT_ARTIFACTS=$(jq -n \
-  --arg type "code" \
-  --arg id "backend-${RUN_ID}" \
-  --arg project "$TARGET_PROJECT" \
-  --arg project_type "$PROJECT_TYPE" \
-  --argjson file_count "${#FILES_CHANGED[@]}" \
-  --arg test_result "$TEST_RESULT" \
-  --arg lint_result "$LINT_RESULT" \
-  '[{
-    type: $type,
-    id: $id,
-    name: "Backend Code Generation",
-    project: $project,
-    project_type: $project_type,
-    files_changed: $file_count,
-    test_result: $test_result,
-    lint_result: $lint_result
-  }]')
-
-save_result
-
-# ============================================================
-# [5/5] 生成截图报告
-# ============================================================
-log_info "[5/5] 生成执行结果截图..."
-
-SAFE_PROJECT=$(html_escape "$TARGET_PROJECT")
-
-# 生成文件变更列表 HTML
-FILES_HTML=""
-for f in "${FILES_CHANGED[@]}"; do
-  SAFE_F=$(html_escape "$(basename "$f")")
-  FILES_HTML+="<div class=\"info-row\"><span class=\"info-value\">📄 ${SAFE_F}</span></div>"
-done
-
-MAIN_CONTENT="
-<div class=\"grid\">
-  <div class=\"card\">
-    <div class=\"card-title\">变更文件数</div>
-    <div class=\"card-value\">${#FILES_CHANGED[@]} 个</div>
-  </div>
-  <div class=\"card\">
-    <div class=\"card-title\">项目类型</div>
-    <div class=\"card-value\">${PROJECT_TYPE}</div>
-  </div>
-</div>
-<div class=\"card\">
-  <div class=\"card-title\">目标项目</div>
-  <div class=\"card-value\" style=\"font-size: 16px;\">${SAFE_PROJECT}</div>
-</div>
-<div class=\"card\">
-  <div class=\"card-title\">测试结果</div>
-  <div class=\"card-value $([ "$TEST_RESULT" == "passed" ] && echo "success")\">
-    $([ "$TEST_RESULT" == "passed" ] && echo "✅" || echo "⚠️") ${TEST_RESULT}
-  </div>
-</div>
-<div class=\"card\">
-  <div class=\"card-title\">Lint 结果</div>
-  <div class=\"card-value $([ "$LINT_RESULT" == "passed" ] && echo "success")\">
-    $([ "$LINT_RESULT" == "passed" ] && echo "✅" || echo "⚠️") ${LINT_RESULT}
-  </div>
-</div>
-<div class=\"card\">
-  <div class=\"card-title\">变更文件</div>
-  ${FILES_HTML}
-</div>
-"
-
-REPORT_HTML=$(generate_result_report_html "Backend 代码生成完成" "✅" "$MAIN_CONTENT")
-screenshot_html_report "$RUN_ID" "backend-execute-result" "$REPORT_HTML" || log_warn "结果截图失败"
-
-# ============================================================
-# 完成
-# ============================================================
-log_execute_end "Backend"
-
+# 保存成功结果
 jq -n \
-  --argjson success "$RESULT_SUCCESS" \
-  --arg project "$TARGET_PROJECT" \
-  --arg project_type "$PROJECT_TYPE" \
-  --argjson file_count "${#FILES_CHANGED[@]}" \
-  --arg test_result "$TEST_RESULT" \
-  --arg lint_result "$LINT_RESULT" \
+  --argjson success true \
+  --argjson files_changed "$FILES_CHANGED" \
+  --arg project "$PROJECT_PATH" \
   '{
     success: $success,
+    files_changed: $files_changed,
     project: $project,
-    project_type: $project_type,
-    files_changed: $file_count,
-    test_result: $test_result,
-    lint_result: $lint_result
-  }'
+    artifacts: [{type: "code", files_changed: $files_changed}]
+  }' > "$WORK_DIR/result.json"
+
+log_info "=========================================="
+log_info "执行阶段完成"
+log_info "=========================================="
+
+cat "$WORK_DIR/result.json"

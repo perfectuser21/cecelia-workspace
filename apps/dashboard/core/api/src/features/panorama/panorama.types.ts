@@ -77,3 +77,13 @@ export interface PanoramaResponse {
   allData: Record<string, LayerData>;
   lastUpdated: number;
 }
+
+// 白板项目类型
+export interface WhiteboardProject {
+  id: string;
+  name: string;
+  nodes: PanoramaNode[];
+  edges: PanoramaEdge[];
+  createdAt: Date;
+  updatedAt: Date;
+}
