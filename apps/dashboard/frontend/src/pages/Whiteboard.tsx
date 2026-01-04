@@ -247,19 +247,13 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
   }, [pan, zoom]);
 
   const getAnchorPos = useCallback((node: WhiteboardNode, anchor: AnchorPosition) => {
-    // 防止 undefined 访问
-    const x = node?.x ?? 0;
-    const y = node?.y ?? 0;
-    const width = node?.width ?? 150;
-    const height = node?.height ?? 50;
-    const cx = x + width / 2;
-    const cy = y + height / 2;
+    const cx = node.x + node.width / 2;
+    const cy = node.y + node.height / 2;
     switch (anchor) {
-      case 'top': return { x: cx, y: y };
-      case 'right': return { x: x + width, y: cy };
-      case 'bottom': return { x: cx, y: y + height };
-      case 'left': return { x: x, y: cy };
-      default: return { x: x + width, y: cy }; // 默认右侧
+      case 'top': return { x: cx, y: node.y };
+      case 'right': return { x: node.x + node.width, y: cy };
+      case 'bottom': return { x: cx, y: node.y + node.height };
+      case 'left': return { x: node.x, y: cy };
     }
   }, []);
 
@@ -477,24 +471,21 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
 
   // 双击：进入子页面（drill-down）
   const handleNodeDoubleClick = useCallback((node: WhiteboardNode) => {
-    const children = nodes.filter(n => n.parentId === node.id);
-    console.log('[Whiteboard] Double click:', node.id, 'children:', children.length, children.map(c => c.id));
-    if (children.length > 0) {
+    const nodeHasChildren = nodes.some(n => n.parentId === node.id);
+    if (nodeHasChildren) {
       // 播放下钻动画
       setDrillingNode(node.id);
       setTimeout(() => {
         setDrillingNode(null);
         // 有子节点，进入下一层（drill-down）
-        console.log('[Whiteboard] Drilling down to:', node.id);
         setViewPath(prev => [...prev, node.id]);
         setExpandedNodes(prev => new Set([...prev, node.id]));
         setSelectedNodes(new Set());
         setSelectedEdge(null);
         setNeedsAutoLayout(true); // 触发自动布局
       }, 300);
-    } else {
-      console.log('[Whiteboard] No children for:', node.id);
     }
+    // 无子节点时不做任何操作（不再进入编辑模式，避免误操作）
   }, [nodes]);
 
   // 更新节点名称
@@ -868,13 +859,12 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
     switch (shape) {
       case 'rect':
         return <rect width={width} height={height} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />;
+      case 'rounded':
+        return <rect width={width} height={height} rx={8} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />;
       case 'pill':
         return <rect width={width} height={height} rx={height/2} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />;
       case 'diamond':
         return <polygon points={`${width/2},0 ${width},${height/2} ${width/2},${height} 0,${height/2}`} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />;
-      case 'rounded':
-      default:
-        return <rect width={width} height={height} rx={8} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />;
     }
   };
 
@@ -1095,20 +1085,14 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
   const loadProject = useCallback(async (projectId: string) => {
     try {
       setIsLoading(true);
+      console.log('[Whiteboard] Loading project:', projectId);
       const res = await fetch(`${API_BASE}/api/v1/panorama/projects/${projectId}`);
       const data = await res.json();
+      console.log('[Whiteboard] Loaded data:', data);
       if (data.project) {
         const project = data.project;
-        // 确保所有节点都有有效的坐标和尺寸
-        const validNodes = (project.nodes || []).map((n: WhiteboardNode, i: number) => ({
-          ...n,
-          x: n.x ?? 100 + (i % 5) * 180,
-          y: n.y ?? 100 + Math.floor(i / 5) * 100,
-          width: n.width ?? 150,
-          height: n.height ?? 50,
-          shape: n.shape ?? 'rounded',
-        }));
-        setNodes(validNodes);
+        console.log('[Whiteboard] Setting nodes:', project.nodes?.length, 'edges:', project.edges?.length);
+        setNodes(project.nodes || []);
         setEdges(project.edges || []);
         setCurrentProjectId(projectId);
         setViewPath([]); // 重置到根层级
@@ -1186,13 +1170,6 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
   useEffect(() => {
     loadProjects();
   }, [loadProjects]);
-
-  // 自动加载第一个项目
-  useEffect(() => {
-    if (projects.length > 0 && !currentProjectId) {
-      loadProject(projects[0].id);
-    }
-  }, [projects, currentProjectId, loadProject]);
 
   // 项目加载或 drill-down 后自动布局
   useEffect(() => {
@@ -1476,10 +1453,7 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
     return checkingFromCurrentLevel;
   }, [nodes, currentParentId, expandedNodes]);
 
-  // 过滤可见节点，并确保所有节点都有有效的坐标
-  const visibleNodes = nodes
-    .filter(isNodeVisible)
-    .filter(n => n && typeof n.x === 'number' && typeof n.y === 'number' && typeof n.width === 'number' && typeof n.height === 'number');
+  const visibleNodes = nodes.filter(isNodeVisible);
   const visibleEdges = edges.filter(e => {
     const fromNode = nodes.find(n => n.id === e.from);
     const toNode = nodes.find(n => n.id === e.to);
@@ -1990,33 +1964,8 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
     img.src = url;
   }, [nodes]);
 
-  // 显示加载状态
-  if (isLoading) {
-    return (
-      <div className={`flex items-center justify-center bg-slate-900 ${embedded ? 'h-full w-full' : 'h-screen'}`}>
-        <div className="text-slate-400">加载中...</div>
-      </div>
-    );
-  }
-
   return (
     <div ref={containerRef} className={`flex relative bg-slate-900 ${embedded ? 'h-full w-full' : 'h-screen'} ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
-      {/* CSS Keyframes for animations */}
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 0.4; transform: scale(1); }
-          50% { opacity: 0.8; transform: scale(1.02); }
-        }
-        @keyframes drillPulse {
-          0% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.8; transform: scale(1.15); }
-          100% { opacity: 0; transform: scale(1.3); }
-        }
-        @keyframes breadcrumbGlow {
-          0%, 100% { box-shadow: 0 0 4px rgba(99, 102, 241, 0.3); }
-          50% { box-shadow: 0 0 12px rgba(99, 102, 241, 0.6); }
-        }
-      `}</style>
       {/* 左侧项目边栏 */}
       <ProjectSidebar
         projects={projects}
@@ -2033,39 +1982,33 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
       <div className="flex-1 flex flex-col">
         {/* 工具栏 */}
         <div className={`h-12 flex items-center gap-2 px-3 border-b border-indigo-500/20 ${embedded ? 'bg-slate-900/40 backdrop-blur-sm' : 'bg-slate-900/40'}`}>
-        {/* 面包屑导航 - 增强版 */}
+        {/* 面包屑导航 */}
         {viewPath.length > 0 && (
-          <div className="flex items-center gap-2 mr-3 px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg" style={{ animation: 'breadcrumbGlow 2s ease-in-out infinite' }}>
+          <div className="flex items-center gap-1 mr-2">
             <button
               onClick={goBack}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-300 bg-indigo-500/20 border border-indigo-400/40 rounded-md hover:bg-indigo-500/30 hover:text-indigo-200 transition-all"
+              className="flex items-center gap-1 px-2 py-1 text-xs text-slate-300 bg-slate-900/60 border border-indigo-500/30 rounded hover:bg-indigo-500/20"
             >
-              ← 返回上层
+              ← 返回
             </button>
-            <div className="h-4 w-px bg-indigo-500/30" />
-            <div className="flex items-center gap-1 text-xs">
+            <div className="flex items-center gap-1 text-xs text-slate-400">
               <button
                 onClick={() => goToLevel(0)}
-                className="px-2 py-0.5 text-slate-300 hover:text-white hover:bg-indigo-500/20 rounded transition-all"
+                className="hover:text-slate-200"
               >
-                🏠 根
+                根
               </button>
               {viewPath.map((nodeId, index) => {
                 const node = nodes.find(n => n.id === nodeId);
-                const isLast = index === viewPath.length - 1;
                 return (
                   <React.Fragment key={nodeId}>
-                    <ChevronRight className="w-3 h-3 text-indigo-400" />
+                    <ChevronRight className="w-3 h-3" />
                     <button
                       onClick={() => goToLevel(index + 1)}
-                      className={`px-2 py-0.5 rounded transition-all max-w-[100px] truncate ${
-                        isLast
-                          ? 'text-indigo-200 bg-indigo-500/30 font-medium'
-                          : 'text-slate-300 hover:text-white hover:bg-indigo-500/20'
-                      }`}
+                      className="hover:text-slate-200 max-w-[80px] truncate"
                       title={node?.name}
                     >
-                      📁 {node?.name || nodeId}
+                      {node?.name || nodeId}
                     </button>
                   </React.Fragment>
                 );
@@ -2446,15 +2389,27 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
                     setHoveredNode(null);
                     setTooltipPos(null);
                   }}
-                  style={{
-                    cursor: nodeHasChildren ? 'pointer' : (dragging === node.id ? 'grabbing' : 'grab'),
-                    transition: 'transform 0.3s ease-out, opacity 0.3s ease-out',
-                    transform: isDrilling ? 'scale(1.1)' : 'scale(1)',
-                    opacity: isDrilling ? 0.7 : 1,
-                  }}
+                  style={{ cursor: nodeHasChildren ? 'pointer' : (dragging === node.id ? 'grabbing' : 'grab') }}
                 >
-                  {/* Drillable node glow effect - 可下钻节点发光效果 */}
+                  {/* 可下钻节点悬浮发光效果 */}
                   {nodeHasChildren && isHovered && !isDrilling && (
+                    <rect
+                      x={-6}
+                      y={-6}
+                      width={node.width + 12}
+                      height={node.height + 12}
+                      rx={14}
+                      fill="none"
+                      stroke={getNodeColor(node)}
+                      strokeWidth={2}
+                      opacity={0.6}
+                      pointerEvents="none"
+                    >
+                      <animate attributeName="opacity" values="0.3;0.7;0.3" dur="1.5s" repeatCount="indefinite" />
+                    </rect>
+                  )}
+                  {/* 下钻动画效果 */}
+                  {isDrilling && (
                     <rect
                       x={-8}
                       y={-8}
@@ -2462,33 +2417,13 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
                       height={node.height + 16}
                       rx={16}
                       fill="none"
-                      stroke={getNodeColor(node)}
-                      strokeWidth={3}
-                      opacity={0.6}
-                      style={{
-                        filter: `drop-shadow(0 0 8px ${getNodeColor(node)})`,
-                        animation: 'pulse 1.5s ease-in-out infinite',
-                      }}
-                      pointerEvents="none"
-                    />
-                  )}
-                  {/* Drilling animation effect - 下钻动画效果 */}
-                  {isDrilling && (
-                    <rect
-                      x={-12}
-                      y={-12}
-                      width={node.width + 24}
-                      height={node.height + 24}
-                      rx={20}
-                      fill="none"
                       stroke="#22c55e"
-                      strokeWidth={4}
-                      style={{
-                        filter: 'drop-shadow(0 0 12px #22c55e)',
-                        animation: 'drillPulse 0.3s ease-out',
-                      }}
+                      strokeWidth={3}
                       pointerEvents="none"
-                    />
+                    >
+                      <animate attributeName="opacity" values="1;0" dur="0.3s" fill="freeze" />
+                      <animate attributeName="stroke-width" values="3;6" dur="0.3s" fill="freeze" />
+                    </rect>
                   )}
                   {/* Group visual indicator - background glow */}
                   {nodeGroup && (
@@ -2604,34 +2539,34 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
                       <title>Click to select entire group</title>
                     </g>
                   )}
-                  {/* Drillable indicator - 右下角文件夹图标和子节点数量 */}
+                  {/* 右下角文件夹图标和子节点数量 */}
                   {nodeHasChildren && (
-                    <g transform={`translate(${node.width - 28}, ${node.height - 18})`}>
+                    <g transform={`translate(${node.width - 32}, ${node.height - 16})`}>
                       <rect
-                        x={-4}
-                        y={-4}
+                        x={0}
+                        y={0}
                         width={36}
-                        height={20}
-                        rx={6}
+                        height={18}
+                        rx={4}
                         fill="#1e293b"
                         stroke={getNodeColor(node)}
-                        strokeWidth={1.5}
+                        strokeWidth={1}
                         opacity={0.9}
                       />
-                      <foreignObject x={0} y={-2} width={16} height={16}>
+                      <foreignObject x={2} y={1} width={16} height={16}>
                         <FolderOpen size={14} color={getNodeColor(node)} style={{ opacity: 0.9 }} />
                       </foreignObject>
                       <text
-                        x={20}
-                        y={9}
+                        x={22}
+                        y={13}
                         fill={getNodeColor(node)}
-                        fontSize={10}
+                        fontSize={11}
                         fontWeight={600}
                         style={{ pointerEvents: 'none' }}
                       >
                         {childCount}
                       </text>
-                      <title>包含 {childCount} 个子节点，双击进入查看</title>
+                      <title>包含 {childCount} 个子节点，双击进入</title>
                     </g>
                   )}
                   {/* Expand/Collapse toggle button for nodes with children */}
@@ -2646,20 +2581,17 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
                       onMouseDown={(e) => e.stopPropagation()}
                     >
                       <circle
-                        r={12}
+                        r={10}
                         fill={expandedNodes.has(node.id) ? getNodeColor(node) : '#1e293b'}
                         stroke={getNodeColor(node)}
                         strokeWidth={2}
-                        style={{
-                          filter: isHovered ? `drop-shadow(0 0 4px ${getNodeColor(node)})` : 'none',
-                        }}
                       />
                       <text
                         x={0}
-                        y={5}
+                        y={4}
                         fill={expandedNodes.has(node.id) ? '#fff' : getNodeColor(node)}
-                        fontSize={16}
-                        fontWeight={700}
+                        fontSize={14}
+                        fontWeight={600}
                         textAnchor="middle"
                         style={{ pointerEvents: 'none' }}
                       >
@@ -3054,7 +2986,7 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
       {/* MiniMap */}
         {visibleNodes.length > 0 && (
           <MiniMap
-            nodes={visibleNodes.filter(n => n.x != null && n.y != null).map(n => ({ id: n.id, x: n.x, y: n.y, width: n.width || 150, height: n.height || 50, color: n.color }))}
+            nodes={visibleNodes.map(n => ({ id: n.id, x: n.x, y: n.y, width: n.width, height: n.height, color: n.color }))}
             edges={visibleEdges.map(e => ({ from: e.from, to: e.to }))}
             viewBox={getViewBox()}
             canvasSize={{ width: 2000, height: 1500 }}
