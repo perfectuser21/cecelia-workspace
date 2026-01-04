@@ -475,20 +475,85 @@ class PanoramaService {
       ],
     };
 
-    // AI 执行详情
+    // AI 工厂 - 4 阶段执行
     allData['flow-execute'] = {
-      title: 'AI 执行',
-      subtitle: 'Claude 代码生成',
+      title: 'AI 工厂',
+      subtitle: '4 阶段自动执行',
       nodes: [
-        { id: 'exec-read', x: START_X, y: START_Y, name: '读取上下文', desc: '理解任务', status: 'completed', type: 'core' },
-        { id: 'exec-plan', x: START_X + GRID_X, y: START_Y, name: '规划方案', desc: '设计实现', status: 'in_progress', type: 'core' },
-        { id: 'exec-code', x: START_X, y: START_Y + GRID_Y, name: '编写代码', desc: '生成实现', status: 'in_progress', type: 'core' },
-        { id: 'exec-test', x: START_X + GRID_X, y: START_Y + GRID_Y, name: '测试验证', desc: '确保正确', status: 'not_started', type: 'core' },
+        { id: 'stage-prepare', x: START_X, y: START_Y, name: '1. 准备', desc: '读取任务/构建Prompt', status: 'completed', type: 'core', hasChildren: true },
+        { id: 'stage-execute', x: START_X + GRID_X, y: START_Y, name: '2. 执行', desc: '调用Claude', status: 'completed', type: 'core', hasChildren: true },
+        { id: 'stage-quality', x: START_X, y: START_Y + GRID_Y, name: '3. 质检', desc: '硬检查+软检查', status: 'completed', type: 'core', hasChildren: true },
+        { id: 'stage-cleanup', x: START_X + GRID_X, y: START_Y + GRID_Y, name: '4. 收尾', desc: 'Git提交/通知', status: 'completed', type: 'core', hasChildren: true },
       ],
       edges: [
-        { from: 'exec-read', to: 'exec-plan' },
-        { from: 'exec-plan', to: 'exec-code' },
-        { from: 'exec-code', to: 'exec-test' },
+        { from: 'stage-prepare', to: 'stage-execute' },
+        { from: 'stage-execute', to: 'stage-quality' },
+        { from: 'stage-quality', to: 'stage-cleanup' },
+        { from: 'stage-quality', to: 'stage-execute' }, // 返工循环
+      ],
+    };
+
+    // 准备阶段详情
+    allData['stage-prepare'] = {
+      title: '1. 准备阶段',
+      subtitle: 'prepare.sh',
+      nodes: [
+        { id: 'prep-notion', x: START_X, y: START_Y, name: '读取 Notion', desc: '任务名/描述/类型', status: 'completed', type: 'core' },
+        { id: 'prep-prompt', x: START_X + GRID_X, y: START_Y, name: '构建 Prompt', desc: '上下文+约束', status: 'completed', type: 'core' },
+        { id: 'prep-dir', x: START_X + GRID_X * 2, y: START_Y, name: '创建工作目录', desc: '/data/runs/{id}', status: 'completed', type: 'core' },
+      ],
+      edges: [
+        { from: 'prep-notion', to: 'prep-prompt' },
+        { from: 'prep-prompt', to: 'prep-dir' },
+      ],
+    };
+
+    // 执行阶段详情
+    allData['stage-execute'] = {
+      title: '2. 执行阶段',
+      subtitle: 'execute.sh',
+      nodes: [
+        { id: 'exec-claude', x: START_X, y: START_Y, name: '调用 Claude', desc: 'claude -p $PROMPT', status: 'completed', type: 'core' },
+        { id: 'exec-timeout', x: START_X + GRID_X, y: START_Y, name: '超时控制', desc: '10分钟限制', status: 'completed', type: 'core' },
+        { id: 'exec-detect', x: START_X + GRID_X * 2, y: START_Y, name: '检测变更', desc: 'unstaged+staged+untracked', status: 'completed', type: 'core' },
+      ],
+      edges: [
+        { from: 'exec-claude', to: 'exec-timeout' },
+        { from: 'exec-timeout', to: 'exec-detect' },
+      ],
+    };
+
+    // 质检阶段详情
+    allData['stage-quality'] = {
+      title: '3. 质检阶段',
+      subtitle: 'quality-check.sh',
+      nodes: [
+        { id: 'qc-exist', x: START_X, y: START_Y, name: '产出物检查', desc: '文件是否生成', status: 'completed', type: 'core' },
+        { id: 'qc-security', x: START_X + GRID_X, y: START_Y, name: '安全扫描', desc: '密钥/敏感信息', status: 'completed', type: 'core' },
+        { id: 'qc-git', x: START_X, y: START_Y + GRID_Y, name: 'Git 检查', desc: '冲突标记', status: 'completed', type: 'core' },
+        { id: 'qc-accept', x: START_X + GRID_X, y: START_Y + GRID_Y, name: '验收标准', desc: 'required:false', status: 'in_progress', type: 'core' },
+      ],
+      edges: [
+        { from: 'qc-exist', to: 'qc-security' },
+        { from: 'qc-security', to: 'qc-git' },
+        { from: 'qc-git', to: 'qc-accept' },
+      ],
+    };
+
+    // 收尾阶段详情
+    allData['stage-cleanup'] = {
+      title: '4. 收尾阶段',
+      subtitle: 'cleanup.sh',
+      nodes: [
+        { id: 'clean-report', x: START_X, y: START_Y, name: '生成报告', desc: 'execution_report.md', status: 'completed', type: 'core' },
+        { id: 'clean-git', x: START_X + GRID_X, y: START_Y, name: 'Git 提交', desc: '创建分支/推送', status: 'completed', type: 'core' },
+        { id: 'clean-notion', x: START_X, y: START_Y + GRID_Y, name: '更新 Notion', desc: '状态→AI Done', status: 'completed', type: 'core' },
+        { id: 'clean-webhook', x: START_X + GRID_X, y: START_Y + GRID_Y, name: 'Webhook', desc: '触发回调/飞书', status: 'completed', type: 'core' },
+      ],
+      edges: [
+        { from: 'clean-report', to: 'clean-git' },
+        { from: 'clean-git', to: 'clean-notion' },
+        { from: 'clean-notion', to: 'clean-webhook' },
       ],
     };
 

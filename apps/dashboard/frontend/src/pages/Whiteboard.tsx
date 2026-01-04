@@ -475,16 +475,19 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
 
   // 双击：进入子页面（drill-down）
   const handleNodeDoubleClick = useCallback((node: WhiteboardNode) => {
-    const nodeHasChildren = nodes.some(n => n.parentId === node.id);
-    if (nodeHasChildren) {
+    const children = nodes.filter(n => n.parentId === node.id);
+    console.log('[Whiteboard] Double click:', node.id, 'children:', children.length, children.map(c => c.id));
+    if (children.length > 0) {
       // 有子节点，进入下一层（drill-down）
+      console.log('[Whiteboard] Drilling down to:', node.id);
       setViewPath(prev => [...prev, node.id]);
       setExpandedNodes(prev => new Set([...prev, node.id]));
       setSelectedNodes(new Set());
       setSelectedEdge(null);
       setNeedsAutoLayout(true); // 触发自动布局
+    } else {
+      console.log('[Whiteboard] No children for:', node.id);
     }
-    // 无子节点时不做任何操作（不再进入编辑模式，避免误操作）
   }, [nodes]);
 
   // 更新节点名称
