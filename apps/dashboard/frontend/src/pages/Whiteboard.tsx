@@ -2000,7 +2000,7 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
   }
 
   return (
-    <div ref={containerRef} className={`flex relative bg-slate-900 ${embedded ? 'h-full w-full' : 'h-screen'} ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
+    <div ref={containerRef} className={`flex relative overflow-hidden bg-slate-900 ${embedded ? 'h-full w-full' : 'h-screen'} ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
       {/* CSS Keyframes for animations */}
       <style>{`
         @keyframes pulse {
@@ -2030,7 +2030,7 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
       />
 
       {/* 主内容区域 */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col relative overflow-hidden">
         {/* 工具栏 */}
         <div className={`h-12 flex items-center gap-2 px-3 border-b border-indigo-500/20 ${embedded ? 'bg-slate-900/40 backdrop-blur-sm' : 'bg-slate-900/40'}`}>
         {/* 面包屑导航 - 增强版 */}
@@ -3385,7 +3385,7 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
         if (!node) return null;
         const children = getChildNodes(detailNodeId);
         return (
-          <div className="absolute top-12 right-0 bottom-8 w-80 border-l border-indigo-500/30 flex flex-col z-30" style={{ background: 'linear-gradient(180deg, #1e2a5e 0%, #1e1b4b 100%)' }}>
+          <div className="fixed top-0 right-0 bottom-0 w-80 border-l border-indigo-500/30 flex flex-col z-40 shadow-2xl" style={{ background: 'linear-gradient(180deg, #1e2a5e 0%, #1e1b4b 100%)' }}>
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-indigo-500/30">
               <div className="flex items-center gap-2">
