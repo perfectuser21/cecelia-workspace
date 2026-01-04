@@ -111,12 +111,23 @@ elif [[ $CLAUDE_EXIT -ne 0 ]]; then
   exit 1
 fi
 
-# 检查是否有文件变更
+# 检查是否有文件变更（包括未跟踪、已暂存、未暂存的所有变更）
 cd "$PROJECT_PATH" || exit 1
-FILES_CHANGED=$(git diff --name-only HEAD 2>/dev/null | wc -l || echo 0)
+
+# 获取所有变更的文件列表
+ALL_CHANGED_FILES=$(mktemp)
+{
+  git diff --name-only 2>/dev/null
+  git diff --name-only --cached 2>/dev/null
+  git ls-files --others --exclude-standard 2>/dev/null
+} | sort -u > "$ALL_CHANGED_FILES"
+
+FILES_CHANGED=$(wc -l < "$ALL_CHANGED_FILES" | tr -d ' ')
 
 # 检查是否有组件创建（.tsx/.jsx 文件）
-COMPONENTS_CREATED=$(git diff --name-only HEAD 2>/dev/null | grep -E '\.(tsx|jsx)$' | wc -l || echo 0)
+COMPONENTS_CREATED=$(grep -E '\.(tsx|jsx)$' "$ALL_CHANGED_FILES" | wc -l || echo 0)
+
+rm -f "$ALL_CHANGED_FILES"
 
 log_info "执行完成，变更 $FILES_CHANGED 个文件，$COMPONENTS_CREATED 个组件"
 

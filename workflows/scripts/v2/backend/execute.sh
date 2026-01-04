@@ -111,11 +111,16 @@ elif [[ $CLAUDE_EXIT -ne 0 ]]; then
   exit 1
 fi
 
-# 检查是否有文件变更
+# 检查是否有文件变更（包括未跟踪、已暂存、未暂存的所有变更）
 cd "$PROJECT_PATH" || exit 1
-FILES_CHANGED=$(git diff --name-only HEAD 2>/dev/null | wc -l || echo 0)
 
-log_info "执行完成，变更 $FILES_CHANGED 个文件"
+# 统计所有类型的变更
+UNSTAGED=$(git diff --name-only 2>/dev/null | wc -l || echo 0)
+STAGED=$(git diff --name-only --cached 2>/dev/null | wc -l || echo 0)
+UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null | wc -l || echo 0)
+FILES_CHANGED=$((UNSTAGED + STAGED + UNTRACKED))
+
+log_info "执行完成，变更 $FILES_CHANGED 个文件 (未暂存: $UNSTAGED, 已暂存: $STAGED, 未跟踪: $UNTRACKED)"
 
 # 保存成功结果
 jq -n \
