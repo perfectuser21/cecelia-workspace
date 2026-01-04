@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, DragEvent } from 'react';
-import { ZoomIn, ZoomOut, RefreshCw, Save, Check, Loader2, Maximize, Minimize, Download, Image, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Trash2, Palette, Copy, AlignHorizontalSpaceBetween, AlignVerticalSpaceBetween, HelpCircle, LayoutGrid, GitBranch, Group, Ungroup, X, Plus, ChevronRight, ChevronDown, FileText } from 'lucide-react';
+import { ZoomIn, ZoomOut, RefreshCw, Save, Check, Loader2, Maximize, Minimize, Download, Image, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Trash2, Palette, Copy, AlignHorizontalSpaceBetween, AlignVerticalSpaceBetween, HelpCircle, LayoutGrid, GitBranch, Group, Ungroup, X, Plus, ChevronRight, ChevronDown, FileText, FolderOpen } from 'lucide-react';
 import MiniMap from './whiteboard/MiniMap';
 import { KeyboardHelp } from './whiteboard/KeyboardHelp';
 import { treeLayout, forceDirectedLayout, gridLayout, circularLayout, applyLayout } from './whiteboard/layoutUtils';
@@ -131,6 +131,8 @@ export default function Whiteboard({ embedded = false }: WhiteboardProps) {
   const [hoveredAnchor, setHoveredAnchor] = useState<{ nodeId: string; anchor: AnchorPosition } | null>(null);
   // 悬浮 Tooltip 位置（屏幕坐标）
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  // 双击下钻动画状态
+  const [drillingNode, setDrillingNode] = useState<string | null>(null);
 
   const [dragging, setDragging] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -478,13 +480,18 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
     const children = nodes.filter(n => n.parentId === node.id);
     console.log('[Whiteboard] Double click:', node.id, 'children:', children.length, children.map(c => c.id));
     if (children.length > 0) {
-      // 有子节点，进入下一层（drill-down）
-      console.log('[Whiteboard] Drilling down to:', node.id);
-      setViewPath(prev => [...prev, node.id]);
-      setExpandedNodes(prev => new Set([...prev, node.id]));
-      setSelectedNodes(new Set());
-      setSelectedEdge(null);
-      setNeedsAutoLayout(true); // 触发自动布局
+      // 播放下钻动画
+      setDrillingNode(node.id);
+      setTimeout(() => {
+        setDrillingNode(null);
+        // 有子节点，进入下一层（drill-down）
+        console.log('[Whiteboard] Drilling down to:', node.id);
+        setViewPath(prev => [...prev, node.id]);
+        setExpandedNodes(prev => new Set([...prev, node.id]));
+        setSelectedNodes(new Set());
+        setSelectedEdge(null);
+        setNeedsAutoLayout(true); // 触发自动布局
+      }, 300);
     } else {
       console.log('[Whiteboard] No children for:', node.id);
     }
@@ -1994,6 +2001,22 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
 
   return (
     <div ref={containerRef} className={`flex relative bg-slate-900 ${embedded ? 'h-full w-full' : 'h-screen'} ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
+      {/* CSS Keyframes for animations */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 0.4; transform: scale(1); }
+          50% { opacity: 0.8; transform: scale(1.02); }
+        }
+        @keyframes drillPulse {
+          0% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.8; transform: scale(1.15); }
+          100% { opacity: 0; transform: scale(1.3); }
+        }
+        @keyframes breadcrumbGlow {
+          0%, 100% { box-shadow: 0 0 4px rgba(99, 102, 241, 0.3); }
+          50% { box-shadow: 0 0 12px rgba(99, 102, 241, 0.6); }
+        }
+      `}</style>
       {/* 左侧项目边栏 */}
       <ProjectSidebar
         projects={projects}
@@ -2010,33 +2033,39 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
       <div className="flex-1 flex flex-col">
         {/* 工具栏 */}
         <div className={`h-12 flex items-center gap-2 px-3 border-b border-indigo-500/20 ${embedded ? 'bg-slate-900/40 backdrop-blur-sm' : 'bg-slate-900/40'}`}>
-        {/* 面包屑导航 */}
+        {/* 面包屑导航 - 增强版 */}
         {viewPath.length > 0 && (
-          <div className="flex items-center gap-1 mr-2">
+          <div className="flex items-center gap-2 mr-3 px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg" style={{ animation: 'breadcrumbGlow 2s ease-in-out infinite' }}>
             <button
               onClick={goBack}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-slate-300 bg-slate-900/60 border border-indigo-500/30 rounded hover:bg-indigo-500/20"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-300 bg-indigo-500/20 border border-indigo-400/40 rounded-md hover:bg-indigo-500/30 hover:text-indigo-200 transition-all"
             >
-              ← 返回
+              ← 返回上层
             </button>
-            <div className="flex items-center gap-1 text-xs text-slate-400">
+            <div className="h-4 w-px bg-indigo-500/30" />
+            <div className="flex items-center gap-1 text-xs">
               <button
                 onClick={() => goToLevel(0)}
-                className="hover:text-slate-200"
+                className="px-2 py-0.5 text-slate-300 hover:text-white hover:bg-indigo-500/20 rounded transition-all"
               >
-                根
+                🏠 根
               </button>
               {viewPath.map((nodeId, index) => {
                 const node = nodes.find(n => n.id === nodeId);
+                const isLast = index === viewPath.length - 1;
                 return (
                   <React.Fragment key={nodeId}>
-                    <ChevronRight className="w-3 h-3" />
+                    <ChevronRight className="w-3 h-3 text-indigo-400" />
                     <button
                       onClick={() => goToLevel(index + 1)}
-                      className="hover:text-slate-200 max-w-[80px] truncate"
+                      className={`px-2 py-0.5 rounded transition-all max-w-[100px] truncate ${
+                        isLast
+                          ? 'text-indigo-200 bg-indigo-500/30 font-medium'
+                          : 'text-slate-300 hover:text-white hover:bg-indigo-500/20'
+                      }`}
                       title={node?.name}
                     >
-                      {node?.name || nodeId}
+                      📁 {node?.name || nodeId}
                     </button>
                   </React.Fragment>
                 );
@@ -2395,6 +2424,8 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
               const isEditing = editingNodeId === node.id;
               const nodeGroup = node.groupId ? groups.get(node.groupId) : null;
               const nodeHasChildren = hasChildren(node.id);
+              const isDrilling = drillingNode === node.id;
+              const childCount = nodeHasChildren ? nodes.filter(n => n.parentId === node.id).length : 0;
               return (
                 <g
                   key={node.id}
@@ -2415,8 +2446,50 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
                     setHoveredNode(null);
                     setTooltipPos(null);
                   }}
-                  style={{ cursor: dragging === node.id ? 'grabbing' : 'grab' }}
+                  style={{
+                    cursor: nodeHasChildren ? 'pointer' : (dragging === node.id ? 'grabbing' : 'grab'),
+                    transition: 'transform 0.3s ease-out, opacity 0.3s ease-out',
+                    transform: isDrilling ? 'scale(1.1)' : 'scale(1)',
+                    opacity: isDrilling ? 0.7 : 1,
+                  }}
                 >
+                  {/* Drillable node glow effect - 可下钻节点发光效果 */}
+                  {nodeHasChildren && isHovered && !isDrilling && (
+                    <rect
+                      x={-8}
+                      y={-8}
+                      width={node.width + 16}
+                      height={node.height + 16}
+                      rx={16}
+                      fill="none"
+                      stroke={getNodeColor(node)}
+                      strokeWidth={3}
+                      opacity={0.6}
+                      style={{
+                        filter: `drop-shadow(0 0 8px ${getNodeColor(node)})`,
+                        animation: 'pulse 1.5s ease-in-out infinite',
+                      }}
+                      pointerEvents="none"
+                    />
+                  )}
+                  {/* Drilling animation effect - 下钻动画效果 */}
+                  {isDrilling && (
+                    <rect
+                      x={-12}
+                      y={-12}
+                      width={node.width + 24}
+                      height={node.height + 24}
+                      rx={20}
+                      fill="none"
+                      stroke="#22c55e"
+                      strokeWidth={4}
+                      style={{
+                        filter: 'drop-shadow(0 0 12px #22c55e)',
+                        animation: 'drillPulse 0.3s ease-out',
+                      }}
+                      pointerEvents="none"
+                    />
+                  )}
                   {/* Group visual indicator - background glow */}
                   {nodeGroup && (
                     <rect
@@ -2531,6 +2604,36 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
                       <title>Click to select entire group</title>
                     </g>
                   )}
+                  {/* Drillable indicator - 右下角文件夹图标和子节点数量 */}
+                  {nodeHasChildren && (
+                    <g transform={`translate(${node.width - 28}, ${node.height - 18})`}>
+                      <rect
+                        x={-4}
+                        y={-4}
+                        width={36}
+                        height={20}
+                        rx={6}
+                        fill="#1e293b"
+                        stroke={getNodeColor(node)}
+                        strokeWidth={1.5}
+                        opacity={0.9}
+                      />
+                      <foreignObject x={0} y={-2} width={16} height={16}>
+                        <FolderOpen size={14} color={getNodeColor(node)} style={{ opacity: 0.9 }} />
+                      </foreignObject>
+                      <text
+                        x={20}
+                        y={9}
+                        fill={getNodeColor(node)}
+                        fontSize={10}
+                        fontWeight={600}
+                        style={{ pointerEvents: 'none' }}
+                      >
+                        {childCount}
+                      </text>
+                      <title>包含 {childCount} 个子节点，双击进入查看</title>
+                    </g>
+                  )}
                   {/* Expand/Collapse toggle button for nodes with children */}
                   {nodeHasChildren && (
                     <g
@@ -2543,17 +2646,20 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
                       onMouseDown={(e) => e.stopPropagation()}
                     >
                       <circle
-                        r={10}
+                        r={12}
                         fill={expandedNodes.has(node.id) ? getNodeColor(node) : '#1e293b'}
                         stroke={getNodeColor(node)}
                         strokeWidth={2}
+                        style={{
+                          filter: isHovered ? `drop-shadow(0 0 4px ${getNodeColor(node)})` : 'none',
+                        }}
                       />
                       <text
                         x={0}
-                        y={4}
+                        y={5}
                         fill={expandedNodes.has(node.id) ? '#fff' : getNodeColor(node)}
-                        fontSize={14}
-                        fontWeight={600}
+                        fontSize={16}
+                        fontWeight={700}
                         textAnchor="middle"
                         style={{ pointerEvents: 'none' }}
                       >
