@@ -3385,7 +3385,7 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
         if (!node) return null;
         const children = getChildNodes(detailNodeId);
         return (
-          <div className="w-80 border-l border-indigo-500/30 flex flex-col shrink-0" style={{ background: 'linear-gradient(180deg, #1e2a5e 0%, #1e1b4b 100%)' }}>
+          <div className="absolute top-12 right-0 bottom-8 w-80 border-l border-indigo-500/30 flex flex-col z-30" style={{ background: 'linear-gradient(180deg, #1e2a5e 0%, #1e1b4b 100%)' }}>
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-indigo-500/30">
               <div className="flex items-center gap-2">
