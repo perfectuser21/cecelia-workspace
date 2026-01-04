@@ -1983,11 +1983,11 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
       />
 
       {/* 主内容区域（包含画布和右侧边栏的水平布局） */}
-      <div className="flex-1 flex min-w-0">
+      <div className="flex-1 flex min-w-0 h-full overflow-hidden">
         {/* 画布和工具栏的垂直布局 */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 h-full">
         {/* 工具栏 */}
-        <div className={`h-12 flex items-center gap-2 px-3 border-b border-indigo-500/20 ${embedded ? 'bg-slate-900/40 backdrop-blur-sm' : 'bg-slate-900/40'}`}>
+        <div className={`h-12 flex-shrink-0 flex items-center gap-2 px-3 border-b border-indigo-500/20 overflow-x-auto ${embedded ? 'bg-slate-900/40 backdrop-blur-sm' : 'bg-slate-900/40'}`}>
         {/* 面包屑导航 */}
         {viewPath.length > 0 && (
           <div className="flex items-center gap-1 mr-2">
@@ -3204,7 +3204,7 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
         const connectedEdges = edges.filter(e => e.from === activeNode.id || e.to === activeNode.id);
 
         return (
-          <div className="w-72 flex-shrink-0 border-l border-indigo-500/20 flex flex-col" style={{ background: 'linear-gradient(180deg, #1e2a5e 0%, #1e1b4b 100%)' }}>
+          <div className="w-72 flex-shrink-0 h-full max-h-full border-l border-indigo-500/20 flex flex-col overflow-hidden" style={{ background: 'linear-gradient(180deg, #1e2a5e 0%, #1e1b4b 100%)' }}>
             <div className="flex-1 overflow-y-auto p-4">
               {/* 标题行 - 简洁版 */}
               <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-700/50">
