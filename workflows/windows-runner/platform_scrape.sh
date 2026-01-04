@@ -23,5 +23,6 @@ case "$PLATFORM" in
   *) echo "{\"error\": \"Unknown platform: $PLATFORM\"}" && exit 1 ;;
 esac
 
-# Run VPS scraper
-cd /home/xx && node vps_scraper.js "$PLATFORM_NEW"
+# Run VPS scraper from project directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR" && node vps_scraper.js "$PLATFORM_NEW"
