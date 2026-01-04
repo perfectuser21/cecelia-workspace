@@ -2261,7 +2261,7 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
       </div>
 
       {/* 画布区域容器 */}
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         {/* 画布 */}
         <div className="flex-1 relative overflow-hidden">
         <svg
@@ -3079,7 +3079,7 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
           const depth = getNodeDepth(selectedNode.id);
 
           return (
-            <div className="border-t border-indigo-500/30 bg-slate-900/80 p-4">
+            <div className="flex-shrink-0 border-t border-indigo-500/30 bg-slate-900/80 p-4">
               <div className="max-w-6xl mx-auto">
                 {/* 标题行 */}
                 <div className="flex items-center gap-3 mb-3">
