@@ -22,8 +22,8 @@ interface MiniMapProps {
   onPanTo: (x: number, y: number) => void;
 }
 
-const MINIMAP_WIDTH = 180;
-const MINIMAP_HEIGHT = 120;
+const MINIMAP_WIDTH = 160;
+const MINIMAP_HEIGHT = 100;
 const PADDING = 10;
 
 export default function MiniMap({ nodes, edges, viewBox, canvasSize, onPanTo }: MiniMapProps) {
@@ -164,7 +164,7 @@ export default function MiniMap({ nodes, edges, viewBox, canvasSize, onPanTo }: 
   };
 
   return (
-    <div className="absolute bottom-4 left-3 w-[180px] h-[120px] bg-slate-800/80 border border-slate-600 rounded-lg overflow-hidden shadow-lg backdrop-blur-sm z-20">
+    <div className="absolute bottom-4 left-4 w-[160px] h-[100px] bg-slate-800/90 border border-slate-600 rounded-lg overflow-hidden shadow-lg backdrop-blur-sm z-10">
       <svg
         ref={svgRef}
         width="100%"

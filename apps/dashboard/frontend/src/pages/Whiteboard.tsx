@@ -1982,8 +1982,10 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
-      {/* 主内容区域 */}
-      <div className="flex-1 flex flex-col">
+      {/* 主内容区域（包含画布和右侧边栏的水平布局） */}
+      <div className="flex-1 flex min-w-0">
+        {/* 画布和工具栏的垂直布局 */}
+        <div className="flex-1 flex flex-col min-w-0">
         {/* 工具栏 */}
         <div className={`h-12 flex items-center gap-2 px-3 border-b border-indigo-500/20 ${embedded ? 'bg-slate-900/40 backdrop-blur-sm' : 'bg-slate-900/40'}`}>
         {/* 面包屑导航 */}
@@ -2300,7 +2302,10 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
 
             {/* 展开状态下的父子连接线 - 根据布局方向决定锚点 */}
             {visibleNodes.filter(n => n.parentId && expandedNodes.has(n.parentId)).map(child => {
-              const parent = nodes.find(n => n.id === child.parentId);
+              // 在下钻视图中，不绘制指向当前根节点的连线（它已经是顶层）
+              if (currentParentId && child.id === currentParentId) return null;
+              // 确保父节点也是可见的
+              const parent = visibleNodes.find(n => n.id === child.parentId);
               if (!parent) return null;
               const color = getNodeColor(parent);
 
@@ -3184,6 +3189,7 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
         })()}
 
       </div>{/* 关闭画布区域容器 div */}
+        </div>{/* 关闭画布和工具栏的垂直布局 div */}
 
       {/* 右侧详情栏 - 悬停或单选时显示 */}
       {!showDetailPanel && (() => {
