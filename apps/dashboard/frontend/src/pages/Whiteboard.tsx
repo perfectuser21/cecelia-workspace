@@ -1455,6 +1455,10 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
 
   const visibleNodes = nodes.filter(isNodeVisible);
   const visibleEdges = edges.filter(e => {
+    // 在下钻视图中，隐藏指向当前根节点的边（根节点已经是最顶层，不需要外部连线）
+    if (currentParentId && e.to === currentParentId) {
+      return false;
+    }
     const fromNode = nodes.find(n => n.id === e.from);
     const toNode = nodes.find(n => n.id === e.to);
     return fromNode && toNode && isNodeVisible(fromNode) && isNodeVisible(toNode);
@@ -3194,7 +3198,7 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
         const connectedEdges = edges.filter(e => e.from === activeNode.id || e.to === activeNode.id);
 
         return (
-          <div className="w-72 border-l border-indigo-500/20 flex flex-col" style={{ background: 'linear-gradient(180deg, #1e2a5e 0%, #1e1b4b 100%)' }}>
+          <div className="w-72 flex-shrink-0 border-l border-indigo-500/20 flex flex-col" style={{ background: 'linear-gradient(180deg, #1e2a5e 0%, #1e1b4b 100%)' }}>
             <div className="flex-1 overflow-y-auto p-4">
               {/* 标题行 - 简洁版 */}
               <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-700/50">

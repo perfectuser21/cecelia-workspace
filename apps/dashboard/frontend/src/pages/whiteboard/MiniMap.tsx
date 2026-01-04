@@ -164,7 +164,7 @@ export default function MiniMap({ nodes, edges, viewBox, canvasSize, onPanTo }: 
   };
 
   return (
-    <div className="absolute bottom-4 left-4 w-[180px] h-[120px] bg-slate-800/80 border border-slate-600 rounded-lg overflow-hidden shadow-lg backdrop-blur-sm z-20">
+    <div className="absolute bottom-4 left-3 w-[180px] h-[120px] bg-slate-800/80 border border-slate-600 rounded-lg overflow-hidden shadow-lg backdrop-blur-sm z-20">
       <svg
         ref={svgRef}
         width="100%"
