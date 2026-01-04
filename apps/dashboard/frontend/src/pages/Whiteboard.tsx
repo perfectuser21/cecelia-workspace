@@ -1987,7 +1987,7 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
         {/* 画布和工具栏的垂直布局 */}
         <div className="flex-1 flex flex-col min-w-0 h-full">
         {/* 工具栏 */}
-        <div className={`h-12 flex-shrink-0 flex items-center gap-2 px-3 border-b border-indigo-500/20 overflow-x-auto ${embedded ? 'bg-slate-900/40 backdrop-blur-sm' : 'bg-slate-900/40'}`}>
+        <div className={`h-12 flex-shrink-0 flex items-center gap-1 px-2 border-b border-indigo-500/20 min-w-0 relative z-30 ${embedded ? 'bg-slate-900/40 backdrop-blur-sm' : 'bg-slate-900/40'}`}>
         {/* 面包屑导航 */}
         {viewPath.length > 0 && (
           <div className="flex items-center gap-1 mr-2">
@@ -2023,8 +2023,8 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
             <div className="w-px h-6 bg-slate-700/50 ml-2" />
           </div>
         )}
-        {/* 形状 */}
-        <div className="flex items-center gap-0.5 p-0.5 bg-slate-900/60 border border-indigo-500/30 rounded-lg">
+        {/* 形状 - 可压缩 */}
+        <div className="flex items-center gap-0.5 p-0.5 bg-slate-900/60 border border-indigo-500/30 rounded-lg min-w-0 overflow-hidden">
           {(Object.keys(shapeConfig) as ShapeType[]).map(shape => (
             <div
               key={shape}
@@ -2047,8 +2047,8 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
           ))}
         </div>
 
-        {/* 颜色 */}
-        <div className="flex items-center gap-0.5 p-0.5 bg-slate-900/60 border border-indigo-500/30 rounded-lg">
+        {/* 颜色 - 可压缩 */}
+        <div className="flex items-center gap-0.5 p-0.5 bg-slate-900/60 border border-indigo-500/30 rounded-lg min-w-0 overflow-hidden">
           {defaultColors.map(color => (
             <button
               key={color}
@@ -2138,9 +2138,9 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
           </button>
         </div>
 
-        {/* 布局整理 */}
+        {/* 布局整理 - 不压缩 */}
         {/* 布局方向切换 + 整理 */}
-        <div className="flex items-center gap-1 bg-slate-800/50 border border-slate-700/50 rounded-lg p-0.5">
+        <div className="flex-shrink-0 flex items-center gap-1 bg-slate-800/50 border border-slate-700/50 rounded-lg p-0.5">
           <button
             onClick={() => { setLayoutDirection('horizontal'); setTimeout(autoArrangeLayout, 50); }}
             className={`px-2 py-1 text-xs rounded transition-colors ${layoutDirection === 'horizontal' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
@@ -2166,8 +2166,8 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
           </button>
         </div>
 
-        {/* 展开/收起全部 */}
-        <div className="flex items-center gap-1 bg-slate-800/50 border border-slate-700/50 rounded-lg p-0.5">
+        {/* 展开/收起全部 - 不压缩 */}
+        <div className="flex-shrink-0 flex items-center gap-1 bg-slate-800/50 border border-slate-700/50 rounded-lg p-0.5">
           <button
             onClick={expandAll}
             disabled={visibleNodes.length === 0}
@@ -3079,7 +3079,7 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
           const depth = getNodeDepth(selectedNode.id);
 
           return (
-            <div className="flex-shrink-0 border-t border-indigo-500/30 bg-slate-900/80 p-4">
+            <div className="flex-shrink-0 border-t border-indigo-500/30 bg-slate-900/80 px-5 py-8 relative z-40">
               <div className="max-w-6xl mx-auto">
                 {/* 标题行 */}
                 <div className="flex items-center gap-3 mb-3">
@@ -3204,7 +3204,7 @@ const screenToSvg = useCallback((clientX: number, clientY: number) => {
         const connectedEdges = edges.filter(e => e.from === activeNode.id || e.to === activeNode.id);
 
         return (
-          <div className="w-72 flex-shrink-0 h-full max-h-full border-l border-indigo-500/20 flex flex-col overflow-hidden" style={{ background: 'linear-gradient(180deg, #1e2a5e 0%, #1e1b4b 100%)' }}>
+          <div className="w-60 flex-shrink-0 h-full max-h-full border-l border-indigo-500/20 flex flex-col overflow-hidden relative z-20" style={{ background: 'linear-gradient(180deg, #1e2a5e 0%, #1e1b4b 100%)' }}>
             <div className="flex-1 overflow-y-auto p-4">
               {/* 标题行 - 简洁版 */}
               <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-700/50">
