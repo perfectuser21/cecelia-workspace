@@ -1,0 +1,92 @@
+# ZenithJoy Autopilot - 生产部署配置
+# 部署命令: docker compose -f deploy/docker-compose.yml up -d
+
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: zenithjoy-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-n8n_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-n8n_social_metrics}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - zenithjoy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-n8n_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Dashboard API
+  api:
+    build:
+      context: ../apps/dashboard
+      dockerfile: Dockerfile
+    container_name: zenithjoy-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-n8n_user}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-n8n_social_metrics}
+      COLLECTOR_API_KEY: ${COLLECTOR_API_KEY:-}
+      NOTION_API_KEY: ${NOTION_API_KEY:-}
+      FEISHU_WEBHOOK_URL: ${FEISHU_WEBHOOK_URL:-}
+    ports:
+      - "3333:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - zenithjoy-network
+    volumes:
+      - api_uploads:/app/data/uploads
+
+  # n8n 工作流引擎
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: zenithjoy-n8n
+    restart: unless-stopped
+    environment:
+      N8N_HOST: ${N8N_HOST:-localhost}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://localhost:5679}
+      GENERIC_TIMEZONE: Asia/Shanghai
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${DB_NAME:-n8n_social_metrics}
+      DB_POSTGRESDB_USER: ${DB_USER:-n8n_user}
+      DB_POSTGRESDB_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "5678:5678"
+      - "5679:5679"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - zenithjoy-network
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  postgres_data:
+  api_uploads:
+  n8n_data:
+
+networks:
+  zenithjoy-network:
+    name: zenithjoy-network
+    driver: bridge

@@ -1,0 +1,27 @@
+# webhook-validator Feature Configuration
+name: webhook-validator
+category: business
+version: 1.0.0
+
+# API Configuration
+api:
+  basePath: /api/webhook-validator
+  requiresAuth: false
+
+# Dependencies
+dependencies:
+  shared:
+    - utils/logger
+
+# External Services
+services:
+  - n8n (webhook endpoint)
+
+# Configuration
+webhook:
+  url: http://localhost:5679/webhook/execution-callback
+  port: 5679
+  container: n8n-self-hosted
+  retryMechanism:
+    maxRetries: 3
+    retryDelay: 2

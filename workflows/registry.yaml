@@ -1,0 +1,189 @@
+# ZenithJoy Workflows Registry
+# 所有工作流的单一注册表，支持标签和分类
+
+version: "1.0"
+updated_at: "2026-01-05"
+
+# 工作流分类
+categories:
+  ai-factory:
+    name: AI Factory
+    description: AI 自动化编程工厂
+    color: "#8B5CF6"
+
+  data-collection:
+    name: 数据采集
+    description: 多平台数据采集
+    color: "#10B981"
+
+  content-publish:
+    name: 内容发布
+    description: 多平台内容发布
+    color: "#F59E0B"
+
+  monitoring:
+    name: 监控运维
+    description: 系统监控和运维
+    color: "#EF4444"
+
+  utility:
+    name: 工具类
+    description: 通用工具工作流
+    color: "#6B7280"
+
+# 标签定义
+tags:
+  shared: 被多个 bundle 共享
+  scheduler: 定时任务
+  webhook: Webhook 触发
+  manual: 手动触发
+  deprecated: 已废弃
+
+# 工作流注册表
+workflows:
+  # ========== AI Factory ==========
+  codebase-factory:
+    name: Codebase Factory
+    file: exports/bundles/ai-factory/codebase-factory.json
+    category: ai-factory
+    tags: [webhook]
+    description: 代码库工厂主工作流
+    version: "1.3.0"
+
+  vibe-coding-master:
+    name: Vibe Coding Master
+    file: exports/bundles/ai-factory/vibe-coding-master.json
+    category: ai-factory
+    tags: [webhook]
+    description: Vibe Coding 主控制器
+    version: "1.0.0"
+
+  execution-callback:
+    name: Execution Callback
+    file: exports/bundles/ai-factory/execution-callback.json
+    category: ai-factory
+    tags: [webhook, shared]
+    description: 执行回调处理（被多个工作流共享）
+    version: "1.0.0"
+    used_by:
+      - ai-factory
+      - monitoring
+
+  feature-entry-checker-v2:
+    name: Feature Entry Checker
+    file: exports/bundles/ai-factory/feature-entry-checker-v2.json
+    category: ai-factory
+    tags: [webhook]
+    description: Feature 入口检查器
+    version: "2.0.0"
+
+  feature-completion-sync-v2:
+    name: Feature Completion Sync
+    file: exports/bundles/ai-factory/feature-completion-sync-v2.json
+    category: ai-factory
+    tags: [webhook]
+    description: Feature 完成同步
+    version: "2.0.0"
+
+  completion-sync:
+    name: Completion Sync
+    file: exports/bundles/ai-factory/completion-sync.json
+    category: ai-factory
+    tags: [webhook]
+    description: 完成同步通知
+    version: "1.0.0"
+
+  # ========== Data Collection ==========
+  data-scheduler:
+    name: Data Collection Scheduler
+    file: exports/bundles/data-collection/scheduler.json
+    category: data-collection
+    tags: [scheduler]
+    description: 数据采集调度器
+    version: "1.0.0"
+
+  douyin-scraper:
+    name: 抖音采集
+    file: exports/bundles/data-collection/douyin.json
+    category: data-collection
+    tags: [webhook]
+    description: 抖音数据采集
+    version: "1.0.0"
+
+  kuaishou-scraper:
+    name: 快手采集
+    file: exports/bundles/data-collection/kuaishou.json
+    category: data-collection
+    tags: [webhook]
+    description: 快手数据采集
+    version: "1.0.0"
+
+  xiaohongshu-scraper:
+    name: 小红书采集
+    file: exports/bundles/data-collection/xiaohongshu.json
+    category: data-collection
+    tags: [webhook]
+    description: 小红书数据采集
+    version: "1.0.0"
+
+  toutiao-scraper:
+    name: 头条采集
+    file: exports/bundles/data-collection/toutiao.json
+    category: data-collection
+    tags: [webhook]
+    description: 今日头条数据采集
+    version: "1.0.0"
+
+  weibo-scraper:
+    name: 微博采集
+    file: exports/bundles/data-collection/weibo.json
+    category: data-collection
+    tags: [webhook]
+    description: 微博数据采集
+    version: "1.0.0"
+
+  # ========== Utilities ==========
+  claude-code-ssh-executor:
+    name: Claude Code SSH Executor
+    file: utilities/claude-code-ssh-executor.json
+    category: utility
+    tags: [webhook, shared]
+    description: SSH 远程执行 Claude Code
+    version: "1.0.0"
+    used_by:
+      - ai-factory
+
+  hello-world:
+    name: Hello World
+    file: utilities/hello-world.json
+    category: utility
+    tags: [manual]
+    description: 测试工作流
+    version: "1.0.0"
+
+# Bundle 定义（引用 registry 中的 workflows）
+bundles:
+  ai-factory:
+    name: AI Factory Bundle
+    workflows:
+      - codebase-factory
+      - vibe-coding-master
+      - execution-callback
+      - feature-entry-checker-v2
+      - feature-completion-sync-v2
+      - completion-sync
+
+  data-collection:
+    name: Data Collection Bundle
+    workflows:
+      - data-scheduler
+      - douyin-scraper
+      - kuaishou-scraper
+      - xiaohongshu-scraper
+      - toutiao-scraper
+      - weibo-scraper
+
+  monitoring:
+    name: Monitoring Bundle
+    workflows:
+      - execution-callback  # 共享
