@@ -21,6 +21,7 @@ ai-factory/
 ├── ai-factory.types.ts      # TypeScript 类型定义
 ├── CLAUDE.md                # 本文档
 └── scripts/                 # Bash 脚本
+    ├── main.sh              # 主入口（n8n 调用此脚本）
     ├── config.sh            # 配置变量
     ├── utils.sh             # 共享工具函数
     ├── worktree-manager.sh  # Worktree 管理
