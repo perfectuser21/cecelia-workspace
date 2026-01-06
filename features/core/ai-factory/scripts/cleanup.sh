@@ -26,6 +26,45 @@ source "$SCRIPT_DIR/utils.sh"
 source "$SCRIPT_DIR/worktree-manager.sh"
 
 # ============================================================
+# 锁机制 - 防止同一任务的 cleanup 被重复执行
+# ============================================================
+LOCK_DIR="${DATA_DIR}/locks"
+mkdir -p "$LOCK_DIR"
+
+acquire_lock() {
+  local task_id="$1"
+  local lock_file="${LOCK_DIR}/cleanup-${task_id}.lock"
+
+  # 使用 flock 获取独占锁，非阻塞模式
+  exec 200>"$lock_file"
+  if ! flock -n 200; then
+    echo "ERROR: cleanup 已在执行中 (task: $task_id)，跳过重复执行" >&2
+    return 1
+  fi
+
+  # 写入 PID 用于调试
+  echo "$$" > "$lock_file"
+  return 0
+}
+
+release_lock() {
+  local task_id="$1"
+  local lock_file="${LOCK_DIR}/cleanup-${task_id}.lock"
+
+  # 释放锁并清理文件
+  flock -u 200 2>/dev/null || true
+  rm -f "$lock_file" 2>/dev/null || true
+}
+
+# 脚本退出时释放锁
+cleanup_on_exit() {
+  if [[ -n "$TASK_ID" ]]; then
+    release_lock "$TASK_ID"
+  fi
+}
+trap cleanup_on_exit EXIT
+
+# ============================================================
 # 参数解析
 # ============================================================
 TASK_ID=""
@@ -72,6 +111,11 @@ if [[ "$EXECUTION_RESULT" != "success" && "$EXECUTION_RESULT" != "failed" ]]; th
   exit 1
 fi
 
+# 获取锁，防止同一任务的 cleanup 被重复执行
+if ! acquire_lock "$TASK_ID"; then
+  exit 0  # 锁已被占用，静默退出
+fi
+
 BRANCH_NAME="${GIT_BRANCH_PREFIX}/${TASK_ID}"
 WORKTREE_PATH="${WORKTREES_DIR}/${TASK_ID}"
 LOG_FILE="${LOGS_DIR}/cleanup-${TASK_ID}.log"
@@ -104,6 +148,22 @@ if [[ -n "$TASK_INFO" ]]; then
 fi
 
 log_info "任务名称: $TASK_NAME"
+
+# ============================================================
+# 提前统计文件改动数（在 worktree 被清理前）
+# ============================================================
+CHANGED_FILES_COUNT=0
+if [[ -d "$WORKTREE_PATH" ]]; then
+  cd "$WORKTREE_PATH" 2>/dev/null || true
+  # 获取当前分支与 main 的差异统计
+  local_diff_stat=$(git diff --stat origin/${GIT_BASE_BRANCH}..HEAD 2>/dev/null | tail -1)
+  if [[ -n "$local_diff_stat" ]]; then
+    # 从 "X files changed" 中提取文件数
+    CHANGED_FILES_COUNT=$(echo "$local_diff_stat" | grep -oE '[0-9]+ file' | grep -oE '[0-9]+' | head -1)
+    [[ -z "$CHANGED_FILES_COUNT" ]] && CHANGED_FILES_COUNT=0
+  fi
+  log_info "统计文件改动数: ${CHANGED_FILES_COUNT} 个文件"
+fi
 
 # ============================================================
 # 处理执行结果
@@ -350,8 +410,8 @@ if [[ "$EXECUTION_RESULT" == "success" && "$HAS_CONFLICT" == "true" ]]; then
   SUMMARY_STATUS="conflict"
 fi
 
-# 调用 append_execution_summary
-if append_execution_summary "$TASK_ID" "$SUMMARY_STATUS" "$START_TIME" "$END_TIME" "$MODEL" "$WORKTREE_PATH" "$BRANCH_NAME"; then
+# 调用 append_execution_summary（传入预先统计的文件改动数）
+if append_execution_summary "$TASK_ID" "$SUMMARY_STATUS" "$START_TIME" "$END_TIME" "$MODEL" "$WORKTREE_PATH" "$BRANCH_NAME" "$CHANGED_FILES_COUNT"; then
   log_info "执行摘要已追加"
 else
   log_warn "追加执行摘要失败"

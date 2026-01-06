@@ -154,4 +154,29 @@ curl http://localhost:3333/v1/ai-factory/worktrees
 
 ---
 
-**最后更新**: 2026-01-05
+## 禁止删除的文件
+
+**执行 AI Factory 任务时，严禁删除以下文件**：
+
+```
+features/core/ai-factory/scripts/
+├── main.sh              # 主入口脚本 - 禁止删除
+├── config.sh            # 配置变量 - 禁止删除
+├── utils.sh             # 工具函数 - 禁止删除
+├── worktree-manager.sh  # Worktree 管理 - 禁止删除
+├── prepare.sh           # 准备阶段 - 禁止删除
+├── executor.sh          # 执行阶段 - 禁止删除
+└── cleanup.sh           # 收尾阶段 - 禁止删除
+```
+
+**此外，禁止删除项目中的以下关键目录**：
+- `features/business/` - 业务模块
+- `features/core/` - 核心模块
+- 任何 `*.sh` 脚本文件
+- 任何 `index.ts` 入口文件
+
+如果任务需要修改这些文件，应该编辑内容而不是删除重建。
+
+---
+
+**最后更新**: 2026-01-06

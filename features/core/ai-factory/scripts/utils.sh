@@ -318,7 +318,7 @@ send_feishu_card() {
 }
 
 # 追加执行摘要到 Notion 页面
-# 参数: $1=page_id, $2=status, $3=start_time, $4=end_time, $5=model, $6=worktree_path, $7=branch_name
+# 参数: $1=page_id, $2=status, $3=start_time, $4=end_time, $5=model, $6=worktree_path, $7=branch_name, $8=changed_files_count（可选，如已提前统计）
 append_execution_summary() {
   local page_id="$1"
   local status="$2"
@@ -327,6 +327,7 @@ append_execution_summary() {
   local model="${5:-unknown}"
   local worktree_path="$6"
   local branch_name="$7"
+  local precomputed_changed_files="${8:-}"
 
   if [[ "${TEST_MODE:-}" == "1" ]]; then
     log_info "[TEST_MODE] 模拟追加执行摘要到 Notion: $page_id"
@@ -351,9 +352,12 @@ append_execution_summary() {
     fi
   fi
 
-  # 统计改动文件数
+  # 使用预先统计的文件数，或尝试实时统计（worktree 可能已被清理）
   local changed_files=0
-  if [[ -d "$worktree_path" ]]; then
+  if [[ -n "$precomputed_changed_files" && "$precomputed_changed_files" != "0" ]]; then
+    # 使用调用者提前统计的数据
+    changed_files="$precomputed_changed_files"
+  elif [[ -d "$worktree_path" ]]; then
     cd "$worktree_path" 2>/dev/null || true
     # 获取当前分支与 main 的差异统计
     local diff_stat=$(git diff --stat origin/main..HEAD 2>/dev/null | tail -1)
