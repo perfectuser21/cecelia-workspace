@@ -13,7 +13,7 @@ Instance stack   →  管理「客户配置」（启用哪些 feature、版本�
 
 | 分支 | 用途 | 谁用 |
 |------|------|------|
-| `master` | 开发分支 | 开发者 |
+| `main` | 开发分支 | 开发者 |
 | `stable` | 稳定分支 | 客户团队 |
 
 ### Git 标签
@@ -48,8 +48,8 @@ features:
 ### 1. 日常开发
 
 ```bash
-# 在 master 分支开发
-git checkout master
+# 在 main 分支开发
+git checkout main
 # ... 开发新功能 ...
 git commit -m "feat: xxx"
 ```
@@ -57,7 +57,7 @@ git commit -m "feat: xxx"
 ### 2. 发布稳定版
 
 ```bash
-# 1. 确认 master 稳定
+# 1. 确认 main 稳定
 # 2. 更新 stack.yml 中的版本号
 # 3. 打标签
 git tag v1.1.0
@@ -65,7 +65,7 @@ git push origin v1.1.0
 
 # 4. 更新 stable 分支
 git checkout stable
-git merge master
+git merge main
 git push origin stable
 ```
 
