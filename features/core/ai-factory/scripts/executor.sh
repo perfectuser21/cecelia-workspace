@@ -224,6 +224,7 @@ To complete: output <promise>TASK_COMPLETE</promise> when ALL requirements are m
       # 运行 claude -p
       if timeout "$ITERATION_TIMEOUT" claude -p \
         --model "$MODEL" \
+        --cwd "$WORKTREE_PATH" \
         --permission-mode "bypassPermissions" \
         --dangerously-skip-permissions \
         "$ITERATION_PROMPT" > "$ITERATION_OUTPUT" 2>&1; then
@@ -302,8 +303,7 @@ $QUALITY_ERRORS
 
     if claude -p \
       --model "$MODEL" \
-      --max-budget-usd "$BUDGET" \
-      --permission-mode "bypassPermissions" \
+      --cwd "$WORKTREE_PATH" \
       --dangerously-skip-permissions \
       "$PROMPT" > "$CLAUDE_OUTPUT_FILE" 2>&1; then
       EXECUTION_RESULT="success"

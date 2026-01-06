@@ -66,12 +66,12 @@ log_info "状态: $TASK_STATUS"
 log_info "[2/4] 创建 Git Worktree..."
 
 # create_worktree 输出可能包含 git 信息，只取最后一行（路径）
-WORKTREE_OUTPUT=$(create_worktree "$TASK_ID" 2>&1)
-WORKTREE_PATH=$(echo "$WORKTREE_OUTPUT" | grep "^/home" | tail -1)
+# 使用更稳定的方法获取路径
+WORKTREE_PATH=$(create_worktree "$TASK_ID" 2>/dev/null | tail -1)
 
 if [[ -z "$WORKTREE_PATH" || ! -d "$WORKTREE_PATH" ]]; then
   log_error "创建 Worktree 失败"
-  log_error "输出: $WORKTREE_OUTPUT"
+  log_error "Worktree 路径: $WORKTREE_PATH"
   exit 1
 fi
 
@@ -108,7 +108,7 @@ When done, output: <promise>TASK_COMPLETE</promise>
 ---
 Task ID: $TASK_ID
 Notion: https://notion.so/${TASK_ID//-/}
-Generated: $(date -Iseconds)
+Generated: $(date '+%Y-%m-%d %H:%M:%S')
 EOF
 
 log_info "Prompt 文件: $PROMPT_FILE"
