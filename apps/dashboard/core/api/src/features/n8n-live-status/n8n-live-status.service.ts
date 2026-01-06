@@ -1,5 +1,5 @@
 // N8n Live Status service
-import logger from '../../../shared/utils/logger';
+import logger from '../../shared/utils/logger';
 import {
   N8nInstance,
   N8nExecutionDetail,

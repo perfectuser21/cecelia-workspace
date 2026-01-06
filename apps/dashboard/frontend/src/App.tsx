@@ -42,6 +42,8 @@ import ClaudeStats from './pages/ClaudeStats';
 import VpsMonitor from './pages/VpsMonitor';
 import N8nWorkflows from './pages/N8nWorkflows';
 import N8nWorkflowDetail from './pages/N8nWorkflowDetail';
+import N8nLiveStatus from './pages/N8nLiveStatus';
+import N8nLiveStatusDetail from './pages/N8nLiveStatusDetail';
 import Tasks from './pages/Tasks';
 import PublishStats from './pages/PublishStats';
 import PlatformStatus from './pages/PlatformStatus';
@@ -455,6 +457,14 @@ function AppContent() {
                           <h3 className="font-medium text-gray-900 mb-1">N8n 工作流</h3>
                           <p className="text-sm text-gray-500">监控自动化工作流执行状态</p>
                         </Link>
+                        <Link
+                          to="/settings/n8n-status"
+                          className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow border"
+                        >
+                          <Radio className="w-10 h-10 text-green-500 mb-3" />
+                          <h3 className="font-medium text-gray-900 mb-1">N8n 实时状态</h3>
+                          <p className="text-sm text-gray-500">实时监控工作流执行、今日统计</p>
+                        </Link>
                       </div>
                     </div>
                   ) : <Navigate to="/" replace />}
@@ -522,6 +532,22 @@ function AppContent() {
               element={
                 <PrivateRoute>
                   {isSuperAdmin ? <N8nWorkflowDetail /> : <Navigate to="/" replace />}
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/settings/n8n-status"
+              element={
+                <PrivateRoute>
+                  {isSuperAdmin ? <N8nLiveStatus /> : <Navigate to="/" replace />}
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/settings/n8n-status/:executionId"
+              element={
+                <PrivateRoute>
+                  {isSuperAdmin ? <N8nLiveStatusDetail /> : <Navigate to="/" replace />}
                 </PrivateRoute>
               }
             />
