@@ -80,7 +80,7 @@ class N8nWorkflowsService {
         throw new Error(`N8n API error: ${response.status} - ${errorText}`);
       }
 
-      return response.json();
+      return await response.json() as T;
     } catch (error) {
       logger.error('Failed to fetch from n8n API', { instance, endpoint, error });
       throw error;
@@ -104,7 +104,7 @@ class N8nWorkflowsService {
         throw new Error(`N8n API error: ${response.status} - ${errorText}`);
       }
 
-      return response.json();
+      return await response.json() as T;
     } catch (error) {
       logger.error('Failed to fetch from n8n API', { endpoint, error });
       throw error;

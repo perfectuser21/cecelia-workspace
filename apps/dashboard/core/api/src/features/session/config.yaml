@@ -1,0 +1,53 @@
+name: session
+version: 1.0.0
+description: Session monitoring feature for Windows Chrome login sessions via CDP
+
+basePath: /api/session
+requiresAuth: false
+
+dependencies: []
+
+exports: []
+
+routes:
+  - method: GET
+    path: /status
+    description: Get all platform session status
+  - method: POST
+    path: /check
+    description: Trigger check for all platforms
+  - method: GET
+    path: /check/:platform
+    description: Check single platform status
+  - method: GET
+    path: /runner
+    description: Get Windows Runner status
+
+platforms:
+  - id: douyin
+    name: 抖音
+    cdpPort: 19222
+  - id: kuaishou
+    name: 快手
+    cdpPort: 19223
+  - id: xiaohongshu
+    name: 小红书
+    cdpPort: 19224
+  - id: toutiao-main
+    name: 头条主号
+    cdpPort: 19225
+  - id: toutiao-sub
+    name: 头条副号
+    cdpPort: 19226
+  - id: weibo
+    name: 微博
+    cdpPort: 19227
+  - id: shipinhao
+    name: 视频号
+    cdpPort: 19228
+  - id: gongzhonghao
+    name: 公众号
+    cdpPort: 19229
+  - id: zhihu
+    name: 知乎
+    cdpPort: 19230

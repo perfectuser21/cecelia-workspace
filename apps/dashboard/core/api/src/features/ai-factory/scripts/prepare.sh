@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# AI Factory - 准备阶段脚本
-# Version: 3.2.1
+# AI Factory v3.1 - 准备阶段脚本
 #
 # 用法: prepare.sh <task_id>
 #
@@ -17,9 +16,6 @@
 #     "branch_name": "..."
 #   }
 #
-
-# 版本号常量
-AI_FACTORY_VERSION="3.2.1"
 
 set -o pipefail
 
@@ -41,7 +37,7 @@ fi
 BRANCH_NAME="${GIT_BRANCH_PREFIX}/${TASK_ID}"
 
 log_info "=========================================="
-log_info "AI Factory v${AI_FACTORY_VERSION} - 准备阶段"
+log_info "AI Factory v3.1 - 准备阶段"
 log_info "=========================================="
 log_info "Task ID: $TASK_ID"
 log_info "=========================================="

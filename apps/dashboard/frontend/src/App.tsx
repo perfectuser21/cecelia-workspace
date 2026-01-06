@@ -47,6 +47,7 @@ import N8nLiveStatusDetail from './pages/N8nLiveStatusDetail';
 import Tasks from './pages/Tasks';
 import PublishStats from './pages/PublishStats';
 import PlatformStatus from './pages/PlatformStatus';
+import ExecutionStatus from './pages/ExecutionStatus';
 import './App.css';
 
 function AppContent() {
@@ -78,6 +79,7 @@ function AppContent() {
       title: '概览',
       items: [
         { path: '/', icon: LayoutDashboard, label: '工作台' },
+        { path: '/execution-status', icon: Activity, label: '工作记录' },
         { path: '/tasks', icon: ListTodo, label: '任务' },
         { path: '/data-center', icon: BarChart3, label: '数据中心' },
       ]
@@ -342,6 +344,14 @@ function AppContent() {
               element={
                 <PrivateRoute>
                   <ContentData />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/execution-status"
+              element={
+                <PrivateRoute>
+                  <ExecutionStatus />
                 </PrivateRoute>
               }
             />

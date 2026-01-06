@@ -1,0 +1,25 @@
+# contents Feature Configuration
+name: contents
+category: business
+version: 1.0.0
+
+# API Configuration
+api:
+  basePath: /api/contents
+  requiresAuth: false  # Mixed auth (public + admin endpoints)
+
+# Dependencies
+dependencies:
+  shared:
+    - db/connection
+    - middleware/auth.middleware
+    - utils/logger
+
+# Database Tables
+database:
+  tables:
+    - website_contents
+
+# Environment Variables
+env:
+  - CLOUDFLARE_DEPLOY_HOOK

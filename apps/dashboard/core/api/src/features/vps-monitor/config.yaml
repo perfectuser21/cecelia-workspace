@@ -1,0 +1,19 @@
+# VPS Monitor Feature Configuration
+name: vps-monitor
+version: "1.0.0"
+description: VPS 资源监控（CPU、内存、磁盘）
+
+api:
+  basePath: /v1/vps-monitor
+  requiresAuth: false
+
+dependencies:
+  shared:
+    - utils/logger
+    - db/connection
+
+endpoints:
+  - GET /v1/vps-monitor/current
+  - GET /v1/vps-monitor/history
+  - GET /v1/vps-monitor/containers
+  - GET /v1/vps-monitor/alerts

@@ -30,7 +30,9 @@ source "$SCRIPT_DIR/utils.sh"
 # Ralph plugin 路径
 RALPH_SETUP_SCRIPT="$HOME/.claude/plugins/cache/claude-plugins-official/ralph-wiggum/unknown/scripts/setup-ralph-loop.sh"
 
+# ============================================================
 # 参数解析
+# ============================================================
 TASK_ID=""
 MODEL="opus"
 BUDGET="100"  # Max 用户，不限制
@@ -99,15 +101,20 @@ mkdir -p "$LOGS_DIR"
 # 记录开始时间
 START_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 
+log_info "=========================================="
 log_info "AI Factory v3.1 - 开始执行"
+log_info "=========================================="
 log_info "Task ID: $TASK_ID"
 log_info "Model: $MODEL"
 log_info "Budget: $BUDGET USD"
 log_info "Mode: $(if $USE_RALPH; then echo "Ralph loop (max $MAX_ITERATIONS)"; else echo "Simple"; fi)"
 log_info "Dry Run: $DRY_RUN"
 log_info "Start Time: $START_TIME"
+log_info "=========================================="
 
+# ============================================================
 # 阶段 1: 准备
+# ============================================================
 log_info "[1/3] 准备阶段..."
 
 PREPARE_OUTPUT=$("$SCRIPT_DIR/prepare.sh" "$TASK_ID" 2>&1)
@@ -139,7 +146,9 @@ log_info "Worktree: $WORKTREE_PATH"
 log_info "Prompt: $PROMPT_FILE"
 log_info "任务: $TASK_NAME"
 
+# ============================================================
 # 阶段 2: 执行
+# ============================================================
 if [[ "$DRY_RUN" == "true" ]]; then
   log_info "[2/3] 执行阶段 (跳过 - dry run)"
   log_info "Prompt 内容:"
@@ -160,6 +169,7 @@ else
   CLAUDE_OUTPUT_FILE="${LOGS_DIR}/claude-${TASK_ID}.log"
 
   if [[ "$USE_RALPH" == "true" ]]; then
+    # ========== Headless Ralph Loop（bash while 循环实现）==========
     log_info "启动 Headless Ralph Loop..."
     log_info "  模型: $MODEL"
     log_info "  最大迭代: $MAX_ITERATIONS"
@@ -226,6 +236,7 @@ To complete: output <promise>TASK_COMPLETE</promise> when ALL requirements are m
         if grep -q "<promise>TASK_COMPLETE</promise>" "$ITERATION_OUTPUT"; then
           log_info "✅ 检测到 <promise>TASK_COMPLETE</promise>"
 
+          # ========== 质检阶段 ==========
           log_info "开始质检..."
           QUALITY_CHECK_OUTPUT=$("$SCRIPT_DIR/quality-check.sh" "$WORKTREE_PATH" 2>&1)
           QUALITY_CHECK_EXIT=$?
@@ -288,13 +299,13 @@ $QUALITY_ERRORS
     fi
 
   else
+    # ========== 简单模式 ==========
     log_info "启动 Claude Code (简单模式)..."
     log_info "  模型: $MODEL"
     log_info "  预算: $BUDGET USD"
 
     if cd "$WORKTREE_PATH" && claude -p \
       --model "$MODEL" \
-      --permission-mode "bypassPermissions" \
       --dangerously-skip-permissions \
       "$PROMPT" > "$CLAUDE_OUTPUT_FILE" 2>&1; then
       EXECUTION_RESULT="success"
@@ -313,7 +324,9 @@ $QUALITY_ERRORS
   fi
 fi
 
+# ============================================================
 # 阶段 3: 收尾
+# ============================================================
 log_info "[3/3] 收尾阶段..."
 
 CLEANUP_OUTPUT=$("$SCRIPT_DIR/cleanup.sh" "$TASK_ID" "$EXECUTION_RESULT" --start-time "$START_TIME" --model "$MODEL" 2>&1)
@@ -326,11 +339,14 @@ CLEANUP_RESULT=$(echo "$CLEANUP_OUTPUT" | sed -n '/^{$/,/^}$/p')
 FINAL_STATUS=$(echo "$CLEANUP_RESULT" | jq -r '.final_status // "Unknown"')
 HAS_CONFLICT=$(echo "$CLEANUP_RESULT" | jq -r '.has_conflict // false')
 
+log_info "=========================================="
 log_info "AI Factory v3.1 - 执行完成"
+log_info "=========================================="
 log_info "任务: $TASK_NAME"
 log_info "执行结果: $EXECUTION_RESULT"
 log_info "最终状态: $FINAL_STATUS"
 log_info "有冲突: $HAS_CONFLICT"
+log_info "=========================================="
 
 # 输出最终结果
 jq -n \

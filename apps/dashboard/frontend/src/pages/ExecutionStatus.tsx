@@ -6,30 +6,139 @@ import {
   RefreshCw,
   Loader2,
   Clock,
-  TrendingUp,
-  ChevronLeft,
+  ChevronDown,
   ChevronRight,
-  BarChart3,
-  Zap,
+  Database,
+  Send,
+  ListTodo,
+  Wrench,
+  Bot,
+  Eye,
 } from 'lucide-react';
-import { runsApi, RunsOverview, RunExecution } from '../api/runs.api';
-import { StatusBadge } from '../components/StatusBadge';
+import { n8nLiveStatusApi, N8nExecutionDetail } from '../api/n8n-live-status.api';
+
+// Feature 定义
+interface FeatureConfig {
+  id: string;
+  name: string;
+  icon: React.ElementType;
+  keywords: string[]; // 工作流名称关键词匹配
+}
+
+const FEATURES: FeatureConfig[] = [
+  {
+    id: 'data-collection',
+    name: '数据采集',
+    icon: Database,
+    keywords: ['采集', '爬取', 'scrape', 'collect', 'fetch-data', '数据采集调度'],
+  },
+  {
+    id: 'content-publish',
+    name: '内容发布',
+    icon: Send,
+    keywords: ['发布', 'publish', 'post', 'upload', '内容发布'],
+  },
+  {
+    id: 'ai-factory',
+    name: 'AI 自动化',
+    icon: Bot,
+    keywords: ['dispatcher', 'claude', 'executor', 'callback', 'completion sync', 'ai factory', 'ai工厂'],
+  },
+  {
+    id: 'monitoring',
+    name: '监控巡检',
+    icon: Eye,
+    keywords: ['监控', '巡逻', 'monitor', 'patrol', 'watch'],
+  },
+  {
+    id: 'maintenance',
+    name: '系统维护',
+    icon: Wrench,
+    keywords: ['nightly', 'backup', 'cleanup', 'scheduler', '维护', '备份', '夜间'],
+  },
+];
+
+// 子任务友好名称映射
+const TASK_NAMES: Record<string, string> = {
+  // 数据采集
+  '抖音': '抖音',
+  '快手': '快手',
+  '小红书': '小红书',
+  '头条': '头条',
+  '微博': '微博',
+  '公众号': '公众号',
+  '视频号': '视频号',
+  '知乎': '知乎',
+  '数据采集调度器': '采集调度',
+  // 内容发布
+  '内容发布': '内容发布',
+  'notion': 'Notion 同步',
+  // AI 自动化
+  'task dispatcher': '任务调度',
+  'feature completion': '功能同步',
+  'execution callback': '执行回调',
+  '异步 claude': 'Claude 执行器',
+  // 监控
+  '监控巡逻': '系统巡检',
+  // 系统维护
+  'nightly': '定时任务',
+  '夜间备份': '数据备份',
+  '夜间文档': '文档检查',
+};
+
+function getTaskFriendlyName(workflowName: string): string {
+  const lower = workflowName?.toLowerCase() || '';
+  for (const [key, value] of Object.entries(TASK_NAMES)) {
+    if (lower.includes(key)) return value;
+  }
+  // 默认返回简化名称
+  return workflowName?.replace(/[-_]/g, ' ').slice(0, 20) || '未知任务';
+}
+
+function matchFeature(workflowName: string): FeatureConfig {
+  const lower = workflowName?.toLowerCase() || '';
+  for (const feature of FEATURES) {
+    if (feature.keywords.some(kw => lower.includes(kw))) {
+      return feature;
+    }
+  }
+  // 默认归类到系统维护
+  return FEATURES[FEATURES.length - 1];
+}
+
+interface FeatureGroup {
+  feature: FeatureConfig;
+  executions: N8nExecutionDetail[];
+  stats: {
+    total: number;
+    success: number;
+    failed: number;
+  };
+}
 
 export default function ExecutionStatus() {
-  const [overview, setOverview] = useState<RunsOverview | null>(null);
+  const [executions, setExecutions] = useState<N8nExecutionDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-
-  // 分页状态
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [expandedFeatures, setExpandedFeatures] = useState<Set<string>>(new Set(['ai-factory', 'data-collection', 'content-publish']));
 
   const fetchData = async () => {
     try {
-      const data = await runsApi.getOverview({ limit: 100 });
-      setOverview(data);
+      const data = await n8nLiveStatusApi.getLiveStatusOverview('local');
+      const allExecutions = [
+        ...data.runningExecutions.map(e => ({
+          id: e.id,
+          workflowId: e.workflowId,
+          workflowName: e.workflowName,
+          status: 'running' as const,
+          mode: 'trigger',
+          startedAt: e.startedAt,
+          finished: false,
+        })),
+        ...data.recentCompleted,
+      ];
+      setExecutions(allExecutions);
       setLastUpdate(new Date().toLocaleTimeString('zh-CN'));
       setError(null);
     } catch (err) {
@@ -39,66 +148,85 @@ export default function ExecutionStatus() {
     }
   };
 
-  const handleRefresh = () => {
-    setLoading(true);
-    fetchData();
-  };
-
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000); // 30秒刷新
+    const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  // 过滤后的执行记录
-  const filteredExecutions = useMemo(() => {
-    const executions = overview?.executions || [];
-    if (statusFilter === 'all') return executions;
-    if (statusFilter === 'error') return executions.filter(e => e.status === 'error' || e.status === 'crashed');
-    return executions.filter(e => e.status === statusFilter);
-  }, [overview?.executions, statusFilter]);
+  // 按 Feature 分组
+  const featureGroups = useMemo<FeatureGroup[]>(() => {
+    const groups = new Map<string, FeatureGroup>();
 
-  // 分页后的执行记录
-  const paginatedExecutions = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredExecutions.slice(start, start + pageSize);
-  }, [filteredExecutions, currentPage, pageSize]);
+    // 初始化所有 Feature
+    for (const feature of FEATURES) {
+      groups.set(feature.id, {
+        feature,
+        executions: [],
+        stats: { total: 0, success: 0, failed: 0 },
+      });
+    }
 
-  const totalPages = Math.ceil(filteredExecutions.length / pageSize);
+    // 分配执行记录
+    for (const exec of executions) {
+      const feature = matchFeature(exec.workflowName || '');
+      const group = groups.get(feature.id)!;
+      group.executions.push(exec);
+      group.stats.total++;
+      if (exec.status === 'success') {
+        group.stats.success++;
+      } else if (exec.status === 'error' || exec.status === 'crashed') {
+        group.stats.failed++;
+      }
+    }
 
-  // 重置分页
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [statusFilter, pageSize]);
+    // 只返回有数据的分组，按执行数量排序
+    return Array.from(groups.values())
+      .filter(g => g.stats.total > 0)
+      .sort((a, b) => b.stats.total - a.stats.total);
+  }, [executions]);
+
+  // 总统计
+  const totalStats = useMemo(() => {
+    return featureGroups.reduce(
+      (acc, g) => ({
+        total: acc.total + g.stats.total,
+        success: acc.success + g.stats.success,
+        failed: acc.failed + g.stats.failed,
+      }),
+      { total: 0, success: 0, failed: 0 }
+    );
+  }, [featureGroups]);
+
+  const toggleFeature = (featureId: string) => {
+    setExpandedFeatures(prev => {
+      const next = new Set(prev);
+      if (next.has(featureId)) {
+        next.delete(featureId);
+      } else {
+        next.add(featureId);
+      }
+      return next;
+    });
+  };
 
   const formatTime = (dateStr: string): string => {
     const date = new Date(dateStr);
-    return date.toLocaleString('zh-CN', {
-      month: '2-digit',
-      day: '2-digit',
+    return date.toLocaleTimeString('zh-CN', {
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit',
     });
   };
 
   const formatDuration = (start: string, end?: string): string => {
-    if (!end) return '-';
-    const startTime = new Date(start).getTime();
-    const endTime = new Date(end).getTime();
-    const duration = Math.round((endTime - startTime) / 1000);
-
+    if (!end) return '进行中';
+    const duration = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 1000);
     if (duration < 60) return `${duration}秒`;
     if (duration < 3600) return `${Math.floor(duration / 60)}分${duration % 60}秒`;
     return `${Math.floor(duration / 3600)}时${Math.floor((duration % 3600) / 60)}分`;
   };
 
-  const getStatusBadgeType = (status: string): 'success' | 'failed' | 'running' | 'waiting' | 'error' => {
-    if (status === 'crashed') return 'error';
-    return status as 'success' | 'failed' | 'running' | 'waiting' | 'error';
-  };
-
-  if (loading && !overview) {
+  if (loading && executions.length === 0) {
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
@@ -106,7 +234,7 @@ export default function ExecutionStatus() {
     );
   }
 
-  if (error && !overview) {
+  if (error && executions.length === 0) {
     return (
       <div className="flex items-center justify-center h-96 text-red-500">
         <XCircle className="w-6 h-6 mr-2" />
@@ -121,19 +249,19 @@ export default function ExecutionStatus() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-3">
-            <BarChart3 className="w-8 h-8 text-blue-600" />
-            执行历史
+            <Activity className="w-8 h-8 text-blue-600" />
+            工作记录
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            查看工作流执行历史和成功率统计
+            今日自动任务执行情况
           </p>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-500">
-            最后更新: {lastUpdate}
+            更新于 {lastUpdate}
           </span>
           <button
-            onClick={handleRefresh}
+            onClick={() => { setLoading(true); fetchData(); }}
             disabled={loading}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
           >
@@ -142,243 +270,121 @@ export default function ExecutionStatus() {
         </div>
       </div>
 
-      {/* 统计卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 总执行次数 */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">总执行次数</p>
-              <p className="text-3xl font-bold mt-1">{overview?.totalRuns || 0}</p>
-            </div>
-            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-              <Zap className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-            </div>
-          </div>
+      {/* 总统计 */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-500">今日执行</p>
+          <p className="text-2xl font-bold mt-1">{totalStats.total}</p>
         </div>
-
-        {/* 成功次数 */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">成功次数</p>
-              <p className="text-3xl font-bold mt-1 text-green-600 dark:text-green-400">
-                {overview?.successfulRuns || 0}
-              </p>
-            </div>
-            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
-              <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
-            </div>
-          </div>
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-500">成功</p>
+          <p className="text-2xl font-bold mt-1 text-green-600">{totalStats.success}</p>
         </div>
-
-        {/* 失败次数 */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">失败次数</p>
-              <p className="text-3xl font-bold mt-1 text-red-600 dark:text-red-400">
-                {overview?.failedRuns || 0}
-              </p>
-            </div>
-            <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
-              <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
-            </div>
-          </div>
-        </div>
-
-        {/* 成功率 */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-sm text-gray-500 dark:text-gray-400">整体成功率</p>
-              <p className="text-3xl font-bold mt-1">
-                {overview?.overallSuccessRate?.toFixed(1) || 0}%
-              </p>
-              {/* 进度条 */}
-              <div className="mt-3 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div
-                  className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${overview?.overallSuccessRate || 0}%` }}
-                />
-              </div>
-            </div>
-            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-            </div>
-          </div>
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-500">失败</p>
+          <p className="text-2xl font-bold mt-1 text-red-600">{totalStats.failed}</p>
         </div>
       </div>
 
-      {/* 执行历史列表 */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-        {/* 筛选栏 */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex gap-2">
-              {['all', 'success', 'error', 'running'].map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    statusFilter === status
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  {status === 'all' ? '全部' : status === 'success' ? '成功' : status === 'error' ? '失败' : '运行中'}
-                  <span className="ml-2 text-xs opacity-75">
-                    ({status === 'all'
-                      ? overview?.executions.length
-                      : status === 'error'
-                      ? overview?.executions.filter(e => e.status === 'error' || e.status === 'crashed').length
-                      : overview?.executions.filter(e => e.status === status).length})
-                  </span>
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500">每页显示</span>
-              <select
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
-                className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
+      {/* Feature 分组 */}
+      <div className="space-y-4">
+        {featureGroups.length === 0 ? (
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center text-gray-500 shadow-sm border border-gray-200 dark:border-gray-700">
+            今日暂无执行记录
+          </div>
+        ) : (
+          featureGroups.map((group) => {
+            const Icon = group.feature.icon;
+            const isExpanded = expandedFeatures.has(group.feature.id);
+
+            return (
+              <div
+                key={group.feature.id}
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden"
               >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* 表格 */}
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-900/50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  工作流
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  状态
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  开始时间
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  结束时间
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  耗时
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  执行ID
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {paginatedExecutions.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                    暂无执行记录
-                  </td>
-                </tr>
-              ) : (
-                paginatedExecutions.map((execution) => (
-                  <tr
-                    key={execution.id}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <Activity className="w-4 h-4 text-gray-400 mr-2" />
-                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {execution.workflowName || 'Unknown'}
+                {/* Feature 头部 */}
+                <button
+                  onClick={() => toggleFeature(group.feature.id)}
+                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                      <Icon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                      {group.feature.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 text-sm">
+                      <span className="text-gray-500">今日 {group.stats.total} 次</span>
+                      <span className="flex items-center gap-1 text-green-600">
+                        <CheckCircle2 className="w-4 h-4" />
+                        {group.stats.success}
+                      </span>
+                      {group.stats.failed > 0 && (
+                        <span className="flex items-center gap-1 text-red-600">
+                          <XCircle className="w-4 h-4" />
+                          {group.stats.failed}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <StatusBadge status={getStatusBadgeType(execution.status)} size="sm" />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      <div className="flex items-center">
-                        <Clock className="w-4 h-4 mr-1" />
-                        {formatTime(execution.startedAt)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {execution.stoppedAt ? formatTime(execution.stoppedAt) : '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {formatDuration(execution.startedAt, execution.stoppedAt)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <code className="px-2 py-1 bg-gray-100 dark:bg-gray-900 rounded text-xs font-mono text-gray-600 dark:text-gray-400">
-                        {execution.id.slice(0, 8)}
-                      </code>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                      )}
+                    </div>
+                    {isExpanded ? (
+                      <ChevronDown className="w-5 h-5 text-gray-400" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    )}
+                  </div>
+                </button>
 
-        {/* 分页 */}
-        {totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                显示 {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, filteredExecutions.length)} 条，
-                共 {filteredExecutions.length} 条
+                {/* 执行记录列表 */}
+                {isExpanded && (
+                  <div className="border-t border-gray-200 dark:border-gray-700">
+                    <div className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                      {group.executions.map((exec) => (
+                        <div
+                          key={exec.id}
+                          className="px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-gray-400">·</span>
+                            <span className="text-sm text-gray-700 dark:text-gray-300">
+                              {getTaskFriendlyName(exec.workflowName || '')}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className="text-gray-500 flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5" />
+                              {formatTime(exec.startedAt)}
+                            </span>
+                            {exec.status === 'success' ? (
+                              <span className="flex items-center gap-1 text-green-600">
+                                <CheckCircle2 className="w-4 h-4" />
+                                成功
+                              </span>
+                            ) : exec.status === 'running' ? (
+                              <span className="flex items-center gap-1 text-blue-600">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                运行中
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-red-600">
+                                <XCircle className="w-4 h-4" />
+                                失败
+                              </span>
+                            )}
+                            <span className="text-gray-400 w-16 text-right">
+                              {formatDuration(exec.startedAt, exec.stoppedAt)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`px-3 py-1 rounded-lg text-sm ${
-                          currentPage === pageNum
-                            ? 'bg-blue-600 text-white'
-                            : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          </div>
+            );
+          })
         )}
       </div>
     </div>
