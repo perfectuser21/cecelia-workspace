@@ -61,10 +61,26 @@ fi
 # ============================================================
 TASK_ID="${1:-}"
 CODING_TYPE="${2:-}"
-MAX_RETRIES="${MAX_RETRIES:-2}"
-STABILITY_RUNS="${STABILITY_RUNS:-3}"
-FULL_RETRY_MAX="${FULL_RETRY_MAX:-1}"
-RETRY_DELAY="${RETRY_DELAY:-2}"
+
+# P0 修复: 验证数值变量，防止非数字值导致算术运算失败
+validate_numeric() {
+  local var_name="$1"
+  local var_value="$2"
+  local default="$3"
+
+  if [[ ! "$var_value" =~ ^[0-9]+$ ]]; then
+    echo "$var_name 不是有效数字 ('$var_value')，使用默认值 $default" >&2
+    echo "$default"
+  else
+    echo "$var_value"
+  fi
+}
+
+# Ralph Wiggum 模式：无限循环直到成功
+MAX_RETRIES=$(validate_numeric "MAX_RETRIES" "${MAX_RETRIES:-9999}" 9999)
+STABILITY_RUNS=$(validate_numeric "STABILITY_RUNS" "${STABILITY_RUNS:-0}" 0)
+FULL_RETRY_MAX=$(validate_numeric "FULL_RETRY_MAX" "${FULL_RETRY_MAX:-1}" 1)
+RETRY_DELAY=$(validate_numeric "RETRY_DELAY" "${RETRY_DELAY:-2}" 2)
 
 if [[ -z "$TASK_ID" ]]; then
   echo "用法: main.sh <task_id> <coding_type>"
@@ -96,8 +112,13 @@ esac
 # ============================================================
 # 获取锁
 # ============================================================
+if ! load_secrets; then
+  echo "错误: 加载 secrets 失败"
+  exit 1
+fi
 if ! acquire_lock; then
   echo "错误: 无法获取执行锁，另一个任务正在执行"
+  curl -sX PATCH "https://api.notion.com/v1/pages/$TASK_ID" -H "Authorization: Bearer $NOTION_API_KEY" -H "Notion-Version: 2022-06-28" -H "Content-Type: application/json" -d '{"properties":{"Status":{"status":{"name":"Next Action"}}}}' > /dev/null 2>&1 || true
   exit 1
 fi
 
@@ -105,15 +126,24 @@ fi
 # P0 修复: 使用数字 0/1 代替字符串，简化 trap 逻辑防止竞态
 LOCK_RELEASED=0
 CLEANUP_IN_PROGRESS=0
+SIGNAL_RECEIVED=""
 
 cleanup_and_exit() {
   local saved_exit_code=$?  # 保存进入时的退出码
-
-  # 防止重复触发
-  [[ $CLEANUP_IN_PROGRESS -eq 1 ]] && return $saved_exit_code
-  CLEANUP_IN_PROGRESS=1
-
   local sig="${1:-EXIT}"
+
+  # P0 修复: 立即屏蔽信号，防止重入
+  trap '' SIGINT SIGTERM SIGHUP
+
+  # 防止重复触发（双重保险）
+  if [[ $CLEANUP_IN_PROGRESS -eq 1 ]]; then
+    # 如果是 EXIT trap 触发但已经清理过，直接返回
+    [[ "$sig" == "EXIT" ]] && return $saved_exit_code
+    return 0
+  fi
+  CLEANUP_IN_PROGRESS=1
+  SIGNAL_RECEIVED="$sig"
+
   log_warn "收到信号 $sig，开始清理..."
 
   # 杀死所有子进程
@@ -132,15 +162,17 @@ cleanup_and_exit() {
     LOCK_RELEASED=1
   fi
 
-  # 如果是信号触发，退出码 130；否则保持原退出码
+  # P0 修复: 信号触发时直接 exit，不返回（避免 EXIT trap 再次触发清理逻辑）
+  # EXIT trap 会自动触发，但 CLEANUP_IN_PROGRESS=1 会阻止重复执行
   if [[ "$sig" != "EXIT" ]]; then
     exit 130
-  else
-    return $saved_exit_code
   fi
+
+  return $saved_exit_code
 }
 
-# 设置 trap 确保锁释放（简化逻辑，统一入口）
+# P0 修复: 设置 trap 确保锁释放
+# 信号 trap 和 EXIT trap 分开处理，cleanup_and_exit 内部防止重复执行
 trap 'cleanup_and_exit SIGINT' SIGINT
 trap 'cleanup_and_exit SIGTERM' SIGTERM
 trap 'cleanup_and_exit SIGHUP' SIGHUP
@@ -185,7 +217,14 @@ PREPARE_RESULT=$(timeout -k 10 300 "$SHARED_DIR/prepare.sh" "$TASK_ID" "$CODING_
 # 等待子进程确保退出
 wait 2>/dev/null || true
 if [[ $PREPARE_EXIT -ne 0 ]]; then
-  echo "准备阶段失败 (exit code: $PREPARE_EXIT)"
+  # P0 修复: 区分超时和其他失败
+  case $PREPARE_EXIT in
+    124) echo "准备阶段超时 (exit code: 124, 超过 5 分钟)" ;;
+    137) echo "准备阶段被强制终止 (exit code: 137, SIGKILL)" ;;
+    *)   echo "准备阶段失败 (exit code: $PREPARE_EXIT)" ;;
+  esac
+  echo "更新 Notion 状态为 AI Failed..."
+  curl -sX PATCH "https://api.notion.com/v1/pages/$TASK_ID" -H "Authorization: Bearer $NOTION_API_KEY" -H "Notion-Version: 2022-06-28" -H "Content-Type: application/json" -d '{"properties":{"Status":{"status":{"name":"AI Failed"}}}}' > /dev/null 2>&1 || true
   exit 4
 fi
 
@@ -202,6 +241,7 @@ TASK_INFO_PATH=$(echo "$PREPARE_JSON" | jq -r '.task_info_path // empty' 2>/dev/
 
 if [[ -z "$WORK_DIR" || -z "$TASK_INFO_PATH" ]]; then
   echo "准备阶段返回数据异常"
+  curl -sX PATCH "https://api.notion.com/v1/pages/$TASK_ID" -H "Authorization: Bearer $NOTION_API_KEY" -H "Notion-Version: 2022-06-28" -H "Content-Type: application/json" -d '{"properties":{"Status":{"status":{"name":"AI Failed"}}}}' > /dev/null 2>&1 || true
   echo "Raw result: $PREPARE_RESULT"
   exit 5
 fi
@@ -258,10 +298,21 @@ while [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; do
   wait 2>/dev/null || true
 
   if [[ $EXECUTE_EXIT -ne 0 ]]; then
-    echo "执行阶段失败 (exit code: $EXECUTE_EXIT)"
-
-    # 记录失败
-    echo '{"success": false, "error": "execute_failed"}' > "$WORK_DIR/result.json"
+    # P0 修复: 区分超时(124)和被杀死(137)的退出码
+    case $EXECUTE_EXIT in
+      124)
+        echo "执行阶段超时 (exit code: 124, 超过 10 分钟)"
+        echo '{"success": false, "error": "execute_timeout"}' > "$WORK_DIR/result.json"
+        ;;
+      137)
+        echo "执行阶段被强制终止 (exit code: 137, SIGKILL)"
+        echo '{"success": false, "error": "execute_killed"}' > "$WORK_DIR/result.json"
+        ;;
+      *)
+        echo "执行阶段失败 (exit code: $EXECUTE_EXIT)"
+        echo '{"success": false, "error": "execute_failed"}' > "$WORK_DIR/result.json"
+        ;;
+    esac
 
     RETRY_COUNT=$((RETRY_COUNT + 1))
     if [[ $RETRY_COUNT -le $MAX_RETRIES ]]; then
@@ -321,9 +372,16 @@ while [[ $FULL_RETRY_COUNT -le $FULL_RETRY_MAX ]]; do
         ;;
       124)
         # P1 修复: 区分超时退出
-        echo "质检脚本超时 (exit code: 124)"
+        echo "质检脚本超时 (exit code: 124, 超过 5 分钟)"
         PASSED=false
         QUALITY_TIMEOUT=true
+        break
+        ;;
+      137)
+        # P0 修复: 区分被强制终止
+        echo "质检脚本被强制终止 (exit code: 137, SIGKILL)"
+        PASSED=false
+        QUALITY_TIMEOUT=true  # 超时后强杀也算超时
         break
         ;;
       *)
@@ -371,7 +429,12 @@ if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
     wait 2>/dev/null || true
 
     if [[ $EXECUTE_EXIT -ne 0 ]]; then
-      echo "  执行失败 (第 $STABILITY_COUNT 次, exit: $EXECUTE_EXIT)"
+      # P0 修复: 区分超时和其他失败
+      case $EXECUTE_EXIT in
+        124) echo "  执行超时 (第 $STABILITY_COUNT 次, 超过 10 分钟)" ;;
+        137) echo "  执行被强制终止 (第 $STABILITY_COUNT 次, SIGKILL)" ;;
+        *)   echo "  执行失败 (第 $STABILITY_COUNT 次, exit: $EXECUTE_EXIT)" ;;
+      esac
       STABILITY_FAILED=true
       break
     fi
@@ -384,7 +447,12 @@ if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
     wait 2>/dev/null || true
 
     if [[ $QUALITY_EXIT -ne 0 ]]; then
-      echo "  质检失败 (第 $STABILITY_COUNT 次, exit: $QUALITY_EXIT)"
+      # P0 修复: 区分超时和其他失败
+      case $QUALITY_EXIT in
+        124) echo "  质检超时 (第 $STABILITY_COUNT 次, 超过 5 分钟)" ;;
+        137) echo "  质检被强制终止 (第 $STABILITY_COUNT 次, SIGKILL)" ;;
+        *)   echo "  质检失败 (第 $STABILITY_COUNT 次, exit: $QUALITY_EXIT)" ;;
+      esac
       STABILITY_FAILED=true
       break
     fi
@@ -415,11 +483,11 @@ if [[ "$PASSED" == "true" && "$STABILITY_RUNS" -gt 0 ]]; then
   fi
 fi
 
-# P0 修复: FATAL_ERROR 已通过 break 2 跳出，不需要重复检查
-# 如果质检都没过（PASSED=false），直接退出外层循环
-if [[ "$PASSED" == "false" ]]; then
-  break  # 质检失败，不需要整体重试，直接退出
-fi
+# P0 修复: 无论成功还是失败，都应该退出外层循环
+# - 成功：进入收尾阶段
+# - 失败：报告错误
+# 整体重试只在稳定性验证失败时触发（在上面的代码里处理）
+break
 
 done  # 结束整体重试循环
 
@@ -430,8 +498,13 @@ echo ""
 echo "[阶段 4/4] 收尾"
 echo "----------------------------------------"
 
-CLEANUP_RESULT=$("$SHARED_DIR/cleanup.sh" "$RUN_ID" "$TASK_ID" "$PASSED" "$RETRY_COUNT") || {
-  echo "收尾阶段失败"
+CLEANUP_RESULT=$(timeout -k 10 300 "$SHARED_DIR/cleanup.sh" "$RUN_ID" "$TASK_ID" "$PASSED" "$RETRY_COUNT") || {
+  CLEANUP_EXIT=$?
+  if [[ $CLEANUP_EXIT -eq 124 ]]; then
+    echo "收尾阶段超时（5分钟）"
+  else
+    echo "收尾阶段失败"
+  fi
   echo "$CLEANUP_RESULT"
 }
 
