@@ -269,7 +269,6 @@ To complete: output <promise>TASK_COMPLETE</promise> when ALL requirements are m
 
     if claude -p \
       --model "$MODEL" \
-      --max-budget-usd "$BUDGET" \
       --permission-mode "bypassPermissions" \
       --dangerously-skip-permissions \
       "$PROMPT" > "$CLAUDE_OUTPUT_FILE" 2>&1; then
