@@ -1,7 +1,6 @@
 #!/bin/bash
 #
 # AI Factory - 准备阶段脚本
-# Version: 3.2.1
 #
 # 用法: prepare.sh <task_id>
 #
