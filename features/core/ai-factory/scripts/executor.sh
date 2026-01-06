@@ -173,6 +173,7 @@ else
     ITERATION=1
     EXECUTION_RESULT="failed"
     ITERATION_TIMEOUT=600  # 每次迭代最多 10 分钟
+    QUALITY_CHECK_FEEDBACK=""  # 质检失败时的反馈信息
 
     while [[ $ITERATION -le $MAX_ITERATIONS ]]; do
       log_info "━━━ Ralph 迭代 $ITERATION/$MAX_ITERATIONS ━━━"
@@ -214,6 +215,7 @@ Review the above changes and continue working on the task.
 
       # 构建带迭代信息的 prompt
       ITERATION_PROMPT="$PROMPT
+$QUALITY_CHECK_FEEDBACK
 $PREVIOUS_CHANGES
 ---
 🔄 Ralph iteration $ITERATION/$MAX_ITERATIONS
@@ -229,8 +231,39 @@ To complete: output <promise>TASK_COMPLETE</promise> when ALL requirements are m
         # 检查输出中是否包含完成标记
         if grep -q "<promise>TASK_COMPLETE</promise>" "$ITERATION_OUTPUT"; then
           log_info "✅ 检测到 <promise>TASK_COMPLETE</promise>"
-          EXECUTION_RESULT="success"
-          break
+
+          # ========== 质检阶段 ==========
+          log_info "开始质检..."
+          QUALITY_CHECK_OUTPUT=$("$SCRIPT_DIR/quality-check.sh" "$WORKTREE_PATH" 2>&1)
+          QUALITY_CHECK_EXIT=$?
+
+          # 提取 JSON 结果（最后一个以 { 开头的行）
+          QUALITY_RESULT=$(echo "$QUALITY_CHECK_OUTPUT" | grep '^{' | tail -1)
+
+          if [[ $QUALITY_CHECK_EXIT -eq 0 ]]; then
+            log_info "✅ 质检通过"
+            EXECUTION_RESULT="success"
+            QUALITY_CHECK_FEEDBACK=""  # 清除质检反馈
+            break
+          else
+            log_warn "❌ 质检失败，继续下一次迭代..."
+
+            # 提取错误信息（每个错误一行，编号显示）
+            QUALITY_ERRORS=$(echo "$QUALITY_RESULT" | jq -r '.errors[] | "- " + .' 2>/dev/null || echo "- 质检失败（未知错误）")
+
+            # 将错误信息保存到 QUALITY_CHECK_FEEDBACK，会在下一次迭代使用
+            QUALITY_CHECK_FEEDBACK="
+## ❌ Quality Check Failed
+
+质检阶段发现以下问题，需要修复：
+
+$QUALITY_ERRORS
+
+**Please fix these issues before marking the task as complete.**
+"
+
+            log_info "错误信息已加入下一次迭代的 prompt"
+          fi
         else
           log_info "未检测到完成标记，继续下一次迭代..."
         fi
