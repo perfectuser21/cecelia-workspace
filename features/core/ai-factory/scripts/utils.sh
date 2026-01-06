@@ -83,7 +83,6 @@ fetch_notion_task() {
       '{
         task_id: $task_id,
         task_name: "测试任务",
-        coding_type: "n8n",
         status: "Next Action",
         content: "测试内容",
         fetched_at: $fetched_at
@@ -133,20 +132,17 @@ fetch_notion_task() {
   fi
 
   local task_name=$(echo "$response" | jq -r '.properties.Name.title | map(.plain_text // "") | join("") // "Unknown"')
-  local coding_type=$(echo "$response" | jq -r '.properties["Coding Type"].select.name // "n8n"')
   local status=$(echo "$response" | jq -r '.properties.Status.status.name // "Unknown"')
 
   jq -n \
     --arg task_id "$task_id" \
     --arg task_name "$task_name" \
-    --arg coding_type "$coding_type" \
     --arg status "$status" \
     --arg content "$content" \
     --arg fetched_at "$(date -Iseconds)" \
     '{
       task_id: $task_id,
       task_name: $task_name,
-      coding_type: $coding_type,
       status: $status,
       content: $content,
       fetched_at: $fetched_at

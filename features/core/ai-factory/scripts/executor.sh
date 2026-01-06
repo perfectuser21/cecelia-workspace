@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# AI Factory v3.0 - 主执行入口
+# AI Factory v3.1 - 主执行入口
 #
 # 用法: executor.sh <task_id> [options]
 #
@@ -99,7 +99,7 @@ LOG_FILE="${LOGS_DIR}/executor-${TASK_ID}.log"
 mkdir -p "$LOGS_DIR"
 
 log_info "=========================================="
-log_info "AI Factory v3.0 - 开始执行"
+log_info "AI Factory v3.1 - 开始执行"
 log_info "=========================================="
 log_info "Task ID: $TASK_ID"
 log_info "Model: $MODEL"
@@ -131,7 +131,6 @@ fi
 WORKTREE_PATH=$(echo "$PREPARE_RESULT" | jq -r '.worktree_path // empty')
 PROMPT_FILE=$(echo "$PREPARE_RESULT" | jq -r '.prompt_file // empty')
 TASK_NAME=$(echo "$PREPARE_RESULT" | jq -r '.task_name // "Unknown"')
-CODING_TYPE=$(echo "$PREPARE_RESULT" | jq -r '.coding_type // "unknown"')
 
 if [[ -z "$WORKTREE_PATH" || -z "$PROMPT_FILE" ]]; then
   log_error "准备结果解析失败"
@@ -142,7 +141,6 @@ fi
 log_info "Worktree: $WORKTREE_PATH"
 log_info "Prompt: $PROMPT_FILE"
 log_info "任务: $TASK_NAME"
-log_info "类型: $CODING_TYPE"
 
 # ============================================================
 # 阶段 2: 执行
@@ -307,7 +305,7 @@ FINAL_STATUS=$(echo "$CLEANUP_RESULT" | jq -r '.final_status // "Unknown"')
 HAS_CONFLICT=$(echo "$CLEANUP_RESULT" | jq -r '.has_conflict // false')
 
 log_info "=========================================="
-log_info "AI Factory v3.0 - 执行完成"
+log_info "AI Factory v3.1 - 执行完成"
 log_info "=========================================="
 log_info "任务: $TASK_NAME"
 log_info "执行结果: $EXECUTION_RESULT"
@@ -319,7 +317,6 @@ log_info "=========================================="
 jq -n \
   --arg task_id "$TASK_ID" \
   --arg task_name "$TASK_NAME" \
-  --arg coding_type "$CODING_TYPE" \
   --arg execution_result "$EXECUTION_RESULT" \
   --arg final_status "$FINAL_STATUS" \
   --argjson has_conflict "$HAS_CONFLICT" \
@@ -329,7 +326,6 @@ jq -n \
   '{
     task_id: $task_id,
     task_name: $task_name,
-    coding_type: $coding_type,
     execution_result: $execution_result,
     final_status: $final_status,
     has_conflict: $has_conflict,
