@@ -28,15 +28,41 @@ source "$SCRIPT_DIR/worktree-manager.sh"
 # ============================================================
 # 参数解析
 # ============================================================
-TASK_ID="${1:-}"
-EXECUTION_RESULT="${2:-}"
+TASK_ID=""
+EXECUTION_RESULT=""
+START_TIME=""
+MODEL=""
+
+# 解析命令行参数
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --start-time)
+      START_TIME="$2"
+      shift 2
+      ;;
+    --model)
+      MODEL="$2"
+      shift 2
+      ;;
+    *)
+      if [[ -z "$TASK_ID" ]]; then
+        TASK_ID="$1"
+      elif [[ -z "$EXECUTION_RESULT" ]]; then
+        EXECUTION_RESULT="$1"
+      fi
+      shift
+      ;;
+  esac
+done
 
 if [[ -z "$TASK_ID" || -z "$EXECUTION_RESULT" ]]; then
-  echo "用法: cleanup.sh <task_id> <execution_result>"
+  echo "用法: cleanup.sh <task_id> <execution_result> [--start-time <time>] [--model <model>]"
   echo ""
   echo "参数:"
   echo "  task_id          Notion 任务 ID"
   echo "  execution_result success 或 failed"
+  echo "  --start-time     任务开始时间（可选）"
+  echo "  --model          使用的模型（可选）"
   exit 1
 fi
 
@@ -61,6 +87,8 @@ log_info "Task ID: $TASK_ID"
 log_info "执行结果: $EXECUTION_RESULT"
 log_info "分支: $BRANCH_NAME"
 log_info "Worktree: $WORKTREE_PATH"
+log_info "模型: ${MODEL:-未指定}"
+log_info "开始时间: ${START_TIME:-未记录}"
 log_info "=========================================="
 
 # ============================================================
@@ -298,7 +326,7 @@ fi
 # ============================================================
 # 写报告到 Notion
 # ============================================================
-log_info "[4/5] 写执行报告到 Notion..."
+log_info "[4/6] 写执行报告到 Notion..."
 
 if [[ -n "$REPORT_CONTENT" ]]; then
   if append_to_notion_page "$TASK_ID" "$REPORT_CONTENT"; then
@@ -309,9 +337,30 @@ if [[ -n "$REPORT_CONTENT" ]]; then
 fi
 
 # ============================================================
+# 追加执行摘要到 Notion
+# ============================================================
+log_info "[5/6] 追加执行摘要到 Notion..."
+
+# 获取当前时间作为结束时间
+END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+
+# 确定摘要状态
+SUMMARY_STATUS="$EXECUTION_RESULT"
+if [[ "$EXECUTION_RESULT" == "success" && "$HAS_CONFLICT" == "true" ]]; then
+  SUMMARY_STATUS="conflict"
+fi
+
+# 调用 append_execution_summary
+if append_execution_summary "$TASK_ID" "$SUMMARY_STATUS" "$START_TIME" "$END_TIME" "$MODEL" "$WORKTREE_PATH" "$BRANCH_NAME"; then
+  log_info "执行摘要已追加"
+else
+  log_warn "追加执行摘要失败"
+fi
+
+# ============================================================
 # 发送飞书通知
 # ============================================================
-log_info "[5/5] 发送飞书通知..."
+log_info "[6/6] 发送飞书通知..."
 
 FEISHU_TITLE=""
 FEISHU_STATUS=""

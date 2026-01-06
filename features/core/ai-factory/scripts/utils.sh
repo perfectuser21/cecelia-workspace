@@ -317,10 +317,116 @@ send_feishu_card() {
   fi
 }
 
+# 追加执行摘要到 Notion 页面
+# 参数: $1=page_id, $2=status, $3=start_time, $4=end_time, $5=model, $6=worktree_path, $7=branch_name
+append_execution_summary() {
+  local page_id="$1"
+  local status="$2"
+  local start_time="$3"
+  local end_time="$4"
+  local model="${5:-unknown}"
+  local worktree_path="$6"
+  local branch_name="$7"
+
+  if [[ "${TEST_MODE:-}" == "1" ]]; then
+    log_info "[TEST_MODE] 模拟追加执行摘要到 Notion: $page_id"
+    return 0
+  fi
+
+  load_secrets || return 1
+
+  if [[ -z "$NOTION_API_KEY" ]]; then
+    log_error "NOTION_API_KEY 未设置"
+    return 1
+  fi
+
+  # 计算耗时（分钟）
+  local duration_minutes=0
+  if [[ -n "$start_time" && -n "$end_time" ]]; then
+    local start_epoch=$(date -d "$start_time" +%s 2>/dev/null || echo 0)
+    local end_epoch=$(date -d "$end_time" +%s 2>/dev/null || echo 0)
+    if [[ $start_epoch -gt 0 && $end_epoch -gt 0 ]]; then
+      local duration_seconds=$((end_epoch - start_epoch))
+      duration_minutes=$((duration_seconds / 60))
+    fi
+  fi
+
+  # 统计改动文件数
+  local changed_files=0
+  if [[ -d "$worktree_path" ]]; then
+    cd "$worktree_path" 2>/dev/null || true
+    # 获取当前分支与 main 的差异统计
+    local diff_stat=$(git diff --stat origin/main..HEAD 2>/dev/null | tail -1)
+    if [[ -n "$diff_stat" ]]; then
+      # 从 "X files changed" 中提取文件数
+      changed_files=$(echo "$diff_stat" | grep -oE '[0-9]+ file' | grep -oE '[0-9]+' | head -1)
+      [[ -z "$changed_files" ]] && changed_files=0
+    fi
+  fi
+
+  # 根据状态选择图标和颜色
+  local icon=""
+  local color_emoji=""
+  case "$status" in
+    success)
+      icon="✅"
+      color_emoji="🟢"
+      ;;
+    failed)
+      icon="❌"
+      color_emoji="🔴"
+      ;;
+    conflict)
+      icon="⚠️"
+      color_emoji="🟡"
+      ;;
+    *)
+      icon="ℹ️"
+      color_emoji="🔵"
+      ;;
+  esac
+
+  # 构建摘要内容
+  local summary_text="${icon} **执行摘要** | 耗时: ${duration_minutes}分钟 | 模型: ${model} | 改动: ${changed_files}个文件 | 分支: \`${branch_name}\`"
+
+  # 构建 Notion API payload
+  local payload
+  payload=$(jq -n --arg text "$summary_text" '{
+    children: [
+      {
+        object: "block",
+        type: "callout",
+        callout: {
+          rich_text: [{
+            type: "text",
+            text: {content: $text},
+            annotations: {bold: false}
+          }],
+          icon: {type: "emoji", emoji: "🤖"},
+          color: "gray_background"
+        }
+      }
+    ]
+  }')
+
+  if curl -sf --connect-timeout 10 --max-time "$API_TIMEOUT" -X PATCH \
+    "https://api.notion.com/v1/blocks/$page_id/children" \
+    -H "Authorization: Bearer $NOTION_API_KEY" \
+    -H "Notion-Version: 2022-06-28" \
+    -H "Content-Type: application/json" \
+    -d "$payload" > /dev/null 2>&1; then
+    log_info "执行摘要已追加到 Notion 页面"
+    return 0
+  else
+    log_warn "追加执行摘要到 Notion 失败"
+    return 1
+  fi
+}
+
 # ============================================================
 # 导出函数
 # ============================================================
 export -f _log log_info log_warn log_error log_debug
 export -f load_secrets
-export -f fetch_notion_task update_notion_status append_to_notion_page
+export -f fetch_notion_task update_notion_status append_to_notion_page append_execution_summary
 export -f send_feishu_card

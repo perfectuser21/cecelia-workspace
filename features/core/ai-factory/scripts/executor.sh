@@ -98,6 +98,9 @@ fi
 LOG_FILE="${LOGS_DIR}/executor-${TASK_ID}.log"
 mkdir -p "$LOGS_DIR"
 
+# 记录开始时间
+START_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+
 log_info "=========================================="
 log_info "AI Factory v3.1 - 开始执行"
 log_info "=========================================="
@@ -106,6 +109,7 @@ log_info "Model: $MODEL"
 log_info "Budget: $BUDGET USD"
 log_info "Mode: $(if $USE_RALPH; then echo "Ralph loop (max $MAX_ITERATIONS)"; else echo "Simple"; fi)"
 log_info "Dry Run: $DRY_RUN"
+log_info "Start Time: $START_TIME"
 log_info "=========================================="
 
 # ============================================================
@@ -222,9 +226,8 @@ $PREVIOUS_CHANGES
 To complete: output <promise>TASK_COMPLETE</promise> when ALL requirements are met."
 
       # 运行 claude -p
-      if timeout "$ITERATION_TIMEOUT" claude -p \
+      if timeout "$ITERATION_TIMEOUT" cd "$WORKTREE_PATH" && claude -p \
         --model "$MODEL" \
-        --cwd "$WORKTREE_PATH" \
         --permission-mode "bypassPermissions" \
         --dangerously-skip-permissions \
         "$ITERATION_PROMPT" > "$ITERATION_OUTPUT" 2>&1; then
@@ -301,9 +304,8 @@ $QUALITY_ERRORS
     log_info "  模型: $MODEL"
     log_info "  预算: $BUDGET USD"
 
-    if claude -p \
+    if cd "$WORKTREE_PATH" && claude -p \
       --model "$MODEL" \
-      --cwd "$WORKTREE_PATH" \
       --dangerously-skip-permissions \
       "$PROMPT" > "$CLAUDE_OUTPUT_FILE" 2>&1; then
       EXECUTION_RESULT="success"
@@ -327,7 +329,7 @@ fi
 # ============================================================
 log_info "[3/3] 收尾阶段..."
 
-CLEANUP_OUTPUT=$("$SCRIPT_DIR/cleanup.sh" "$TASK_ID" "$EXECUTION_RESULT" 2>&1)
+CLEANUP_OUTPUT=$("$SCRIPT_DIR/cleanup.sh" "$TASK_ID" "$EXECUTION_RESULT" --start-time "$START_TIME" --model "$MODEL" 2>&1)
 CLEANUP_EXIT=$?
 
 # 提取 JSON（从第一个 { 到最后一个 }）
