@@ -1,0 +1,18 @@
+# Tasks Feature Configuration
+name: tasks
+version: "1.0.0"
+description: Notion 任务库代理
+
+api:
+  basePath: /api/tasks
+  requiresAuth: true
+
+dependencies:
+  shared:
+    - utils/config
+
+endpoints:
+  - GET /api/tasks
+  - GET /api/tasks/users
+  - PATCH /api/tasks/:id
+  - POST /api/tasks

@@ -1,0 +1,21 @@
+# platform-data Feature Configuration
+name: platform-data
+category: business
+version: 1.0.0
+
+# API Configuration
+api:
+  basePath: /api/platform-data
+  requiresAuth: false
+
+# Dependencies
+dependencies:
+  shared:
+    - db/connection
+    - utils/logger
+
+# Database Tables
+database:
+  tables:
+    - content_items
+    - content_metrics

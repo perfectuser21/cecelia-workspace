@@ -1,0 +1,47 @@
+name: metrics
+version: 1.0.0
+description: Social media metrics collection and reporting feature
+
+basePath: /v1/metrics
+requiresAuth: true
+
+dependencies:
+  - ../../shared/db/connection
+  - ../../shared/types
+  - ../../shared/middleware/error.middleware
+  - ../../shared/utils/logger
+  - ../accounts
+
+exports:
+  - metricService
+  - metricRepository
+  - reportRepository
+
+routes:
+  - method: GET
+    path: /dashboard
+    description: Get dashboard metrics with time range
+  - method: GET
+    path: /latest/:accountId
+    description: Get latest metrics for account
+  - method: GET
+    path: /account/:accountId
+    description: Get metrics for account by date range
+  - method: GET
+    path: /date/:date
+    description: Get all metrics for a specific date
+  - method: GET
+    path: /platform/:platform
+    description: Get metrics by platform and date range
+  - method: GET
+    path: /range
+    description: Get metrics by date range
+  - method: POST
+    path: /report_daily
+    description: Generate daily report
+  - method: GET
+    path: /reports/date/:date
+    description: Get report by date
+  - method: GET
+    path: /reports/recent
+    description: Get recent reports

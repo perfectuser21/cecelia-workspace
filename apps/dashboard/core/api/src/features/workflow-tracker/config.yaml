@@ -1,0 +1,32 @@
+# Workflow Tracker Feature Configuration
+name: workflow-tracker
+version: "1.0.0"
+description: 工作流执行追踪
+
+api:
+  basePath: /v1/workflow-tracker
+  requiresAuth: false
+
+dependencies:
+  shared:
+    - db/connection
+    - middleware/error.middleware
+    - utils/logger
+
+phases:
+  - PREPARE
+  - VALIDATE
+  - EXECUTE
+  - VERIFY
+  - FINALIZE
+
+endpoints:
+  - GET /v1/workflow-tracker/runs
+  - POST /v1/workflow-tracker/runs
+  - GET /v1/workflow-tracker/runs/:run_id
+  - PATCH /v1/workflow-tracker/runs/:run_id
+  - DELETE /v1/workflow-tracker/runs/:run_id
+  - POST /v1/workflow-tracker/runs/:run_id/events
+  - GET /v1/workflow-tracker/runs/:run_id/events
+  - GET /v1/workflow-tracker/runs/:run_id/stream
+  - POST /v1/workflow-tracker/detect-stuck

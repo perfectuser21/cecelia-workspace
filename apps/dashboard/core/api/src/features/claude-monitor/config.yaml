@@ -1,0 +1,21 @@
+# Claude Monitor Feature Configuration
+name: claude-monitor
+version: "1.0.0"
+description: Claude 会话监控
+
+api:
+  basePath: /v1/claude-monitor
+  requiresAuth: false
+
+dependencies:
+  shared:
+    - db/connection
+    - middleware/error.middleware
+    - utils/logger
+
+endpoints:
+  - GET /v1/claude-monitor/sessions
+  - GET /v1/claude-monitor/sessions/:id
+  - GET /v1/claude-monitor/sessions/:id/messages
+  - POST /v1/claude-monitor/sessions
+  - POST /v1/claude-monitor/sessions/:id/messages
