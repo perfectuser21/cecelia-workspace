@@ -184,6 +184,21 @@ merge_to_main() {
     log_warn "无法拉取远程分支，使用本地版本"
   fi
 
+  # 先尝试 rebase 到最新的 master，避免分叉冲突
+  log_info "Rebase 分支 $branch_name 到最新的 $GIT_BASE_BRANCH..."
+  if timeout "$GIT_TIMEOUT" git checkout "$branch_name" >/dev/null 2>&1; then
+    if timeout "$GIT_TIMEOUT" git rebase "$GIT_BASE_BRANCH" >/dev/null 2>&1; then
+      log_info "Rebase 成功"
+    else
+      log_warn "Rebase 失败，尝试 abort 并继续合并"
+      git rebase --abort 2>/dev/null || true
+    fi
+    # 切回主分支
+    timeout "$GIT_TIMEOUT" git checkout "$GIT_BASE_BRANCH" >/dev/null 2>&1
+  else
+    log_warn "无法切换到 $branch_name，跳过 rebase"
+  fi
+
   # 尝试合并（使用 --no-edit 避免打开编辑器）
   log_info "合并分支: $branch_name -> $GIT_BASE_BRANCH"
   local merge_output

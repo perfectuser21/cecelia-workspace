@@ -18,7 +18,7 @@
 #
 
 # 版本号常量
-AI_FACTORY_VERSION="3.2.1"
+AI_FACTORY_VERSION="3.3.0"
 
 set -o pipefail
 

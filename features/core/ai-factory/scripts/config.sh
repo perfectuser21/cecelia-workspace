@@ -1,6 +1,9 @@
 #!/bin/bash
 #
-# AI Factory v3.0 配置文件
+# AI Factory v3.3 配置文件
+#
+# 版本号
+AI_FACTORY_VERSION="3.3.0"
 #
 
 # ============================================================
@@ -245,6 +248,9 @@ RESOURCE_RECOVERY_WAIT="${RESOURCE_RECOVERY_WAIT:-60}"
 # ============================================================
 # 导出变量
 # ============================================================
+
+# 版本号
+export AI_FACTORY_VERSION
 
 # 目录变量
 export SCRIPTS_DIR AI_FACTORY_DIR PROJECT_DIR WORKTREES_DIR DATA_DIR RUNS_DIR LOGS_DIR WORKFLOWS_DIR

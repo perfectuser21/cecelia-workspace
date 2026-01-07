@@ -1,4 +1,4 @@
-# AI Factory v3.0
+# AI Factory v3.3
 
 自动化任务执行系统，通过 Git Worktree 实现并行任务隔离。
 
@@ -45,7 +45,7 @@ ai-factory/
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      AI Factory v3.0                        │
+│                      AI Factory v3.3                        │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -202,7 +202,7 @@ curl http://localhost:3333/v1/ai-factory/worktrees
 版本信息存储在 `scripts/config.sh` 中：
 
 ```bash
-AI_FACTORY_VERSION="3.2.1"
+AI_FACTORY_VERSION="3.3.0"
 ```
 
 ### 升级策略
@@ -216,6 +216,12 @@ AI_FACTORY_VERSION="3.2.1"
 版本变更记录在 `CHANGELOG.md` 中：
 
 ```
+## [3.3.0] - 2026-01-07
+- 改进合并逻辑：合并前先 rebase 到最新 master，防止分叉冲突
+- 统一版本管理：所有脚本使用统一版本号常量
+- 完善配置参数化：使用 ${VAR:-default} 语法
+- 增强文档：添加执行约束、版本管理、并行执行详细说明
+
 ## [3.2.1] - 2026-01-06
 - 修复 executor.sh 参数解析
 - 优化 Ralph 循环性能
