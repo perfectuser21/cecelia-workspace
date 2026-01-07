@@ -157,15 +157,22 @@ log_info "任务名称: $TASK_NAME"
 # ============================================================
 CHANGED_FILES_COUNT=0
 if [[ -d "$WORKTREE_PATH" ]]; then
-  cd "$WORKTREE_PATH" 2>/dev/null || true
-  # 获取当前分支与 main 的差异统计
-  local_diff_stat=$(git diff --stat origin/${GIT_BASE_BRANCH}..HEAD 2>/dev/null | tail -1)
-  if [[ -n "$local_diff_stat" ]]; then
-    # 从 "X files changed" 中提取文件数
-    CHANGED_FILES_COUNT=$(echo "$local_diff_stat" | grep -oE '[0-9]+ file' | grep -oE '[0-9]+' | head -1)
-    [[ -z "$CHANGED_FILES_COUNT" ]] && CHANGED_FILES_COUNT=0
+  if cd "$WORKTREE_PATH" 2>/dev/null; then
+    # 获取当前分支与 main 的差异统计
+    local local_diff_stat
+    if local_diff_stat=$(git diff --stat "origin/${GIT_BASE_BRANCH}..HEAD" 2>/dev/null | tail -1); then
+      # 从 "X files changed" 中提取文件数
+      CHANGED_FILES_COUNT=$(echo "$local_diff_stat" | grep -oE '[0-9]+ file' | grep -oE '[0-9]+' | head -1)
+      CHANGED_FILES_COUNT=${CHANGED_FILES_COUNT:-0}
+    else
+      log_warn "Failed to calculate changed files count"
+      CHANGED_FILES_COUNT=0
+    fi
+    log_info "统计文件改动数: ${CHANGED_FILES_COUNT} 个文件"
+  else
+    log_warn "Failed to enter worktree for stats, skipping"
+    CHANGED_FILES_COUNT=0
   fi
-  log_info "统计文件改动数: ${CHANGED_FILES_COUNT} 个文件"
 fi
 
 # ============================================================
@@ -184,13 +191,19 @@ if [[ "$EXECUTION_RESULT" == "success" ]]; then
 
   # 先在 worktree 中提交更改（如果有）
   if [[ -d "$WORKTREE_PATH" ]]; then
-    cd "$WORKTREE_PATH" || true
-    # 检查是否有未暂存或未跟踪的更改
-    if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
-      log_info "提交 worktree 中的更改..."
+    if ! cd "$WORKTREE_PATH"; then
+      log_error "Cannot enter worktree for final commit: $WORKTREE_PATH"
+      MERGE_RESULT="failed"
+    else
+      # 检查是否有未暂存或未跟踪的更改
+      if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+        log_info "提交 worktree 中的更改..."
 
-      # 添加所有更改
-      git add -A 2>/dev/null || true
+        # 添加所有更改
+        if ! git add -A 2>/dev/null; then
+          log_warn "Failed to stage all changes, trying partial add"
+          git add . 2>/dev/null || log_error "Failed to add changes"
+        fi
 
       # 只有在有更改的情况下才提交
       if git diff --cached --quiet 2>/dev/null; then
@@ -213,6 +226,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>" 2>/dev/null || true
       fi
     else
       log_info "worktree 中没有未提交的更改"
+    fi
     fi
   fi
 

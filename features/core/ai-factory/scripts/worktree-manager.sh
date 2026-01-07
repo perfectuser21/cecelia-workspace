@@ -319,6 +319,15 @@ cleanup_worktree() {
       if ! timeout "$GIT_TIMEOUT" git worktree remove --force "$worktree_path" 2>/dev/null; then
         # 最后手段：手动删除目录
         log_warn "强制移除失败，手动删除目录..."
+        # Safety checks before rm -rf
+        if [[ -z "$worktree_path" || "$worktree_path" == "/" ]]; then
+          log_error "Invalid worktree path, refusing to delete: $worktree_path"
+          return 1
+        fi
+        if [[ ! "$worktree_path" == "$WORKTREES_DIR"* ]]; then
+          log_error "Worktree path is outside WORKTREES_DIR, refusing to delete"
+          return 1
+        fi
         rm -rf "$worktree_path"
       fi
     fi

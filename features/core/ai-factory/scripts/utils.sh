@@ -20,7 +20,8 @@ NC='\033[0m'
 _log() {
   local level="$1"
   local message="$2"
-  local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+  local timestamp
+  timestamp=$(date '+%Y-%m-%d %H:%M:%S')
   local color=""
 
   case "$level" in
@@ -62,7 +63,8 @@ log_json() {
   local level="${1:-info}"
   local message="$2"
   local extra_data="${3:-}"
-  local timestamp=$(date -Iseconds)
+  local timestamp
+  timestamp=$(date -Iseconds)
 
   # 构建 JSON 日志
   local json_log
@@ -116,7 +118,8 @@ output_result_json() {
   local status="${1:-success}"
   local message="${2:-OK}"
   local data="${3:-null}"
-  local timestamp=$(date -Iseconds)
+  local timestamp
+  timestamp=$(date -Iseconds)
 
   # 构建结果 JSON
   local result_json
@@ -235,8 +238,10 @@ fetch_notion_task() {
     ' 2>/dev/null)
   fi
 
-  local task_name=$(echo "$response" | jq -r '.properties.Name.title | map(.plain_text // "") | join("") // "Unknown"')
-  local status=$(echo "$response" | jq -r '.properties.Status.status.name // "Unknown"')
+  local task_name
+  task_name=$(echo "$response" | jq -r '.properties.Name.title | map(.plain_text // "") | join("") // "Unknown"')
+  local status
+  status=$(echo "$response" | jq -r '.properties.Status.status.name // "Unknown"')
 
   jq -n \
     --arg task_id "$task_id" \
@@ -448,8 +453,10 @@ append_execution_summary() {
   # 计算耗时（分钟）
   local duration_minutes=0
   if [[ -n "$start_time" && -n "$end_time" ]]; then
-    local start_epoch=$(date -d "$start_time" +%s 2>/dev/null || echo 0)
-    local end_epoch=$(date -d "$end_time" +%s 2>/dev/null || echo 0)
+    local start_epoch
+    start_epoch=$(date -d "$start_time" +%s 2>/dev/null || echo 0)
+    local end_epoch
+    end_epoch=$(date -d "$end_time" +%s 2>/dev/null || echo 0)
     if [[ $start_epoch -gt 0 && $end_epoch -gt 0 ]]; then
       local duration_seconds=$((end_epoch - start_epoch))
       duration_minutes=$((duration_seconds / 60))
@@ -463,8 +470,10 @@ append_execution_summary() {
     changed_files="$precomputed_changed_files"
   elif [[ -d "$worktree_path" ]]; then
     cd "$worktree_path" 2>/dev/null || true
-    # 获取当前分支与 main 的差异统计
-    local diff_stat=$(git diff --stat origin/main..HEAD 2>/dev/null | tail -1)
+    # 获取当前分支与基础分支的差异统计
+    local diff_stat
+    # 使用 GIT_BASE_BRANCH 变量而不是硬编码 main
+    diff_stat=$(git diff --stat "origin/${GIT_BASE_BRANCH:-master}..HEAD" 2>/dev/null | tail -1)
     if [[ -n "$diff_stat" ]]; then
       # 从 "X files changed" 中提取文件数
       changed_files=$(echo "$diff_stat" | grep -oE '[0-9]+ file' | grep -oE '[0-9]+' | head -1)
@@ -490,7 +499,7 @@ append_execution_summary() {
       ;;
     *)
       icon="ℹ️"
-      color_emoji="🔵"
+      # color_emoji="🔵"  # Currently unused
       ;;
   esac
 

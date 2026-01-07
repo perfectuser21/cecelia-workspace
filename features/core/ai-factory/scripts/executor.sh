@@ -28,7 +28,7 @@ source "$SCRIPT_DIR/config.sh"
 source "$SCRIPT_DIR/utils.sh"
 
 # Ralph plugin 路径
-RALPH_SETUP_SCRIPT="$HOME/.claude/plugins/cache/claude-plugins-official/ralph-wiggum/unknown/scripts/setup-ralph-loop.sh"
+# RALPH_SETUP_SCRIPT="$HOME/.claude/plugins/cache/claude-plugins-official/ralph-wiggum/unknown/scripts/setup-ralph-loop.sh"  # Currently unused
 
 # 参数解析
 TASK_ID=""
@@ -93,7 +93,7 @@ if [[ -z "$TASK_ID" ]]; then
   exit 1
 fi
 
-LOG_FILE="${LOGS_DIR}/executor-${TASK_ID}.log"
+# LOG_FILE="${LOGS_DIR}/executor-${TASK_ID}.log"  # Currently unused
 mkdir -p "$LOGS_DIR"
 
 # 记录开始时间
@@ -317,7 +317,7 @@ fi
 log_info "[3/3] 收尾阶段..."
 
 CLEANUP_OUTPUT=$("$SCRIPT_DIR/cleanup.sh" "$TASK_ID" "$EXECUTION_RESULT" --start-time "$START_TIME" --model "$MODEL" 2>&1)
-CLEANUP_EXIT=$?
+# CLEANUP_EXIT=$?  # Currently unused
 
 # 提取 JSON（从第一个 { 到最后一个 }）
 CLEANUP_RESULT=$(echo "$CLEANUP_OUTPUT" | sed -n '/^{$/,/^}$/p')
