@@ -46,6 +46,110 @@ log_error() { _log "ERROR" "$1"; }
 log_debug() { [[ "${DEBUG:-false}" == "true" ]] && _log "DEBUG" "$1"; }
 
 # ============================================================
+# JSON 输出函数
+# ============================================================
+
+# 输出格式化的 JSON 日志
+# 功能: 将结构化数据输出为 JSON 格式的日志
+# 参数:
+#   $1 - 日志级别 (info/warn/error/debug)
+#   $2 - 消息内容
+#   $3 - 额外的 JSON 数据 (可选)
+# 示例:
+#   log_json "info" "任务开始" '{"task_id": "123", "model": "claude-3-5-sonnet"}'
+#   log_json "error" "执行失败" '{"error_code": 500, "details": "timeout"}'
+log_json() {
+  local level="${1:-info}"
+  local message="$2"
+  local extra_data="${3:-}"
+  local timestamp=$(date -Iseconds)
+
+  # 构建 JSON 日志
+  local json_log
+
+  # 基础日志结构
+  json_log=$(jq -n \
+    --arg timestamp "$timestamp" \
+    --arg level "$level" \
+    --arg message "$message" \
+    '{
+      timestamp: $timestamp,
+      level: $level,
+      message: $message
+    }')
+
+  # 如果有额外数据，尝试合并
+  if [[ -n "$extra_data" ]]; then
+    # 验证 extra_data 是否为有效 JSON
+    if echo "$extra_data" | jq -e . >/dev/null 2>&1; then
+      # 合并 JSON 对象
+      json_log=$(echo "$json_log" | jq --argjson extra "$extra_data" '. + $extra')
+    else
+      # 如果不是有效 JSON，将其作为 extra 字段
+      json_log=$(echo "$json_log" | jq --arg extra "$extra_data" '. + {extra: $extra}')
+    fi
+  fi
+
+  # 输出到标准错误（保持与其他日志一致）
+  echo "$json_log" | jq -c . >&2
+
+  # 如果设置了日志文件，也写入文件
+  if [[ -n "$LOG_FILE" ]]; then
+    local log_dir
+    log_dir="$(dirname "$LOG_FILE")"
+    [[ ! -d "$log_dir" ]] && mkdir -p "$log_dir" 2>/dev/null
+    echo "$json_log" | jq -c . >> "$LOG_FILE.json" 2>/dev/null
+  fi
+}
+
+# 输出执行结果的 JSON
+# 功能: 标准化输出执行结果，便于程序解析
+# 参数:
+#   $1 - 状态 (success/failed/warning)
+#   $2 - 消息内容
+#   $3 - 数据对象 (JSON 格式，可选)
+# 返回: 输出 JSON 到标准输出
+# 示例:
+#   output_result_json "success" "任务完成" '{"files_changed": 10, "duration": 120}'
+#   output_result_json "failed" "编译失败" '{"error": "syntax error", "line": 42}'
+output_result_json() {
+  local status="${1:-success}"
+  local message="${2:-OK}"
+  local data="${3:-null}"
+  local timestamp=$(date -Iseconds)
+
+  # 构建结果 JSON
+  local result_json
+  result_json=$(jq -n \
+    --arg timestamp "$timestamp" \
+    --arg status "$status" \
+    --arg message "$message" \
+    --argjson data "$data" \
+    '{
+      timestamp: $timestamp,
+      status: $status,
+      message: $message,
+      data: $data
+    }')
+
+  # 输出到标准输出（用于程序解析）
+  echo "$result_json" | jq .
+
+  # 根据状态决定是否同时记录到日志
+  case "$status" in
+    success)
+      log_debug "Result: $message"
+      ;;
+    failed|error)
+      log_error "Result: $message"
+      ;;
+    warning)
+      log_warn "Result: $message"
+      ;;
+  esac
+}
+
+# ============================================================
 # Secrets 加载
 # ============================================================
 
@@ -430,7 +534,7 @@ append_execution_summary() {
 # ============================================================
 # 导出函数
 # ============================================================
-export -f _log log_info log_warn log_error log_debug
+export -f _log log_info log_warn log_error log_debug log_json output_result_json
 export -f load_secrets
 export -f fetch_notion_task update_notion_status append_to_notion_page append_execution_summary
 export -f send_feishu_card
