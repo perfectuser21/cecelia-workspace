@@ -215,8 +215,9 @@ $PREVIOUS_CHANGES
 🔄 Ralph iteration $ITERATION/$MAX_ITERATIONS
 To complete: output <promise>TASK_COMPLETE</promise> when ALL requirements are met."
 
-      # 运行 claude -p
-      if timeout "$ITERATION_TIMEOUT" cd "$WORKTREE_PATH" && claude -p \
+      # 运行 claude -p (必须用 --cwd 确保在 worktree 目录执行)
+      if timeout "$ITERATION_TIMEOUT" claude -p \
+        --cwd "$WORKTREE_PATH" \
         --model "$MODEL" \
         --permission-mode "bypassPermissions" \
         --dangerously-skip-permissions \
@@ -292,7 +293,8 @@ $QUALITY_ERRORS
     log_info "  模型: $MODEL"
     log_info "  预算: $BUDGET USD"
 
-    if cd "$WORKTREE_PATH" && claude -p \
+    if claude -p \
+      --cwd "$WORKTREE_PATH" \
       --model "$MODEL" \
       --permission-mode "bypassPermissions" \
       --dangerously-skip-permissions \
