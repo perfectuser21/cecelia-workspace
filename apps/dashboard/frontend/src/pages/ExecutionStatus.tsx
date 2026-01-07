@@ -1,148 +1,74 @@
-import { useState, useEffect, useMemo } from 'react';
-import {
-  CheckCircle2,
-  XCircle,
-  Activity,
-  RefreshCw,
-  Loader2,
-  Clock,
-  ChevronDown,
-  ChevronRight,
-  Database,
-  Send,
-  ListTodo,
-  Wrench,
-  Bot,
-  Eye,
-} from 'lucide-react';
-import { n8nLiveStatusApi, N8nExecutionDetail } from '../api/n8n-live-status.api';
+import { useState, useEffect } from 'react';
+import { CheckCircle2, XCircle, Loader2, RefreshCw, TrendingUp, Clock, Zap } from 'lucide-react';
 
-// Feature 定义
-interface FeatureConfig {
-  id: string;
-  name: string;
-  icon: React.ElementType;
-  keywords: string[]; // 工作流名称关键词匹配
+interface TodayStats {
+  running: number;
+  success: number;
+  error: number;
+  total: number;
+  successRate: number;
 }
 
-const FEATURES: FeatureConfig[] = [
-  {
-    id: 'data-collection',
-    name: '数据采集',
-    icon: Database,
-    keywords: ['采集', '爬取', 'scrape', 'collect', 'fetch-data', '数据采集调度'],
-  },
-  {
-    id: 'content-publish',
-    name: '内容发布',
-    icon: Send,
-    keywords: ['发布', 'publish', 'post', 'upload', '内容发布'],
-  },
-  {
-    id: 'ai-factory',
-    name: 'AI 自动化',
-    icon: Bot,
-    keywords: ['dispatcher', 'claude', 'executor', 'callback', 'completion sync', 'ai factory', 'ai工厂'],
-  },
-  {
-    id: 'monitoring',
-    name: '监控巡检',
-    icon: Eye,
-    keywords: ['监控', '巡逻', 'monitor', 'patrol', 'watch'],
-  },
-  {
-    id: 'maintenance',
-    name: '系统维护',
-    icon: Wrench,
-    keywords: ['nightly', 'backup', 'cleanup', 'scheduler', '维护', '备份', '夜间'],
-  },
+interface Execution {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  status: string;
+  startedAt: string;
+  stoppedAt?: string;
+  duration?: number;
+}
+
+interface ApiResponse {
+  todayStats: TodayStats;
+  recentCompleted: Execution[];
+  runningExecutions: Execution[];
+}
+
+const FEATURES = [
+  { id: 'data-collection', name: '数据采集', color: '#3b82f6', bg: 'bg-blue-50 dark:bg-blue-900/20', keywords: ['采集', 'scrape', 'collect', 'fetch-data'] },
+  { id: 'content-publish', name: '内容发布', color: '#8b5cf6', bg: 'bg-purple-50 dark:bg-purple-900/20', keywords: ['发布', 'publish', 'post'] },
+  { id: 'ai-factory', name: 'AI 自动化', color: '#f59e0b', bg: 'bg-amber-50 dark:bg-amber-900/20', keywords: ['dispatcher', 'claude', 'executor', 'ai'] },
+  { id: 'monitoring', name: '监控巡检', color: '#10b981', bg: 'bg-emerald-50 dark:bg-emerald-900/20', keywords: ['监控', 'monitor', 'patrol'] },
+  { id: 'maintenance', name: '系统维护', color: '#6b7280', bg: 'bg-gray-50 dark:bg-gray-800/50', keywords: ['nightly', 'backup', 'cleanup', 'scheduler'] },
 ];
 
-// 子任务友好名称映射
-const TASK_NAMES: Record<string, string> = {
-  // 数据采集
-  '抖音': '抖音',
-  '快手': '快手',
-  '小红书': '小红书',
-  '头条': '头条',
-  '微博': '微博',
-  '公众号': '公众号',
-  '视频号': '视频号',
-  '知乎': '知乎',
-  '数据采集调度器': '采集调度',
-  // 内容发布
-  '内容发布': '内容发布',
-  'notion': 'Notion 同步',
-  // AI 自动化
-  'task dispatcher': '任务调度',
-  'feature completion': '功能同步',
-  'execution callback': '执行回调',
-  '异步 claude': 'Claude 执行器',
-  // 监控
-  '监控巡逻': '系统巡检',
-  // 系统维护
-  'nightly': '定时任务',
-  '夜间备份': '数据备份',
-  '夜间文档': '文档检查',
-};
-
-function getTaskFriendlyName(workflowName: string): string {
-  const lower = workflowName?.toLowerCase() || '';
-  for (const [key, value] of Object.entries(TASK_NAMES)) {
-    if (lower.includes(key)) return value;
+function matchFeature(name: string) {
+  const lower = (name || '').toLowerCase();
+  for (const f of FEATURES) {
+    if (f.keywords.some(k => lower.includes(k))) return f;
   }
-  // 默认返回简化名称
-  return workflowName?.replace(/[-_]/g, ' ').slice(0, 20) || '未知任务';
+  return FEATURES[4];
 }
 
-function matchFeature(workflowName: string): FeatureConfig {
-  const lower = workflowName?.toLowerCase() || '';
-  for (const feature of FEATURES) {
-    if (feature.keywords.some(kw => lower.includes(kw))) {
-      return feature;
-    }
-  }
-  // 默认归类到系统维护
-  return FEATURES[FEATURES.length - 1];
+function formatTime(dateStr: string) {
+  const date = new Date(dateStr);
+  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 }
 
-interface FeatureGroup {
-  feature: FeatureConfig;
-  executions: N8nExecutionDetail[];
-  stats: {
-    total: number;
-    success: number;
-    failed: number;
-  };
+function formatDuration(seconds?: number) {
+  if (!seconds) return '-';
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
 export default function ExecutionStatus() {
-  const [executions, setExecutions] = useState<N8nExecutionDetail[]>([]);
+  const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastUpdate, setLastUpdate] = useState<string>('');
-  const [expandedFeatures, setExpandedFeatures] = useState<Set<string>>(new Set(['ai-factory', 'data-collection', 'content-publish']));
+  const [error, setError] = useState('');
+  const [lastUpdate, setLastUpdate] = useState('');
 
   const fetchData = async () => {
     try {
-      const data = await n8nLiveStatusApi.getLiveStatusOverview('local');
-      const allExecutions = [
-        ...data.runningExecutions.map(e => ({
-          id: e.id,
-          workflowId: e.workflowId,
-          workflowName: e.workflowName,
-          status: 'running' as const,
-          mode: 'trigger',
-          startedAt: e.startedAt,
-          finished: false,
-        })),
-        ...data.recentCompleted,
-      ];
-      setExecutions(allExecutions);
-      setLastUpdate(new Date().toLocaleTimeString('zh-CN'));
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '获取数据失败');
+      setLoading(true);
+      const res = await fetch('/api/v1/n8n-live-status/instances/local/overview');
+      if (!res.ok) throw new Error('API error');
+      const json = await res.json();
+      setData(json);
+      setError('');
+      setLastUpdate(new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
+    } catch {
+      setError('加载失败');
     } finally {
       setLoading(false);
     }
@@ -150,233 +76,194 @@ export default function ExecutionStatus() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
+    const t = setInterval(fetchData, 30000);
+    return () => clearInterval(t);
   }, []);
 
-  // 按 Feature 分组
-  const featureGroups = useMemo<FeatureGroup[]>(() => {
-    const groups = new Map<string, FeatureGroup>();
+  // 合并所有执行记录
+  const allExecs = [...(data?.runningExecutions || []), ...(data?.recentCompleted || [])];
 
-    // 初始化所有 Feature
-    for (const feature of FEATURES) {
-      groups.set(feature.id, {
-        feature,
-        executions: [],
-        stats: { total: 0, success: 0, failed: 0 },
-      });
-    }
+  // 按 Feature 统计
+  const featureStats = FEATURES.map(f => {
+    const matched = allExecs.filter(e => matchFeature(e.workflowName).id === f.id);
+    const success = matched.filter(e => e.status === 'success').length;
+    const failed = matched.filter(e => e.status === 'error' || e.status === 'crashed').length;
+    const running = matched.filter(e => e.status === 'running').length;
+    const avgDuration = matched.length > 0
+      ? Math.round(matched.reduce((acc, e) => acc + (e.duration || 0), 0) / matched.length)
+      : 0;
 
-    // 分配执行记录
-    for (const exec of executions) {
-      const feature = matchFeature(exec.workflowName || '');
-      const group = groups.get(feature.id)!;
-      group.executions.push(exec);
-      group.stats.total++;
-      if (exec.status === 'success') {
-        group.stats.success++;
-      } else if (exec.status === 'error' || exec.status === 'crashed') {
-        group.stats.failed++;
-      }
-    }
+    return {
+      ...f,
+      total: matched.length,
+      success,
+      failed,
+      running,
+      avgDuration,
+      executions: matched.slice(0, 5), // 最近5条
+    };
+  }).filter(s => s.total > 0);
 
-    // 只返回有数据的分组，按执行数量排序
-    return Array.from(groups.values())
-      .filter(g => g.stats.total > 0)
-      .sort((a, b) => b.stats.total - a.stats.total);
-  }, [executions]);
+  const todayStats = data?.todayStats || { total: 0, success: 0, error: 0, running: 0, successRate: 0 };
 
-  // 总统计
-  const totalStats = useMemo(() => {
-    return featureGroups.reduce(
-      (acc, g) => ({
-        total: acc.total + g.stats.total,
-        success: acc.success + g.stats.success,
-        failed: acc.failed + g.stats.failed,
-      }),
-      { total: 0, success: 0, failed: 0 }
-    );
-  }, [featureGroups]);
-
-  const toggleFeature = (featureId: string) => {
-    setExpandedFeatures(prev => {
-      const next = new Set(prev);
-      if (next.has(featureId)) {
-        next.delete(featureId);
-      } else {
-        next.add(featureId);
-      }
-      return next;
-    });
-  };
-
-  const formatTime = (dateStr: string): string => {
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const formatDuration = (start: string, end?: string): string => {
-    if (!end) return '进行中';
-    const duration = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 1000);
-    if (duration < 60) return `${duration}秒`;
-    if (duration < 3600) return `${Math.floor(duration / 60)}分${duration % 60}秒`;
-    return `${Math.floor(duration / 3600)}时${Math.floor((duration % 3600) / 60)}分`;
-  };
-
-  if (loading && executions.length === 0) {
+  if (loading && !data) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
       </div>
     );
   }
 
-  if (error && executions.length === 0) {
+  if (error && !data) {
     return (
-      <div className="flex items-center justify-center h-96 text-red-500">
-        <XCircle className="w-6 h-6 mr-2" />
-        {error}
+      <div className="flex items-center justify-center h-64 text-red-500">
+        <XCircle className="w-5 h-5 mr-2" />{error}
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="max-w-5xl mx-auto">
+      {/* 头部 */}
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-3">
-            <Activity className="w-8 h-8 text-blue-600" />
-            工作记录
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-            今日自动任务执行情况
-          </p>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">工作记录</h1>
+          <p className="text-sm text-gray-500 mt-1">今日自动化任务执行概览</p>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-500">
-            更新于 {lastUpdate}
-          </span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-400">{lastUpdate} 更新</span>
           <button
-            onClick={() => { setLoading(true); fetchData(); }}
+            onClick={fetchData}
             disabled={loading}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
-            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
-      {/* 总统计 */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-gray-500">今日执行</p>
-          <p className="text-2xl font-bold mt-1">{totalStats.total}</p>
+      {/* 顶部统计卡片 */}
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+          <div className="flex items-center gap-2 text-gray-500 text-xs mb-2">
+            <Zap className="w-3.5 h-3.5" />
+            <span>总执行</span>
+          </div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">{todayStats.total}</div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-gray-500">成功</p>
-          <p className="text-2xl font-bold mt-1 text-green-600">{totalStats.success}</p>
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+          <div className="flex items-center gap-2 text-green-600 text-xs mb-2">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>成功</span>
+          </div>
+          <div className="text-2xl font-bold text-green-600">{todayStats.success}</div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-gray-500">失败</p>
-          <p className="text-2xl font-bold mt-1 text-red-600">{totalStats.failed}</p>
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+          <div className="flex items-center gap-2 text-red-500 text-xs mb-2">
+            <XCircle className="w-3.5 h-3.5" />
+            <span>失败</span>
+          </div>
+          <div className="text-2xl font-bold text-red-500">{todayStats.error}</div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+          <div className="flex items-center gap-2 text-gray-500 text-xs mb-2">
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>成功率</span>
+          </div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">{todayStats.successRate}%</div>
         </div>
       </div>
 
       {/* Feature 分组 */}
       <div className="space-y-4">
-        {featureGroups.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center text-gray-500 shadow-sm border border-gray-200 dark:border-gray-700">
+        {featureStats.length === 0 ? (
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center text-gray-400 border border-gray-100 dark:border-gray-700">
             今日暂无执行记录
           </div>
         ) : (
-          featureGroups.map((group) => {
-            const Icon = group.feature.icon;
-            const isExpanded = expandedFeatures.has(group.feature.id);
+          featureStats.map(feat => {
+            const rate = feat.total > 0 ? Math.round((feat.success / feat.total) * 100) : 0;
 
             return (
               <div
-                key={group.feature.id}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden"
+                key={feat.id}
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden"
               >
                 {/* Feature 头部 */}
-                <button
-                  onClick={() => toggleFeature(group.feature.id)}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                >
+                <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-gray-700/50">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                      <Icon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <div
+                      className="w-10 h-10 rounded-lg flex items-center justify-center"
+                      style={{ backgroundColor: feat.color + '15' }}
+                    >
+                      <div
+                        className="w-2.5 h-2.5 rounded-full"
+                        style={{ backgroundColor: feat.color }}
+                      />
                     </div>
-                    <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {group.feature.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-3 text-sm">
-                      <span className="text-gray-500">今日 {group.stats.total} 次</span>
-                      <span className="flex items-center gap-1 text-green-600">
-                        <CheckCircle2 className="w-4 h-4" />
-                        {group.stats.success}
-                      </span>
-                      {group.stats.failed > 0 && (
-                        <span className="flex items-center gap-1 text-red-600">
-                          <XCircle className="w-4 h-4" />
-                          {group.stats.failed}
-                        </span>
-                      )}
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-white">{feat.name}</div>
+                      <div className="text-xs text-gray-500 flex items-center gap-3 mt-0.5">
+                        <span>{feat.total} 次执行</span>
+                        {feat.avgDuration > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            平均 {formatDuration(feat.avgDuration)}
+                          </span>
+                        )}
+                        {feat.running > 0 && (
+                          <span className="text-blue-500 flex items-center gap-1">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            {feat.running} 运行中
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    {isExpanded ? (
-                      <ChevronDown className="w-5 h-5 text-gray-400" />
-                    ) : (
-                      <ChevronRight className="w-5 h-5 text-gray-400" />
-                    )}
                   </div>
-                </button>
 
-                {/* 执行记录列表 */}
-                {isExpanded && (
-                  <div className="border-t border-gray-200 dark:border-gray-700">
-                    <div className="divide-y divide-gray-100 dark:divide-gray-700/50">
-                      {group.executions.map((exec) => (
+                  {/* 右侧进度 */}
+                  <div className="flex items-center gap-4">
+                    <div className="w-32">
+                      <div className="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${rate}%`, backgroundColor: feat.color }}
+                        />
+                      </div>
+                    </div>
+                    <div className="w-12 text-right text-sm font-medium" style={{ color: feat.color }}>
+                      {rate}%
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs w-20 justify-end">
+                      <span className="text-green-600 font-medium">{feat.success}</span>
+                      <span className="text-gray-300">/</span>
+                      <span className={feat.failed > 0 ? 'text-red-500 font-medium' : 'text-gray-400'}>
+                        {feat.failed}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 最近执行列表 */}
+                {feat.executions.length > 0 && (
+                  <div className="px-5 py-3 bg-gray-50/50 dark:bg-gray-900/30">
+                    <div className="flex flex-wrap gap-2">
+                      {feat.executions.map(exec => (
                         <div
                           key={exec.id}
-                          className="px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs ${
+                            exec.status === 'success'
+                              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                              : exec.status === 'running'
+                              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                              : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                          }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <span className="text-gray-400">·</span>
-                            <span className="text-sm text-gray-700 dark:text-gray-300">
-                              {getTaskFriendlyName(exec.workflowName || '')}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm">
-                            <span className="text-gray-500 flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5" />
-                              {formatTime(exec.startedAt)}
-                            </span>
-                            {exec.status === 'success' ? (
-                              <span className="flex items-center gap-1 text-green-600">
-                                <CheckCircle2 className="w-4 h-4" />
-                                成功
-                              </span>
-                            ) : exec.status === 'running' ? (
-                              <span className="flex items-center gap-1 text-blue-600">
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                运行中
-                              </span>
-                            ) : (
-                              <span className="flex items-center gap-1 text-red-600">
-                                <XCircle className="w-4 h-4" />
-                                失败
-                              </span>
-                            )}
-                            <span className="text-gray-400 w-16 text-right">
-                              {formatDuration(exec.startedAt, exec.stoppedAt)}
-                            </span>
-                          </div>
+                          {exec.status === 'success' && <CheckCircle2 className="w-3 h-3" />}
+                          {exec.status === 'running' && <Loader2 className="w-3 h-3 animate-spin" />}
+                          {(exec.status === 'error' || exec.status === 'crashed') && <XCircle className="w-3 h-3" />}
+                          <span>{formatTime(exec.startedAt)}</span>
+                          {exec.duration && <span className="text-gray-500">· {formatDuration(exec.duration)}</span>}
                         </div>
                       ))}
                     </div>
