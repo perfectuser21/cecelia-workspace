@@ -1,0 +1,28 @@
+2025-12-22 10:46:04 [[31merror[39m]: [31mFailed to connect to database[39m {
+  "error": "password authentication failed for user \"postgres\"",
+  "host": "localhost"
+}
+2025-12-22 10:47:03 [[31merror[39m]: [31mUncaught exception[39m {
+  "error": "listen EADDRINUSE: address already in use :::3000",
+  "stack": "Error: listen EADDRINUSE: address already in use :::3000\n    at Server.setupListenHandle [as _listen2] (node:net:1817:16)\n    at listenInCluster (node:net:1865:12)\n    at Server.listen (node:net:1953:7)\n    at Function.listen (/home/xx/dev/n8n-social-media-scraper/node_modules/.pnpm/express@4.22.1/node_modules/express/lib/application.js:635:24)\n    at Server.start (/home/xx/dev/n8n-social-media-scraper/core/api/src/server.ts:93:16)\n    at processTicksAndRejections (node:internal/process/task_queues:95:5)"
+}
+2025-12-22 10:47:17 [[31merror[39m]: [31mUncaught exception[39m {
+  "error": "listen EADDRINUSE: address already in use :::3000",
+  "stack": "Error: listen EADDRINUSE: address already in use :::3000\n    at Server.setupListenHandle [as _listen2] (node:net:1817:16)\n    at listenInCluster (node:net:1865:12)\n    at Server.listen (node:net:1953:7)\n    at Function.listen (/home/xx/dev/n8n-social-media-scraper/node_modules/.pnpm/express@4.22.1/node_modules/express/lib/application.js:635:24)\n    at Server.start (/home/xx/dev/n8n-social-media-scraper/core/api/src/server.ts:93:16)\n    at processTicksAndRejections (node:internal/process/task_queues:95:5)"
+}
+2025-12-22 10:47:39 [[31merror[39m]: [31mUncaught exception[39m {
+  "error": "listen EADDRINUSE: address already in use :::3001",
+  "stack": "Error: listen EADDRINUSE: address already in use :::3001\n    at Server.setupListenHandle [as _listen2] (node:net:1817:16)\n    at listenInCluster (node:net:1865:12)\n    at Server.listen (node:net:1953:7)\n    at Function.listen (/home/xx/dev/n8n-social-media-scraper/node_modules/.pnpm/express@4.22.1/node_modules/express/lib/application.js:635:24)\n    at Server.start (/home/xx/dev/n8n-social-media-scraper/core/api/src/server.ts:93:16)\n    at processTicksAndRejections (node:internal/process/task_queues:95:5)"
+}
+2025-12-22 10:48:08 [[31merror[39m]: [31mUncaught exception[39m {
+  "error": "listen EADDRINUSE: address already in use :::3000",
+  "stack": "Error: listen EADDRINUSE: address already in use :::3000\n    at Server.setupListenHandle [as _listen2] (node:net:1817:16)\n    at listenInCluster (node:net:1865:12)\n    at Server.listen (node:net:1953:7)\n    at Function.listen (/home/xx/dev/n8n-social-media-scraper/node_modules/.pnpm/express@4.22.1/node_modules/express/lib/application.js:635:24)\n    at Server.start (/home/xx/dev/n8n-social-media-scraper/core/api/src/server.ts:93:16)\n    at processTicksAndRejections (node:internal/process/task_queues:95:5)"
+}
+2025-12-22 10:48:29 [[31merror[39m]: [31mUncaught exception[39m {
+  "error": "listen EADDRINUSE: address already in use :::3002",
+  "stack": "Error: listen EADDRINUSE: address already in use :::3002\n    at Server.setupListenHandle [as _listen2] (node:net:1817:16)\n    at listenInCluster (node:net:1865:12)\n    at Server.listen (node:net:1953:7)\n    at Function.listen (/home/xx/dev/n8n-social-media-scraper/node_modules/.pnpm/express@4.22.1/node_modules/express/lib/application.js:635:24)\n    at Server.start (/home/xx/dev/n8n-social-media-scraper/core/api/src/server.ts:93:16)\n    at processTicksAndRejections (node:internal/process/task_queues:95:5)"
+}
+2025-12-22 10:48:58 [[31merror[39m]: [31mUncaught exception[39m {
+  "error": "listen EADDRINUSE: address already in use :::3000",
+  "stack": "Error: listen EADDRINUSE: address already in use :::3000\n    at Server.setupListenHandle [as _listen2] (node:net:1817:16)\n    at listenInCluster (node:net:1865:12)\n    at Server.listen (node:net:1953:7)\n    at Function.listen (/home/xx/dev/n8n-social-media-scraper/node_modules/.pnpm/express@4.22.1/node_modules/express/lib/application.js:635:24)\n    at Server.start (/home/xx/dev/n8n-social-media-scraper/core/api/src/server.ts:93:16)\n    at processTicksAndRejections (node:internal/process/task_queues:95:5)"
+}
