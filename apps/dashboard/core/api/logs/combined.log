@@ -1,0 +1,38 @@
+2025-12-22 10:46:04 [[32minfo[39m]: [32mCreated upload directory: /home/xx/dev/n8n-social-media-scraper/core/api/data/uploads[39m 
+2025-12-22 10:46:04 [[32minfo[39m]: [32mCreated upload directory: /home/xx/dev/n8n-social-media-scraper/core/api/data/uploads/original[39m 
+2025-12-22 10:46:04 [[32minfo[39m]: [32mCreated upload directory: /home/xx/dev/n8n-social-media-scraper/core/api/data/uploads/processed[39m 
+2025-12-22 10:46:04 [[32minfo[39m]: [32mCreated upload directory: /home/xx/dev/n8n-social-media-scraper/core/api/data/uploads/thumbnails[39m 
+2025-12-22 10:46:04 [[32minfo[39m]: [32mCreated upload directory: /home/xx/dev/n8n-social-media-scraper/core/api/data/uploads/temp[39m 
+2025-12-22 10:46:04 [[31merror[39m]: [31mFailed to connect to database[39m {
+  "error": "password authentication failed for user \"postgres\"",
+  "host": "localhost"
+}
+2025-12-22 10:47:03 [[32minfo[39m]: [32mNew database connection established[39m 
+2025-12-22 10:47:17 [[32minfo[39m]: [32mNew database connection established[39m 
+2025-12-22 10:47:39 [[32minfo[39m]: [32mNew database connection established[39m 
+2025-12-22 10:48:08 [[32minfo[39m]: [32mNew database connection established[39m 
+2025-12-22 10:48:29 [[32minfo[39m]: [32mNew database connection established[39m 
+2025-12-22 10:48:58 [[32minfo[39m]: [32mNew database connection established[39m 
+2025-12-22 10:49:27 [[32minfo[39m]: [32mNew database connection established[39m 
+2025-12-22 10:49:27 [[32minfo[39m]: [32mDatabase connection pool initialized[39m {
+  "host": "localhost",
+  "database": "n8n_social_metrics"
+}
+2025-12-22 10:49:27 [[32minfo[39m]: [32mDatabase connected successfully[39m 
+2025-12-22 10:49:27 [[32minfo[39m]: [32mServer started on port 3333[39m {
+  "nodeEnv": "development",
+  "port": 3333
+}
+2025-12-22 10:54:21 [[33mwarn[39m]: [33mMissing authorization header[39m {
+  "ip": "::ffff:127.0.0.1",
+  "path": "/accounts"
+}
+2025-12-22 10:54:21 [[33mwarn[39m]: [33mRequest completed with error[39m {
+  "method": "GET",
+  "path": "/accounts",
+  "statusCode": 401,
+  "duration": "2ms",
+  "ip": "::ffff:127.0.0.1",
+  "userAgent": "curl/7.81.0"
+}
+2025-12-22 11:07:47 [[32minfo[39m]: [32mSIGTERM received, shutting down gracefully[39m 
