@@ -23,7 +23,8 @@ interface Overview {
   recent_runs: TaskRun[];
 }
 
-const CECILIA_API = import.meta.env.VITE_CECILIA_API_URL || 'https://core.zenjoymedia.media:3000';
+// API 和前端同域，使用相对路径
+const CECILIA_API = '';
 
 export default function CeciliaRuns() {
   const [overview, setOverview] = useState<Overview | null>(null);

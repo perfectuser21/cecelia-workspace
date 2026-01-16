@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { instanceApi } from '../api/instance.api';
 
 // 主题配置
 interface ThemeConfig {
@@ -11,7 +10,7 @@ interface ThemeConfig {
   sidebarGradient?: string;
 }
 
-// Instance 配置类型（与后端 API 返回格式一致）
+// Instance 配置类型
 export interface InstanceConfig {
   instance: string;
   name: string;
@@ -19,9 +18,9 @@ export interface InstanceConfig {
   features: Record<string, boolean>;
 }
 
-// 默认配置
-const defaultConfig: InstanceConfig = {
-  instance: 'zenithjoy',
+// Dashboard 配置（蓝色主题）
+const dashboardConfig: InstanceConfig = {
+  instance: 'dashboard',
   name: '悦升云端',
   theme: {
     logo: '/logo-white.png',
@@ -39,17 +38,48 @@ const defaultConfig: InstanceConfig = {
     'publish-stats': true,
     'scraping': true,
     'tools': true,
-    'video-editor': true,
     'canvas': true,
     'settings': true,
   },
 };
+
+// Cecilia 配置（AI黑客透明风格）
+const ceciliaConfig: InstanceConfig = {
+  instance: 'cecilia',
+  name: 'Cecilia',
+  theme: {
+    logo: '/logo-white.png',
+    logoCollapsed: 'C',
+    primaryColor: '#00d4ff',  // 电光青色
+    secondaryColor: '#00ff88', // 霓虹绿
+    sidebarGradient: 'linear-gradient(180deg, rgba(0,10,20,0.95) 0%, rgba(0,20,40,0.9) 50%, rgba(0,30,50,0.85) 100%)',
+  },
+  features: {
+    'cecilia-tasks': true,
+    'cecilia-history': true,
+    'cecilia-stats': true,
+    'cecilia-logs': true,
+    'settings': true,
+  },
+};
+
+// 根据域名获取配置
+function getConfigByHostname(): InstanceConfig {
+  const hostname = window.location.hostname;
+
+  if (hostname.startsWith('core.') || hostname.includes('core')) {
+    return ceciliaConfig;
+  }
+
+  return dashboardConfig;
+}
 
 interface InstanceContextType {
   config: InstanceConfig | null;
   loading: boolean;
   error: string | null;
   isFeatureEnabled: (featureKey: string) => boolean;
+  isCecilia: boolean;
 }
 
 const InstanceContext = createContext<InstanceContextType | undefined>(undefined);
@@ -60,30 +90,17 @@ export function InstanceProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadConfig = async () => {
-      try {
-        // 从后端 API 加载配置
-        const response = await instanceApi.getConfig();
-        if (response.success && response.config) {
-          setConfig(response.config);
-          applyTheme(response.config.theme);
-        } else {
-          // API 返回失败，使用默认配置
-          console.warn('API returned no config, using default');
-          setConfig(defaultConfig);
-          applyTheme(defaultConfig.theme);
-        }
-      } catch (e) {
-        console.warn('Failed to load instance config from API, using default:', e);
-        setError('Failed to load configuration');
-        setConfig(defaultConfig);
-        applyTheme(defaultConfig.theme);
-      } finally {
-        setLoading(false);
-      }
-    };
+    // 根据域名自动选择配置
+    const selectedConfig = getConfigByHostname();
+    setConfig(selectedConfig);
+    applyTheme(selectedConfig.theme);
 
-    loadConfig();
+    // 更新页面标题
+    document.title = selectedConfig.instance === 'cecilia'
+      ? 'Cecilia - AI Code Executor'
+      : '悦升云端 - 运营中台';
+
+    setLoading(false);
   }, []);
 
   // 应用主题到 CSS 变量
@@ -109,13 +126,15 @@ export function InstanceProvider({ children }: { children: ReactNode }) {
 
   // 检查 feature 是否启用
   const isFeatureEnabled = (featureKey: string): boolean => {
-    if (!config) return true; // 配置未加载时默认启用
-    const enabled = config.features[featureKey];
-    return enabled !== false; // 未定义的 feature 默认启用
+    if (!config) return false;
+    return config.features[featureKey] === true;
   };
 
+  // 是否为 Cecilia 实例
+  const isCecilia = config?.instance === 'cecilia';
+
   return (
-    <InstanceContext.Provider value={{ config, loading, error, isFeatureEnabled }}>
+    <InstanceContext.Provider value={{ config, loading, error, isFeatureEnabled, isCecilia }}>
       {children}
     </InstanceContext.Provider>
   );

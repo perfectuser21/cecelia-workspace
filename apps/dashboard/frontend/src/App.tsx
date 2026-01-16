@@ -56,7 +56,7 @@ function AppContent() {
   const location = useLocation();
   const { user, logout, isAuthenticated, isSuperAdmin } = useAuth();
   const { theme, actualTheme, setTheme } = useTheme();
-  const { config, loading: instanceLoading, isFeatureEnabled } = useInstance();
+  const { config, loading: instanceLoading, isFeatureEnabled, isCecilia } = useInstance();
   const [collapsed, setCollapsed] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
@@ -78,6 +78,28 @@ function AppContent() {
   };
 
   // 定义所有导航组，带 featureKey 用于动态过滤
+  // Cecilia 导航组
+  const ceciliaNavGroups = [
+    {
+      title: '概览',
+      items: [
+        { path: '/cecilia', icon: Bot, label: '任务总览', featureKey: 'cecilia-tasks' },
+        { path: '/cecilia/history', icon: ListTodo, label: '历史记录', featureKey: 'cecilia-history' },
+        { path: '/cecilia/stats', icon: BarChart3, label: '统计分析', featureKey: 'cecilia-stats' },
+      ]
+    },
+    {
+      title: '系统',
+      items: [
+        { path: '/cecilia/logs', icon: Activity, label: '执行日志', featureKey: 'cecilia-logs' },
+        ...(isSuperAdmin ? [
+          { path: '/settings', icon: Settings, label: '配置', featureKey: 'settings' },
+        ] : []),
+      ]
+    }
+  ];
+
+  // Dashboard 导航组
   const allNavGroups = [
     {
       title: '概览',
@@ -101,7 +123,6 @@ function AppContent() {
       title: '系统',
       items: [
         { path: '/tools', icon: Sparkles, label: '工具箱', featureKey: 'tools' },
-        { path: '/cecilia', icon: Bot, label: 'Cecilia', featureKey: 'cecilia' },
         ...(isSuperAdmin ? [
           { path: '/canvas', icon: Palette, label: '画布', featureKey: 'canvas' },
           { path: '/settings', icon: Settings, label: '管理员', featureKey: 'settings' },
@@ -110,8 +131,9 @@ function AppContent() {
     }
   ];
 
-  // 根据 feature 开关过滤菜单
-  const navGroups = allNavGroups
+  // 根据 instance 和 feature 开关过滤菜单
+  const baseNavGroups = isCecilia ? ceciliaNavGroups : allNavGroups;
+  const navGroups = baseNavGroups
     .map(group => ({
       ...group,
       items: group.items.filter(item => isFeatureEnabled(item.featureKey))
@@ -360,7 +382,41 @@ function AppContent() {
               path="/"
               element={
                 <PrivateRoute>
-                  <Dashboard />
+                  {isCecilia ? <Navigate to="/cecilia" replace /> : <Dashboard />}
+                </PrivateRoute>
+              }
+            />
+
+            {/* Cecilia 路由 */}
+            <Route
+              path="/cecilia"
+              element={
+                <PrivateRoute>
+                  <CeciliaRuns />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/cecilia/history"
+              element={
+                <PrivateRoute>
+                  <CeciliaRuns />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/cecilia/stats"
+              element={
+                <PrivateRoute>
+                  <CeciliaRuns />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/cecilia/logs"
+              element={
+                <PrivateRoute>
+                  <CeciliaRuns />
                 </PrivateRoute>
               }
             />
@@ -448,14 +504,6 @@ function AppContent() {
                       </Link>
                     </div>
                   </div>
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/cecilia"
-              element={
-                <PrivateRoute>
-                  <CeciliaRuns />
                 </PrivateRoute>
               }
             />
