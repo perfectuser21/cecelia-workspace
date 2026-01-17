@@ -1,0 +1,349 @@
+/**
+ * 导航配置 - 配置驱动 UI
+ *
+ * 这个文件定义了菜单和路由的配置
+ * 修改这里就能添加/删除/修改页面，无需改动其他代码
+ */
+
+import { lazy, ComponentType } from 'react';
+import type { LucideIcon } from 'lucide-react';
+import {
+  LayoutDashboard,
+  BarChart3,
+  Database,
+  FileText,
+  Sparkles,
+  Settings,
+  Activity,
+  MonitorDot,
+  Server,
+  DollarSign,
+  Workflow,
+  ListTodo,
+  TrendingUp,
+  Radio,
+  Palette,
+  Bot,
+  Cpu,
+  Code,
+} from 'lucide-react';
+
+// ============ 类型定义 ============
+
+export interface NavItem {
+  path: string;
+  icon: LucideIcon;
+  label: string;
+  featureKey: string;
+  // 权限控制
+  requireSuperAdmin?: boolean;
+  // 路由配置
+  component?: string;  // 组件路径，用于懒加载
+  redirect?: string;   // 重定向目标
+}
+
+export interface NavGroup {
+  title: string;
+  items: NavItem[];
+}
+
+export interface RouteConfig {
+  path: string;
+  component?: string;
+  redirect?: string;
+  requireAuth?: boolean;
+  requireSuperAdmin?: boolean;
+}
+
+// ============ 页面组件懒加载映射 ============
+
+// 懒加载所有页面组件
+export const pageComponents: Record<string, () => Promise<{ default: ComponentType }>> = {
+  'Dashboard': () => import('../pages/Dashboard'),
+  'Canvas': () => import('../pages/Canvas'),
+  'ContentData': () => import('../pages/ContentData'),
+  'ContentPublish': () => import('../pages/ContentPublish'),
+  'ExecutionStatus': () => import('../pages/ExecutionStatus'),
+  'Tasks': () => import('../pages/Tasks'),
+  'PlatformStatus': () => import('../pages/PlatformStatus'),
+  'PublishStats': () => import('../pages/PublishStats'),
+  'CeciliaRuns': () => import('../pages/CeciliaRuns'),
+  'EngineCapabilities': () => import('../pages/EngineCapabilities'),
+  'TaskMonitor': () => import('../pages/TaskMonitor'),
+  'SessionMonitor': () => import('../pages/SessionMonitor'),
+  'ClaudeMonitor': () => import('../pages/ClaudeMonitor'),
+  'ClaudeStats': () => import('../pages/ClaudeStats'),
+  'VpsMonitor': () => import('../pages/VpsMonitor'),
+  'N8nWorkflows': () => import('../pages/N8nWorkflows'),
+  'N8nWorkflowDetail': () => import('../pages/N8nWorkflowDetail'),
+  'N8nLiveStatus': () => import('../pages/N8nLiveStatus'),
+  'N8nLiveStatusDetail': () => import('../pages/N8nLiveStatusDetail'),
+  'LoginPage': () => import('../pages/LoginPage'),
+  'PlatformStatusDashboard': () => import('../pages/PlatformStatusDashboard'),
+  'DevTasks': () => import('../pages/DevTasks'),
+};
+
+// 获取懒加载组件
+export function getPageComponent(name: string) {
+  const loader = pageComponents[name];
+  if (!loader) {
+    console.warn(`Page component not found: ${name}`);
+    return null;
+  }
+  return lazy(loader);
+}
+
+// ============ Core 实例导航配置 ============
+
+export const coreNavGroups: NavGroup[] = [
+  {
+    title: 'Engine',
+    items: [
+      {
+        path: '/engine',
+        icon: Cpu,
+        label: '能力概览',
+        featureKey: 'engine-capabilities',
+        component: 'EngineCapabilities'
+      },
+      {
+        path: '/engine/tasks',
+        icon: Activity,
+        label: '任务监控',
+        featureKey: 'task-monitor',
+        component: 'TaskMonitor'
+      },
+      {
+        path: '/engine/dev',
+        icon: Code,
+        label: '开发任务',
+        featureKey: 'dev-tasks',
+        component: 'DevTasks'
+      },
+    ]
+  },
+  {
+    title: 'Cecilia',
+    items: [
+      {
+        path: '/cecilia',
+        icon: Bot,
+        label: '任务总览',
+        featureKey: 'cecilia-tasks',
+        component: 'CeciliaRuns'
+      },
+      {
+        path: '/cecilia/history',
+        icon: ListTodo,
+        label: '历史记录',
+        featureKey: 'cecilia-history',
+        component: 'CeciliaRuns'
+      },
+      {
+        path: '/cecilia/stats',
+        icon: BarChart3,
+        label: '统计分析',
+        featureKey: 'cecilia-stats',
+        component: 'CeciliaRuns'
+      },
+      {
+        path: '/cecilia/logs',
+        icon: Activity,
+        label: '执行日志',
+        featureKey: 'cecilia-logs',
+        component: 'CeciliaRuns'
+      },
+    ]
+  },
+  {
+    title: '系统',
+    items: [
+      {
+        path: '/settings',
+        icon: Settings,
+        label: '配置',
+        featureKey: 'settings',
+        requireSuperAdmin: true,
+        component: 'SettingsPage'
+      },
+    ]
+  }
+];
+
+// ============ Dashboard 实例导航配置 ============
+
+export const dashboardNavGroups: NavGroup[] = [
+  {
+    title: '概览',
+    items: [
+      {
+        path: '/',
+        icon: LayoutDashboard,
+        label: '工作台',
+        featureKey: 'workbench',
+        component: 'Dashboard'
+      },
+      {
+        path: '/execution-status',
+        icon: Activity,
+        label: '工作记录',
+        featureKey: 'execution-status',
+        component: 'ExecutionStatus'
+      },
+      {
+        path: '/tasks',
+        icon: ListTodo,
+        label: '任务',
+        featureKey: 'tasks',
+        component: 'Tasks'
+      },
+      {
+        path: '/data-center',
+        icon: BarChart3,
+        label: '数据中心',
+        featureKey: 'data-center',
+        component: 'ContentData'
+      },
+    ]
+  },
+  {
+    title: '管理',
+    items: [
+      {
+        path: '/content',
+        icon: FileText,
+        label: '内容管理',
+        featureKey: 'content',
+        component: 'ContentPublish'
+      },
+      {
+        path: '/platform-status',
+        icon: Radio,
+        label: '平台状态',
+        featureKey: 'platform-status',
+        component: 'PlatformStatus'
+      },
+      {
+        path: '/publish-stats',
+        icon: TrendingUp,
+        label: '发布统计',
+        featureKey: 'publish-stats',
+        component: 'PublishStats'
+      },
+      {
+        path: '/scraping',
+        icon: Database,
+        label: '数据采集',
+        featureKey: 'scraping',
+        component: 'ScrapingPlaceholder'  // 占位页面
+      },
+    ]
+  },
+  {
+    title: '系统',
+    items: [
+      {
+        path: '/tools',
+        icon: Sparkles,
+        label: '工具箱',
+        featureKey: 'tools',
+        component: 'ToolsPage'
+      },
+      {
+        path: '/canvas',
+        icon: Palette,
+        label: '画布',
+        featureKey: 'canvas',
+        requireSuperAdmin: true,
+        component: 'Canvas'
+      },
+      {
+        path: '/settings',
+        icon: Settings,
+        label: '管理员',
+        featureKey: 'settings',
+        requireSuperAdmin: true,
+        component: 'SettingsPage'
+      },
+    ]
+  }
+];
+
+// ============ 额外路由配置（不在菜单显示） ============
+
+export const additionalRoutes: RouteConfig[] = [
+  // 任务详情
+  { path: '/tasks/:name', component: 'Tasks', requireAuth: true },
+
+  // 登录相关
+  { path: '/login/:platform/:accountId', component: 'LoginPage', requireAuth: true },
+  { path: '/platform-login', component: 'PlatformStatusDashboard', requireAuth: true },
+
+  // 工具子页面
+  { path: '/tools/session-monitor', component: 'SessionMonitor', requireAuth: true },
+
+  // 管理员子页面
+  { path: '/settings/claude-monitor', component: 'ClaudeMonitor', requireAuth: true, requireSuperAdmin: true },
+  { path: '/settings/vps-monitor', component: 'VpsMonitor', requireAuth: true, requireSuperAdmin: true },
+  { path: '/settings/claude-stats', component: 'ClaudeStats', requireAuth: true, requireSuperAdmin: true },
+  { path: '/settings/n8n-workflows', component: 'N8nWorkflows', requireAuth: true, requireSuperAdmin: true },
+  { path: '/settings/n8n-workflows/:instance/:id', component: 'N8nWorkflowDetail', requireAuth: true, requireSuperAdmin: true },
+  { path: '/settings/n8n-status', component: 'N8nLiveStatus', requireAuth: true, requireSuperAdmin: true },
+  { path: '/settings/n8n-status/:executionId', component: 'N8nLiveStatusDetail', requireAuth: true, requireSuperAdmin: true },
+
+  // 重定向
+  { path: '/panorama', redirect: '/canvas' },
+  { path: '/whiteboard', redirect: '/canvas' },
+];
+
+// ============ 辅助函数 ============
+
+/**
+ * 根据实例类型获取导航配置
+ */
+export function getNavGroups(isCecilia: boolean): NavGroup[] {
+  return isCecilia ? coreNavGroups : dashboardNavGroups;
+}
+
+/**
+ * 过滤菜单项（根据 feature flag 和权限）
+ */
+export function filterNavGroups(
+  groups: NavGroup[],
+  isFeatureEnabled: (key: string) => boolean,
+  isSuperAdmin: boolean
+): NavGroup[] {
+  return groups
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item => {
+        // 检查 feature flag
+        if (!isFeatureEnabled(item.featureKey)) return false;
+        // 检查超级管理员权限
+        if (item.requireSuperAdmin && !isSuperAdmin) return false;
+        return true;
+      })
+    }))
+    .filter(group => group.items.length > 0);
+}
+
+/**
+ * 从导航配置中提取所有路由
+ */
+export function extractRoutesFromNav(groups: NavGroup[]): RouteConfig[] {
+  const routes: RouteConfig[] = [];
+
+  for (const group of groups) {
+    for (const item of group.items) {
+      routes.push({
+        path: item.path,
+        component: item.component,
+        redirect: item.redirect,
+        requireAuth: true,
+        requireSuperAdmin: item.requireSuperAdmin,
+      });
+    }
+  }
+
+  return routes;
+}

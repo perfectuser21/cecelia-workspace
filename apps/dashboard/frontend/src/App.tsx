@@ -1,14 +1,7 @@
 import { useState } from 'react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  BarChart3,
   LogOut,
-  Database,
-  FileText,
-  Sparkles,
-  Settings,
-  KeyRound,
   Activity,
   MonitorDot,
   Server,
@@ -19,14 +12,22 @@ import {
   Moon,
   Monitor,
   Workflow,
-  ListTodo,
-  X,
-  TrendingUp,
   Radio,
+  Database,
+  LayoutDashboard,
+  BarChart3,
+  FileText,
+  Sparkles,
+  Settings,
+  ListTodo,
+  TrendingUp,
   Palette,
   Bot,
   Cpu,
+  Code,
 } from 'lucide-react';
+// 从配置文件导入菜单配置
+import { getNavGroups, filterNavGroups } from './config/navigation.config';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { InstanceProvider, useInstance } from './contexts/InstanceContext';
@@ -53,6 +54,7 @@ import ExecutionStatus from './pages/ExecutionStatus';
 import CeciliaRuns from './pages/CeciliaRuns';
 import EngineCapabilities from './pages/EngineCapabilities';
 import TaskMonitor from './pages/TaskMonitor';
+import DevTasks from './pages/DevTasks';
 import './App.css';
 
 function AppContent() {
@@ -80,75 +82,11 @@ function AppContent() {
     setTheme(themes[nextIndex]);
   };
 
-  // 定义所有导航组，带 featureKey 用于动态过滤
-  // Core 导航组
-  const ceciliaNavGroups = [
-    {
-      title: 'Engine',
-      items: [
-        { path: '/engine', icon: Cpu, label: '能力概览', featureKey: 'engine-capabilities' },
-        { path: '/engine/tasks', icon: Activity, label: '任务监控', featureKey: 'task-monitor' },
-      ]
-    },
-    {
-      title: 'Cecilia',
-      items: [
-        { path: '/cecilia', icon: Bot, label: '任务总览', featureKey: 'cecilia-tasks' },
-        { path: '/cecilia/history', icon: ListTodo, label: '历史记录', featureKey: 'cecilia-history' },
-        { path: '/cecilia/stats', icon: BarChart3, label: '统计分析', featureKey: 'cecilia-stats' },
-        { path: '/cecilia/logs', icon: Activity, label: '执行日志', featureKey: 'cecilia-logs' },
-      ]
-    },
-    {
-      title: '系统',
-      items: [
-        ...(isSuperAdmin ? [
-          { path: '/settings', icon: Settings, label: '配置', featureKey: 'settings' },
-        ] : []),
-      ]
-    }
-  ];
-
-  // Dashboard 导航组
-  const allNavGroups = [
-    {
-      title: '概览',
-      items: [
-        { path: '/', icon: LayoutDashboard, label: '工作台', featureKey: 'workbench' },
-        { path: '/execution-status', icon: Activity, label: '工作记录', featureKey: 'execution-status' },
-        { path: '/tasks', icon: ListTodo, label: '任务', featureKey: 'tasks' },
-        { path: '/data-center', icon: BarChart3, label: '数据中心', featureKey: 'data-center' },
-      ]
-    },
-    {
-      title: '管理',
-      items: [
-        { path: '/content', icon: FileText, label: '内容管理', featureKey: 'content' },
-        { path: '/platform-status', icon: Radio, label: '平台状态', featureKey: 'platform-status' },
-        { path: '/publish-stats', icon: TrendingUp, label: '发布统计', featureKey: 'publish-stats' },
-        { path: '/scraping', icon: Database, label: '数据采集', featureKey: 'scraping' },
-      ]
-    },
-    {
-      title: '系统',
-      items: [
-        { path: '/tools', icon: Sparkles, label: '工具箱', featureKey: 'tools' },
-        ...(isSuperAdmin ? [
-          { path: '/canvas', icon: Palette, label: '画布', featureKey: 'canvas' },
-          { path: '/settings', icon: Settings, label: '管理员', featureKey: 'settings' },
-        ] : []),
-      ]
-    }
-  ];
-
-  // 根据 instance 和 feature 开关过滤菜单
-  const baseNavGroups = isCecilia ? ceciliaNavGroups : allNavGroups;
-  const navGroups = baseNavGroups
-    .map(group => ({
-      ...group,
-      items: group.items.filter(item => isFeatureEnabled(item.featureKey))
-    }))
-    .filter(group => group.items.length > 0);
+  // ============ 配置驱动菜单 ============
+  // 菜单配置从 config/navigation.config.ts 读取
+  // 添加新菜单只需修改配置文件，无需改动这里
+  const baseNavGroups = getNavGroups(isCecilia);
+  const navGroups = filterNavGroups(baseNavGroups, isFeatureEnabled, isSuperAdmin);
 
   // 兼容旧代码
   const navItems = navGroups.flatMap(g => g.items);
@@ -411,6 +349,14 @@ function AppContent() {
               element={
                 <PrivateRoute>
                   <TaskMonitor />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/engine/dev"
+              element={
+                <PrivateRoute>
+                  <DevTasks />
                 </PrivateRoute>
               }
             />
