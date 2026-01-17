@@ -94,8 +94,8 @@ export default function FeishuLogin() {
       qrLoginRef.current = window.QRLogin({
         id: 'feishu-qr-container',
         goto: goto,
-        width: 250,
-        height: 250,
+        width: 200,
+        height: 200,
         style: 'border:none;background:white;',
       });
       setQrReady(true);
@@ -117,16 +117,6 @@ export default function FeishuLogin() {
       setRefreshing(false);
     }, 300);
   }, [initQRCode]);
-
-  // 备选：点击按钮跳转飞书登录
-  const handleLogin = () => {
-    if (!APP_ID) {
-      setError('飞书应用未配置');
-      return;
-    }
-    const feishuAuthUrl = `https://open.feishu.cn/open-apis/authen/v1/authorize?app_id=${APP_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&state=STATE`;
-    window.location.href = feishuAuthUrl;
-  };
 
   // 检查是否有 code 参数（飞书回调）
   useEffect(() => {
@@ -297,14 +287,14 @@ export default function FeishuLogin() {
 
             {/* 飞书扫码二维码容器 */}
             <div className="flex flex-col items-center mb-6">
-              {/* 二维码外框 - 渐变边框效果 */}
-              <div className="relative p-0.5 rounded-2xl bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600">
-                <div className="relative bg-white rounded-xl p-3">
+              {/* 二维码外框 */}
+              <div className="relative rounded-2xl border-2 border-sky-400/50 p-1">
+                <div className="relative bg-white rounded-xl p-2">
                   <div
                     key={qrKey}
                     id="feishu-qr-container"
                     className="rounded-lg [&_iframe]:!border-0 [&_iframe]:!outline-none [&_iframe]:block"
-                    style={{ width: 250, height: 250 }}
+                    style={{ width: 200, height: 200 }}
                   >
                     {(!qrReady || refreshing) && !error && (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50">
@@ -312,10 +302,6 @@ export default function FeishuLogin() {
                         <p className="text-gray-400 text-sm">{refreshing ? '刷新中...' : '加载中...'}</p>
                       </div>
                     )}
-                  </div>
-                  {/* 扫码图标装饰 */}
-                  <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-sky-500 to-blue-600 rounded-full p-2 shadow-lg">
-                    <Smartphone className="w-4 h-4 text-white" />
                   </div>
                 </div>
               </div>
@@ -339,24 +325,8 @@ export default function FeishuLogin() {
               </p>
             </div>
 
-            {/* 分隔线 */}
-            <div className="flex items-center gap-4 my-6">
-              <div className="flex-1 h-px bg-white/10" />
-              <span className="text-white/30 text-sm">或</span>
-              <div className="flex-1 h-px bg-white/10" />
-            </div>
-
-            {/* 备选：点击按钮跳转飞书登录 */}
-            <button
-              onClick={handleLogin}
-              className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white font-medium transition-all duration-200 flex items-center justify-center gap-2"
-            >
-              <img src="/logo-color.png" alt="飞书" className="w-5 h-5" />
-              使用飞书登录
-            </button>
-
             {/* 说明文字 */}
-            <p className="text-center text-white/40 text-sm leading-relaxed mt-6">
+            <p className="text-center text-white/40 text-sm leading-relaxed mt-4">
               遇到问题？随时找我们
             </p>
           </div>
