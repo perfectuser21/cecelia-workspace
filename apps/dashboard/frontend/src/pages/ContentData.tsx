@@ -65,7 +65,7 @@ interface Stats {
   };
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://dashboard.zenjoymedia.media:3000';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://dashboard.zenjoymedia.media';
 
 // 详情弹窗组件
 function DetailModal({
