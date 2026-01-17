@@ -81,6 +81,9 @@ export const pageComponents: Record<string, () => Promise<{ default: ComponentTy
   'LoginPage': () => import('../pages/LoginPage'),
   'PlatformStatusDashboard': () => import('../pages/PlatformStatusDashboard'),
   'DevTasks': () => import('../pages/DevTasks'),
+  'ToolsPage': () => import('../pages/ToolsPage'),
+  'ScrapingPage': () => import('../pages/ScrapingPage'),
+  'AdminSettingsPage': () => import('../pages/AdminSettingsPage'),
 };
 
 // 获取懒加载组件
@@ -164,7 +167,7 @@ export const coreNavGroups: NavGroup[] = [
         label: '配置',
         featureKey: 'settings',
         requireSuperAdmin: true,
-        component: 'SettingsPage'
+        component: 'AdminSettingsPage'
       },
     ]
   }
@@ -235,7 +238,7 @@ export const dashboardNavGroups: NavGroup[] = [
         icon: Database,
         label: '数据采集',
         featureKey: 'scraping',
-        component: 'ScrapingPlaceholder'  // 占位页面
+        component: 'ScrapingPage'
       },
     ]
   },
@@ -263,7 +266,7 @@ export const dashboardNavGroups: NavGroup[] = [
         label: '管理员',
         featureKey: 'settings',
         requireSuperAdmin: true,
-        component: 'SettingsPage'
+        component: 'AdminSettingsPage'
       },
     ]
   }
