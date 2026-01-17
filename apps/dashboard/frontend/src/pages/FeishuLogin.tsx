@@ -94,9 +94,9 @@ export default function FeishuLogin() {
       qrLoginRef.current = window.QRLogin({
         id: 'feishu-qr-container',
         goto: goto,
-        width: 200,
-        height: 200,
-        style: 'border:none;background:transparent;',
+        width: 180,
+        height: 210,
+        style: 'border:none;background:white;margin:0;padding:0;',
       });
       setQrReady(true);
       setError('');
@@ -288,13 +288,13 @@ export default function FeishuLogin() {
             {/* 飞书扫码二维码容器 */}
             <div className="flex flex-col items-center mb-6">
               {/* 二维码外框 - 渐变边框效果 */}
-              <div className="relative p-1 rounded-2xl bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600">
-                <div className="relative bg-white rounded-xl p-4">
+              <div className="relative p-0.5 rounded-2xl bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600">
+                <div className="relative bg-white rounded-xl p-3">
                   <div
                     key={qrKey}
                     id="feishu-qr-container"
-                    className="overflow-hidden"
-                    style={{ width: 200, height: 200 }}
+                    className="overflow-hidden rounded-lg [&_iframe]:!border-0 [&_iframe]:!outline-none [&_iframe]:block"
+                    style={{ width: 180, height: 210 }}
                   >
                     {(!qrReady || refreshing) && !error && (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50">
