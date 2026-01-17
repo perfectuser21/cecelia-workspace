@@ -94,9 +94,9 @@ export default function FeishuLogin() {
       qrLoginRef.current = window.QRLogin({
         id: 'feishu-qr-container',
         goto: goto,
-        width: 180,
-        height: 210,
-        style: 'border:none;background:white;margin:0;padding:0;',
+        width: 200,
+        height: 200,
+        style: 'border:none;background:white;',
       });
       setQrReady(true);
       setError('');
@@ -294,7 +294,7 @@ export default function FeishuLogin() {
                     key={qrKey}
                     id="feishu-qr-container"
                     className="overflow-hidden rounded-lg [&_iframe]:!border-0 [&_iframe]:!outline-none [&_iframe]:block"
-                    style={{ width: 180, height: 210 }}
+                    style={{ width: 200, height: 200 }}
                   >
                     {(!qrReady || refreshing) && !error && (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50">
