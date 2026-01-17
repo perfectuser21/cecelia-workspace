@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, X, Menu, Maximize, RefreshCw, Loader2 } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://dashboard.zenjoymedia.media:3000';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://dashboard.zenjoymedia.media';
 
 interface WorkflowNode {
   id: string;

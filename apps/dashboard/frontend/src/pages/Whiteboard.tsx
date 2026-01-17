@@ -5,7 +5,7 @@ import { KeyboardHelp } from './whiteboard/KeyboardHelp';
 import { treeLayout, forceDirectedLayout, gridLayout, circularLayout, applyLayout } from './whiteboard/layoutUtils';
 import ProjectSidebar, { WhiteboardProject } from './whiteboard/ProjectSidebar';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://dashboard.zenjoymedia.media:3000';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://dashboard.zenjoymedia.media';
 
 // 简化为思维导图常用形状
 type ShapeType = 'rounded' | 'rect' | 'pill' | 'diamond';
