@@ -34,7 +34,10 @@ export default function FeishuLogin() {
 
   // 飞书应用配置（从环境变量读取）
   const APP_ID = import.meta.env.VITE_FEISHU_APP_ID;
-  const REDIRECT_URI = import.meta.env.VITE_FEISHU_REDIRECT_URI;
+  // 动态 redirect_uri：使用当前域名，确保登录后回到原域名
+  // 强制使用 HTTPS（飞书只接受 HTTPS 的 redirect_uri）
+  const origin = window.location.origin.replace(/^http:/, 'https:');
+  const REDIRECT_URI = `${origin}/login`;
 
   // 处理飞书登录回调
   const handleFeishuCallback = async (code: string) => {
