@@ -13,12 +13,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Checkout zenithjoy-core (for features)
+      # Checkout zenithjoy-core (public repo, no token needed)
+      - name: Checkout zenithjoy-core
         uses: actions/checkout@v4
         with:
           repository: perfectuser21/zenithjoy-core
-          path: zenithjoy-core
-          ref: develop
+          path: ../zenithjoy-core
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -37,6 +37,3 @@ jobs:
       - name: Build frontend
         run: pnpm run build
         working-directory: apps/dashboard/frontend
-        env:
-          # Point to the checked out zenithjoy-core
-          VITE_FEATURES_PATH: ${{ github.workspace }}/zenithjoy-core/features
