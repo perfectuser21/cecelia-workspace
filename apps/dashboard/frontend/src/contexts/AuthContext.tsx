@@ -7,7 +7,10 @@ const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 天
 function setCookie(name: string, value: string) {
   const isLocalhost = window.location.hostname === 'localhost';
   const domain = isLocalhost ? '' : `; domain=${COOKIE_DOMAIN}`;
-  document.cookie = `${name}=${encodeURIComponent(value)}; path=/${domain}; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`;
+  const secure = isLocalhost ? '' : '; Secure';
+  // SameSite=None 允许跨子域名共享（需要 Secure）
+  const sameSite = isLocalhost ? 'Lax' : 'None';
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/${domain}; max-age=${COOKIE_MAX_AGE}; SameSite=${sameSite}${secure}`;
 }
 
 function getCookie(name: string): string | null {
@@ -47,13 +50,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 初始化时从 cookie 读取用户信息（跨子域名共享）
   useEffect(() => {
+    console.log('🔍 AuthProvider init, checking cookies...');
+    console.log('🍪 All cookies:', document.cookie);
     const savedUser = getCookie('user');
     const savedToken = getCookie('token');
+    console.log('🔍 Found user cookie:', !!savedUser, 'token cookie:', !!savedToken);
 
     if (savedUser && savedToken) {
       try {
         setUser(JSON.parse(savedUser));
         setToken(savedToken);
+        console.log('✅ Restored user from cookie');
       } catch (error) {
         console.error('Failed to parse user data:', error);
         deleteCookie('user');
@@ -82,10 +89,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = (newUser: User, newToken: string) => {
+    console.log('🔐 Login called, setting cookies with domain:', COOKIE_DOMAIN);
     setUser(newUser);
     setToken(newToken);
     setCookie('user', JSON.stringify(newUser));
     setCookie('token', newToken);
+    console.log('🍪 Cookies after login:', document.cookie);
   };
 
   const logout = () => {
