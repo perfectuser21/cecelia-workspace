@@ -1,8 +1,27 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import path from 'path'
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@features/core': path.resolve(__dirname, '../../../../zenithjoy-core/features'),
+      '@': path.resolve(__dirname, './src'),
+    },
+    // Dedupe to ensure single instances of dependencies
+    dedupe: [
+      'react', 'react-dom', 'react-router-dom',
+      'lucide-react', 'axios', 'recharts',
+    ],
+  },
+  // Optimize deps to pre-bundle external feature dependencies
+  optimizeDeps: {
+    include: [
+      'react', 'react-dom', 'react-router-dom',
+      'lucide-react', 'axios', 'recharts',
+    ],
+  },
   plugins: [
     react(),
     VitePWA({
