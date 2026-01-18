@@ -36,8 +36,7 @@ export default function FeishuLogin() {
 
   // 飞书应用配置（从环境变量读取）
   const APP_ID = import.meta.env.VITE_FEISHU_APP_ID;
-  // 动态 redirect_uri：使用当前域名，确保登录后回到原域名
-  // 强制使用 HTTPS（飞书只接受 HTTPS 的 redirect_uri）
+  // 动态 redirect_uri：使用当前域名（需要在飞书应用后台配置所有域名）
   const origin = window.location.origin.replace(/^http:/, 'https:');
   const REDIRECT_URI = `${origin}/login`;
 
@@ -92,7 +91,7 @@ export default function FeishuLogin() {
       return;
     }
 
-    // 构造授权地址
+    // 构造授权地址（QR 码 SDK 必须使用 passport 端点才能收到 tmp_code）
     const goto = `https://passport.feishu.cn/suite/passport/oauth/authorize?client_id=${APP_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&state=STATE`;
 
     try {
@@ -111,10 +110,10 @@ export default function FeishuLogin() {
     }
   }, [APP_ID, REDIRECT_URI]);
 
-  // 飞书一键登录 - 直接跳转授权页面
+  // 飞书一键登录 - 使用开放平台 OAuth 接口（原来能工作的方式）
   const handleClickLogin = useCallback(() => {
-    const goto = `https://passport.feishu.cn/suite/passport/oauth/authorize?client_id=${APP_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&state=STATE`;
-    window.location.href = goto;
+    const authUrl = `https://open.feishu.cn/open-apis/authen/v1/authorize?app_id=${APP_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&state=STATE`;
+    window.location.href = authUrl;
   }, [APP_ID, REDIRECT_URI]);
 
   // 刷新二维码 - 通过改变 key 让 React 重建容器
@@ -187,7 +186,7 @@ export default function FeishuLogin() {
           const tmpCode = event.data.tmp_code;
           if (tmpCode) {
             console.log('Received tmp_code:', tmpCode);
-            // 使用 tmp_code 跳转完成授权
+            // 使用 tmp_code 跳转完成授权（与 goto 保持一致）
             const goto = `https://passport.feishu.cn/suite/passport/oauth/authorize?client_id=${APP_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&state=STATE`;
             window.location.href = `${goto}&tmp_code=${tmpCode}`;
           }
