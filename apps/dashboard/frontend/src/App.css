@@ -759,3 +759,22 @@
 .page-loader-bg {
   animation: loaderPulse 2s ease-in-out infinite;
 }
+
+/* ============================================
+   17. 卡片淡入上浮动画 (用于 Core Dashboard)
+   ============================================ */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  opacity: 0;
+}
