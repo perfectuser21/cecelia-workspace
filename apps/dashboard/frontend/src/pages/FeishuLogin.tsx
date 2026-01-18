@@ -341,7 +341,7 @@ export default function FeishuLogin() {
               className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
                 isCore
                   ? 'bg-slate-600 hover:bg-slate-500 text-white'
-                  : 'bg-sky-500 hover:bg-sky-400 text-white'
+                  : 'bg-blue-700 hover:bg-blue-600 text-white'
               }`}
             >
               <ExternalLink className="w-5 h-5" />
