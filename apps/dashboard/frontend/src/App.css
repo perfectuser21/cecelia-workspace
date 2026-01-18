@@ -139,6 +139,107 @@
   background: linear-gradient(180deg, #64748b, #94a3b8, #64748b);
 }
 
+/* Core body 背景色 - 防止滚动露底 */
+.instance-cecilia {
+  background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%);
+}
+
+.instance-cecilia.dark,
+.instance-cecilia .dark {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+/* Core magnetic button - 冷灰色 */
+.instance-cecilia .magnetic-btn:hover {
+  border-color: rgba(100, 116, 139, 0.3) !important;
+  box-shadow:
+    0 10px 30px -8px rgba(100, 116, 139, 0.35),
+    0 0 0 1px rgba(100, 116, 139, 0.1);
+}
+
+.instance-cecilia.dark .magnetic-btn:hover,
+.instance-cecilia .dark .magnetic-btn:hover {
+  border-color: rgba(148, 163, 184, 0.3) !important;
+  box-shadow:
+    0 10px 30px -8px rgba(148, 163, 184, 0.4),
+    0 0 0 1px rgba(148, 163, 184, 0.15);
+}
+
+/* Core flowing light - 冷灰色 */
+.instance-cecilia .flowing-light-hover::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(100, 116, 139, 0.1) 25%,
+    rgba(148, 163, 184, 0.15) 50%,
+    rgba(100, 116, 139, 0.1) 75%,
+    transparent 100%
+  );
+}
+
+/* Core gradient border - 冷灰色 */
+.instance-cecilia .gradient-border::before {
+  background: conic-gradient(
+    from var(--angle),
+    #475569,
+    #64748b,
+    #94a3b8,
+    #64748b,
+    #475569
+  );
+}
+
+/* Core particle - 冷灰色 */
+.instance-cecilia .particle {
+  background: linear-gradient(135deg, #475569, #94a3b8);
+}
+
+/* Core text shine - 冷灰色 */
+.instance-cecilia .text-shine {
+  background: linear-gradient(
+    90deg,
+    #334155 0%,
+    #475569 25%,
+    #94a3b8 50%,
+    #475569 75%,
+    #334155 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* Core inner glow - 冷灰色 */
+.instance-cecilia .inner-glow:hover {
+  box-shadow:
+    inset 0 0 30px rgba(100, 116, 139, 0.1),
+    0 10px 40px -10px rgba(0, 0, 0, 0.15);
+}
+
+/* Core 紫色点缀 - 用于强调元素 */
+.instance-cecilia .accent-glow {
+  box-shadow:
+    0 0 8px rgba(139, 92, 246, 0.4),
+    0 0 16px rgba(139, 92, 246, 0.2);
+}
+
+.instance-cecilia.dark .accent-glow,
+.instance-cecilia .dark .accent-glow {
+  box-shadow:
+    0 0 10px rgba(167, 139, 250, 0.4),
+    0 0 20px rgba(167, 139, 250, 0.2);
+}
+
+/* Core 滚动条紫色点缀版 */
+.instance-cecilia .scrollbar-accent::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #7c3aed 0%, #8b5cf6 50%, #a78bfa 100%);
+}
+
+/* Core nav active with purple accent */
+.instance-cecilia .nav-active-purple::after {
+  background: linear-gradient(180deg, #7c3aed, #a78bfa, #7c3aed);
+}
+
 /* ============================================
    WOW EFFECTS - ZenithJoy Dashboard
    ============================================ */
