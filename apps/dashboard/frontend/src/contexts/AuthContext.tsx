@@ -1,5 +1,26 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
+// Cookie 工具函数 - 跨子域名共享
+const COOKIE_DOMAIN = '.zenjoymedia.media';
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 天
+
+function setCookie(name: string, value: string) {
+  const isLocalhost = window.location.hostname === 'localhost';
+  const domain = isLocalhost ? '' : `; domain=${COOKIE_DOMAIN}`;
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/${domain}; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`;
+}
+
+function getCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+function deleteCookie(name: string) {
+  const isLocalhost = window.location.hostname === 'localhost';
+  const domain = isLocalhost ? '' : `; domain=${COOKIE_DOMAIN}`;
+  document.cookie = `${name}=; path=/${domain}; max-age=0`;
+}
+
 interface User {
   id: string;
   feishu_user_id?: string;
@@ -24,10 +45,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
-  // 初始化时从 localStorage 读取用户信息
+  // 初始化时从 cookie 读取用户信息（跨子域名共享）
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    const savedToken = localStorage.getItem('token');
+    const savedUser = getCookie('user');
+    const savedToken = getCookie('token');
 
     if (savedUser && savedToken) {
       try {
@@ -35,8 +56,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(savedToken);
       } catch (error) {
         console.error('Failed to parse user data:', error);
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
+        deleteCookie('user');
+        deleteCookie('token');
+      }
+    }
+
+    // 迁移：如果 localStorage 有数据但 cookie 没有，迁移到 cookie
+    if (!savedUser && !savedToken) {
+      const lsUser = localStorage.getItem('user');
+      const lsToken = localStorage.getItem('token');
+      if (lsUser && lsToken) {
+        try {
+          setUser(JSON.parse(lsUser));
+          setToken(lsToken);
+          setCookie('user', lsUser);
+          setCookie('token', lsToken);
+          // 清理 localStorage
+          localStorage.removeItem('user');
+          localStorage.removeItem('token');
+        } catch (error) {
+          console.error('Failed to migrate auth data:', error);
+        }
       }
     }
   }, []);
@@ -44,13 +84,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = (newUser: User, newToken: string) => {
     setUser(newUser);
     setToken(newToken);
-    localStorage.setItem('user', JSON.stringify(newUser));
-    localStorage.setItem('token', newToken);
+    setCookie('user', JSON.stringify(newUser));
+    setCookie('token', newToken);
   };
 
   const logout = () => {
     setUser(null);
     setToken(null);
+    deleteCookie('user');
+    deleteCookie('token');
+    // 清理可能残留的 localStorage
     localStorage.removeItem('user');
     localStorage.removeItem('token');
   };
