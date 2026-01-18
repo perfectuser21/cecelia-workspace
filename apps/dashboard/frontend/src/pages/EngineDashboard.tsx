@@ -1,9 +1,9 @@
 /**
  * EngineDashboard - Engine 工作台首页
- * 显示最近开发活动、当前任务、系统状态
+ * 合并天气、问候语、倒计时 + 开发任务监控
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Activity,
@@ -18,9 +18,142 @@ import {
   RefreshCw,
   Terminal,
   Zap,
+  Sun,
+  Cloud,
+  CloudRain,
+  CloudSnow,
+  Quote,
+  Timer,
+  PartyPopper,
+  Bot,
 } from 'lucide-react';
 import { getAllTasks, type DevTaskStatus } from '../api/dev-tracker.api';
 import { getEngineInfo, type EngineInfo } from '../api/engine.api';
+import { useAuth } from '../contexts/AuthContext';
+
+// ============ 天气和问候语相关 ============
+
+// 每日一言库
+const DAILY_QUOTES = [
+  { text: '把每一件简单的事做好就是不简单。', author: '稻盛和夫' },
+  { text: '不要等待机会，而要创造机会。', author: '林肯' },
+  { text: '成功不是终点，失败也不是终结，唯有勇气才是永恒。', author: '丘吉尔' },
+  { text: '今天的努力是明天的礼物。', author: '佚名' },
+  { text: '专注于当下，未来自然清晰。', author: '佚名' },
+  { text: '简单的事情重复做，你就是专家。', author: '佚名' },
+  { text: '与其担心未来，不如现在好好努力。', author: '佚名' },
+  { text: '每一个优秀的人，都有一段沉默的时光。', author: '佚名' },
+  { text: 'Code is poetry.', author: 'WordPress' },
+  { text: 'Talk is cheap. Show me the code.', author: 'Linus Torvalds' },
+  { text: '代码写得好，BUG 少不了。', author: '程序员' },
+  { text: '今天的 TODO，就是明天的 DONE。', author: '乐观开发者' },
+];
+
+// 节日配置
+const HOLIDAYS: Record<string, { name: string; greeting: string; emoji: string }> = {
+  '01-01': { name: '元旦', greeting: '新年快乐！新的一年，新的开始', emoji: '🎊' },
+  '02-14': { name: '情人节', greeting: '愿你被爱包围', emoji: '💕' },
+  '03-14': { name: '白色情人节', greeting: '甜蜜的一天', emoji: '🤍' },
+  '04-01': { name: '愚人节', greeting: '今天说的话要小心哦', emoji: '🤡' },
+  '05-01': { name: '劳动节', greeting: '劳动最光荣！不过今天可以休息', emoji: '💪' },
+  '05-04': { name: '青年节', greeting: '永远年轻，永远热泪盈眶', emoji: '🔥' },
+  '06-01': { name: '儿童节', greeting: '愿你永葆童心', emoji: '🎈' },
+  '10-01': { name: '国庆节', greeting: '祖国生日快乐！', emoji: '🇨🇳' },
+  '10-31': { name: '万圣节', greeting: 'Trick or Treat!', emoji: '🎃' },
+  '12-24': { name: '平安夜', greeting: '平安喜乐', emoji: '🎄' },
+  '12-25': { name: '圣诞节', greeting: 'Merry Christmas!', emoji: '🎅' },
+  '12-31': { name: '跨年夜', greeting: '新年倒计时！', emoji: '🎆' },
+};
+
+const getHoliday = () => {
+  const now = new Date();
+  const key = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return HOLIDAYS[key] || null;
+};
+
+const getDailyQuote = () => {
+  const today = new Date();
+  const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+  const index = seed % DAILY_QUOTES.length;
+  return DAILY_QUOTES[index];
+};
+
+const getOffWorkCountdown = () => {
+  const now = new Date();
+  const day = now.getDay();
+  if (day === 0 || day === 6) return null;
+
+  const hour = now.getHours();
+  const minute = now.getMinutes();
+  const timeValue = hour + minute / 60;
+  if (timeValue < 8.5 || timeValue >= 18) return null;
+
+  const offWorkTime = new Date(now);
+  offWorkTime.setHours(18, 0, 0, 0);
+  const diff = offWorkTime.getTime() - now.getTime();
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  return { hours, minutes };
+};
+
+const getWeekendCountdown = () => {
+  const now = new Date();
+  const day = now.getDay();
+  if (day === 0 || day === 6) return null;
+  return 6 - day;
+};
+
+interface WeatherInfo {
+  temp: string;
+  desc: string;
+  icon: 'sun' | 'cloud' | 'rain' | 'snow';
+  city: string;
+}
+
+const getWeatherIcon = (code: string) => {
+  const codeNum = parseInt(code);
+  if (codeNum >= 200 && codeNum < 300) return 'rain';
+  if (codeNum >= 300 && codeNum < 600) return 'rain';
+  if (codeNum >= 600 && codeNum < 700) return 'snow';
+  if (codeNum >= 700 && codeNum < 800) return 'cloud';
+  if (codeNum === 800) return 'sun';
+  return 'cloud';
+};
+
+const getDynamicGreeting = (holiday: ReturnType<typeof getHoliday>) => {
+  const now = new Date();
+  const hour = now.getHours();
+  const minute = now.getMinutes();
+  const day = now.getDay();
+  const timeValue = hour + minute / 60;
+
+  if (holiday) {
+    return { greeting: `${holiday.emoji} ${holiday.name}快乐`, subtitle: holiday.greeting };
+  }
+
+  if (day === 0 || day === 6) {
+    return { greeting: '周末好', subtitle: '难得休息，还惦记着代码？' };
+  }
+
+  if (timeValue < 8.5) {
+    return { greeting: '早', subtitle: '来得挺早，先来杯咖啡吧' };
+  }
+  if (timeValue < 12) {
+    return { greeting: '上午好', subtitle: '状态不错，继续 Coding' };
+  }
+  if (timeValue < 13.5) {
+    return { greeting: '中午好', subtitle: '该吃饭啦，别饿着自己' };
+  }
+  if (timeValue < 18) {
+    return { greeting: '下午好', subtitle: '离下班又近了一步' };
+  }
+  if (timeValue < 21) {
+    return { greeting: '晚上好', subtitle: '辛苦一天了，注意休息' };
+  }
+  return { greeting: '夜猫子', subtitle: '这么晚还在忙，注意身体' };
+};
+
+// ============ 活动相关 ============
 
 interface RecentActivity {
   id: string;
@@ -32,14 +165,21 @@ interface RecentActivity {
 }
 
 export default function EngineDashboard() {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState<DevTaskStatus[]>([]);
   const [engineInfo, setEngineInfo] = useState<EngineInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [weather, setWeather] = useState<WeatherInfo | null>(null);
+  const [offWorkCountdown, setOffWorkCountdown] = useState(getOffWorkCountdown());
+  const weekendCountdown = getWeekendCountdown();
+
+  const holiday = useMemo(() => getHoliday(), []);
+  const dailyQuote = useMemo(() => getDailyQuote(), []);
+  const greeting = getDynamicGreeting(holiday);
 
   const fetchData = async () => {
     try {
       const [tasksRes, engineRes] = await Promise.all([getAllTasks(), getEngineInfo()]);
-
       if (tasksRes.success && tasksRes.data) {
         setTasks(tasksRes.data);
       }
@@ -57,6 +197,40 @@ export default function EngineDashboard() {
     fetchData();
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  // 倒计时更新
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setOffWorkCountdown(getOffWorkCountdown());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // 天气获取
+  useEffect(() => {
+    const fetchWeather = async () => {
+      try {
+        const res = await fetch("https://wttr.in/Xi'an?format=j1");
+        if (res.ok) {
+          const data = await res.json();
+          const current = data.current_condition?.[0];
+          if (current) {
+            setWeather({
+              temp: current.temp_C,
+              desc: current.lang_zh?.[0]?.value || current.weatherDesc?.[0]?.value || '未知',
+              icon: getWeatherIcon(current.weatherCode),
+              city: '西安',
+            });
+          }
+        }
+      } catch (e) {
+        console.log('天气获取失败', e);
+      }
+    };
+    fetchWeather();
+    const weatherTimer = setInterval(fetchWeather, 30 * 60 * 1000);
+    return () => clearInterval(weatherTimer);
   }, []);
 
   // 从任务生成最近活动
@@ -186,10 +360,10 @@ export default function EngineDashboard() {
       <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-6 border border-cyan-500/20">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white mb-1">Engine 工作台</h1>
-            <p className="text-slate-400">
-              {new Date().toLocaleDateString('zh-CN', { weekday: 'long', month: 'long', day: 'numeric' })}
-            </p>
+            <h1 className="text-2xl font-bold text-white mb-1">
+              {greeting.greeting}，{user?.name || 'Developer'}
+            </h1>
+            <p className="text-slate-400">{greeting.subtitle}</p>
           </div>
           <div className="flex items-center gap-4">
             {engineInfo && (
@@ -202,6 +376,51 @@ export default function EngineDashboard() {
               <Cpu className="w-8 h-8 text-cyan-400" />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* 天气 + 倒计时 + 每日一言 */}
+      <div className="flex flex-wrap gap-3">
+        {weather && (
+          <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
+            {weather.icon === 'sun' && <Sun className="w-4 h-4 text-amber-500" />}
+            {weather.icon === 'cloud' && <Cloud className="w-4 h-4 text-slate-400" />}
+            {weather.icon === 'rain' && <CloudRain className="w-4 h-4 text-blue-500" />}
+            {weather.icon === 'snow' && <CloudSnow className="w-4 h-4 text-cyan-400" />}
+            <span className="text-sm text-slate-600 dark:text-slate-300">
+              {weather.city} <span className="font-medium text-slate-800 dark:text-white">{weather.temp}°C</span>{' '}
+              {weather.desc}
+            </span>
+          </div>
+        )}
+
+        {offWorkCountdown && (
+          <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm">
+            <Timer className="w-4 h-4 text-cyan-500" />
+            <span className="text-sm text-slate-600 dark:text-slate-300">
+              距离下班还有{' '}
+              <span className="font-medium text-slate-800 dark:text-white">
+                {offWorkCountdown.hours}小时{offWorkCountdown.minutes}分钟
+              </span>
+            </span>
+          </div>
+        )}
+
+        {weekendCountdown !== null && weekendCountdown > 0 && (
+          <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm">
+            <PartyPopper className="w-4 h-4 text-purple-500" />
+            <span className="text-sm text-slate-600 dark:text-slate-300">
+              距离周末还有 <span className="font-medium text-slate-800 dark:text-white">{weekendCountdown}天</span>
+            </span>
+          </div>
+        )}
+
+        <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm">
+          <Quote className="w-4 h-4 text-cyan-500" />
+          <span className="text-sm text-slate-600 dark:text-slate-300">
+            {dailyQuote.text}
+            <span className="text-slate-400 dark:text-slate-500 ml-1">—— {dailyQuote.author}</span>
+          </span>
         </div>
       </div>
 
@@ -373,7 +592,7 @@ export default function EngineDashboard() {
                 to="/cecilia"
                 className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
               >
-                <Workflow className="w-4 h-4 text-orange-500" />
+                <Bot className="w-4 h-4 text-orange-500" />
                 <span className="text-sm text-slate-700 dark:text-slate-300">Cecilia</span>
               </Link>
             </div>
