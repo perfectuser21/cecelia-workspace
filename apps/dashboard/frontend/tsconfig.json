@@ -18,7 +18,10 @@
     "noImplicitAny": false,
     "baseUrl": ".",
     "paths": {
-      "@features/core/*": ["../../../../zenithjoy-core/features/*"],
+      "@features/core/*": [
+        "../../../../zenithjoy-core/features/*",
+        "../../../zenithjoy-core/features/*"
+      ],
       "@/*": ["src/*"]
     }
   },

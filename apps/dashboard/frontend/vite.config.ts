@@ -2,11 +2,17 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
+import fs from 'fs'
+
+// Support both local dev (sibling repo) and CI (nested checkout)
+const localCorePath = path.resolve(__dirname, '../../../../zenithjoy-core/features')
+const ciCorePath = path.resolve(__dirname, '../../../zenithjoy-core/features')
+const coreFeaturesPath = fs.existsSync(localCorePath) ? localCorePath : ciCorePath
 
 export default defineConfig({
   resolve: {
     alias: {
-      '@features/core': path.resolve(__dirname, '../../../../zenithjoy-core/features'),
+      '@features/core': coreFeaturesPath,
       '@': path.resolve(__dirname, './src'),
     },
     // Dedupe to ensure single instances of dependencies
