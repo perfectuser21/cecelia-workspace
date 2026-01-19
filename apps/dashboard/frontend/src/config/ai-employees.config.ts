@@ -4,6 +4,11 @@
  * 把 n8n 工作流抽象成「AI 员工」概念，按部门组织，隐藏技术细节
  */
 
+// 图标类型（lucide-react 图标名称）
+export type IconName =
+  | 'Monitor' | 'Code' | 'Wallet'  // 部门图标
+  | 'Video' | 'BarChart3' | 'Wrench' | 'User';  // 员工图标
+
 // 职能
 export interface AiAbility {
   id: string;
@@ -16,7 +21,7 @@ export interface AiAbility {
 export interface AiEmployee {
   id: string;
   name: string;
-  avatar: string;  // emoji
+  icon: IconName;  // lucide 图标名称
   role: string;
   description?: string;
   abilities: AiAbility[];
@@ -26,7 +31,7 @@ export interface AiEmployee {
 export interface Department {
   id: string;
   name: string;
-  icon: string;  // emoji
+  icon: IconName;  // lucide 图标名称
   description?: string;
   employees: AiEmployee[];
 }
@@ -37,13 +42,13 @@ export const AI_DEPARTMENTS: Department[] = [
   {
     id: 'media',
     name: '新媒体部',
-    icon: '📺',
+    icon: 'Monitor',
     description: '负责社交媒体账号运营和内容发布',
     employees: [
       {
         id: 'xiaoyun',
         name: '小运',
-        avatar: '🎬',
+        icon: 'Video',
         role: '内容运营专员',
         description: '负责各平台账号的登录管理和内容发布',
         abilities: [
@@ -64,7 +69,7 @@ export const AI_DEPARTMENTS: Department[] = [
       {
         id: 'xiaoxi',
         name: '小析',
-        avatar: '📊',
+        icon: 'BarChart3',
         role: '数据分析师',
         description: '负责数据采集和分析任务',
         abilities: [
@@ -87,13 +92,13 @@ export const AI_DEPARTMENTS: Department[] = [
   {
     id: 'tech',
     name: '技术部',
-    icon: '💻',
+    icon: 'Code',
     description: '负责技术支持和系统维护',
     employees: [
       {
         id: 'xiaowei',
         name: '小维',
-        avatar: '🔧',
+        icon: 'Wrench',
         role: '技术运维专员',
         description: '负责 AI 任务调度和系统维护',
         abilities: [
@@ -116,7 +121,7 @@ export const AI_DEPARTMENTS: Department[] = [
   {
     id: 'finance',
     name: '财务部',
-    icon: '💰',
+    icon: 'Wallet',
     description: '预留部门',
     employees: []  // 预留
   }
