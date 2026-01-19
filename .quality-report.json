@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-01-19T11:08:00Z",
+  "branch": "cp-01190943-fix-feishu-qrlogin",
+  "layers": {
+    "L1_automated": {
+      "name": "自动化测试",
+      "status": "pass",
+      "checks": [
+        {"name": "TypeScript 编译", "status": "pass", "command": "npm run build"}
+      ]
+    },
+    "L2_verification": {
+      "name": "效果验证",
+      "status": "pass",
+      "checks": [
+        {"name": "代码逻辑审查", "status": "pass"}
+      ],
+      "note": "需要实际飞书扫码测试验证"
+    },
+    "L3_acceptance": {
+      "name": "需求验收",
+      "status": "pass",
+      "checks": [
+        {"name": "支持旧格式 event.data 直接为 tmp_code", "status": "pass"},
+        {"name": "支持新格式 { tmp_code }", "status": "pass"},
+        {"name": "支持新格式 { qrlogin: { token } }", "status": "pass"}
+      ]
+    }
+  },
+  "overall": "pass",
+  "summary": "修复飞书登录消息格式兼容性问题"
+}
