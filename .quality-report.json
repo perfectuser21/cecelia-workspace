@@ -1,58 +1,58 @@
 {
   "branch": "cp-01191245-ai-employees",
   "timestamp": "2026-01-19T13:00:00Z",
-  "layer1": {
-    "passed": true,
-    "tests": {
-      "build": {
-        "command": "npm run build",
-        "passed": true,
-        "output": "vite build completed successfully"
+  "layers": {
+    "L1_automated": {
+      "status": "pass",
+      "tests": {
+        "build": {
+          "command": "npm run build",
+          "passed": true,
+          "output": "vite build completed successfully"
+        }
       }
+    },
+    "L2_verification": {
+      "status": "pass",
+      "checks": [
+        {
+          "item": "Page routing works",
+          "passed": true,
+          "notes": "/ai-employees route correctly configured"
+        },
+        {
+          "item": "Build includes AiEmployeesPage",
+          "passed": true,
+          "notes": "AiEmployeesPage-BOTOat0u.js generated"
+        }
+      ]
+    },
+    "L3_acceptance": {
+      "status": "pass",
+      "dod_items": [
+        {
+          "item": "npm run build 构建成功",
+          "passed": true
+        },
+        {
+          "item": "访问 /ai-employees 页面正常路由",
+          "passed": true
+        },
+        {
+          "item": "按部门显示员工配置",
+          "passed": true
+        },
+        {
+          "item": "员工卡片组件完成",
+          "passed": true
+        },
+        {
+          "item": "点击卡片可展开查看职能详情",
+          "passed": true
+        }
+      ]
     }
   },
-  "layer2": {
-    "passed": true,
-    "checks": [
-      {
-        "item": "Page routing works",
-        "passed": true,
-        "notes": "/ai-employees route correctly configured"
-      },
-      {
-        "item": "Build includes AiEmployeesPage",
-        "passed": true,
-        "notes": "AiEmployeesPage-BOTOat0u.js generated"
-      }
-    ]
-  },
-  "layer3": {
-    "passed": true,
-    "dod_items": [
-      {
-        "item": "npm run build 构建成功",
-        "passed": true
-      },
-      {
-        "item": "访问 /ai-employees 页面正常路由",
-        "passed": true
-      },
-      {
-        "item": "按部门显示员工配置",
-        "passed": true
-      },
-      {
-        "item": "员工卡片组件完成",
-        "passed": true
-      },
-      {
-        "item": "点击卡片可展开查看职能详情",
-        "passed": true
-      }
-    ]
-  },
-  "overall": {
-    "passed": true,
-    "notes": "All quality checks passed. L1 project - build verification only."
-  }
+  "overall": "pass",
+  "notes": "All quality checks passed. L1 project - build verification only."
 }
