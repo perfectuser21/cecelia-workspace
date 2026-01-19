@@ -77,6 +77,8 @@ export const pageComponents: Record<string, () => Promise<{ default: ComponentTy
   'AdminSettingsPage': () => import('../pages/AdminSettingsPage'),
   'MediaScenarioPage': () => import('../pages/MediaScenarioPage'),
   'AiEmployeesPage': () => import('../pages/AiEmployeesPage'),
+  'AiEmployeeDetailPage': () => import('../pages/AiEmployeeDetailPage'),
+  'AiAbilityDetailPage': () => import('../pages/AiAbilityDetailPage'),
 
   // --- 从 zenithjoy-core/features 加载（个人功能） ---
   // claude-monitor feature
@@ -249,6 +251,10 @@ export const autopilotNavGroups: NavGroup[] = [
 // ============ 额外路由配置（不在菜单显示） ============
 
 export const additionalRoutes: RouteConfig[] = [
+  // === AI 员工详情页路由 ===
+  { path: '/ai-employees/:employeeId', component: 'AiEmployeeDetailPage', requireAuth: true },
+  { path: '/ai-employees/:employeeId/abilities/:abilityId', component: 'AiAbilityDetailPage', requireAuth: true },
+
   // === 新媒体运营场景子路由 ===
   // 这些路由由 MediaScenarioPage 内部处理嵌套路由
   { path: '/media/*', component: 'MediaScenarioPage', requireAuth: true },
