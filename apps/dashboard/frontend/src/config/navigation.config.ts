@@ -157,9 +157,9 @@ export const additionalRoutes: RouteConfig[] = [
   { path: '/settings/n8n-status/:executionId', component: 'N8nLiveStatusDetail', requireAuth: true, requireSuperAdmin: true },
   { path: '/settings/canvas', component: 'Canvas', requireAuth: true, requireSuperAdmin: true },
 
-  // 旧重定向
-  { path: '/panorama', redirect: '/settings/canvas' },
-  { path: '/whiteboard', redirect: '/settings/canvas' },
+  // 旧重定向（已废弃，现在由 Core features 处理）
+  // { path: '/panorama', redirect: '/settings/canvas' },  // 现在是 dev-panorama 功能
+  // { path: '/whiteboard', redirect: '/settings/canvas' }, // 现在由 canvas feature 处理
 ];
 
 // ============ 辅助函数 ============
