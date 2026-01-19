@@ -27,6 +27,7 @@ import {
   Cpu,
   Code,
   Video,  // 新媒体运营图标
+  Users,  // AI 员工图标
 } from 'lucide-react';
 
 // ============ 类型定义 ============
@@ -75,6 +76,7 @@ export const pageComponents: Record<string, () => Promise<{ default: ComponentTy
   'ScrapingPage': () => import('../pages/ScrapingPage'),
   'AdminSettingsPage': () => import('../pages/AdminSettingsPage'),
   'MediaScenarioPage': () => import('../pages/MediaScenarioPage'),
+  'AiEmployeesPage': () => import('../pages/AiEmployeesPage'),
 
   // --- 从 zenithjoy-core/features 加载（个人功能） ---
   // claude-monitor feature
@@ -224,6 +226,13 @@ export const autopilotNavGroups: NavGroup[] = [
         label: '新媒体运营',
         featureKey: 'media-scenario',
         component: 'MediaScenarioPage'
+      },
+      {
+        path: '/ai-employees',
+        icon: Users,
+        label: 'AI 员工',
+        featureKey: 'ai-employees',
+        component: 'AiEmployeesPage'
       },
       {
         path: '/settings',
