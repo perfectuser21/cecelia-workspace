@@ -182,14 +182,31 @@ export default function FeishuLogin() {
     const handleMessage = (event: MessageEvent) => {
       try {
         const qrLogin = qrLoginRef.current;
-        if (qrLogin && qrLogin.matchOrigin(event.origin) && qrLogin.matchData(event.data)) {
-          const tmpCode = event.data.tmp_code;
-          if (tmpCode) {
-            console.log('Received tmp_code:', tmpCode);
-            // 使用 tmp_code 跳转完成授权（与 goto 保持一致）
-            const goto = `https://passport.feishu.cn/suite/passport/oauth/authorize?client_id=${APP_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&state=STATE`;
-            window.location.href = `${goto}&tmp_code=${tmpCode}`;
+        if (!qrLogin || !qrLogin.matchOrigin(event.origin)) return;
+
+        // 支持多种数据格式
+        let tmpCode: string | undefined;
+        const data = event.data;
+
+        if (typeof data === 'string') {
+          // 旧格式：event.data 直接是 tmp_code 字符串
+          tmpCode = data;
+        } else if (typeof data === 'object' && data !== null) {
+          // 新格式1：{ tmp_code: "..." }
+          if (data.tmp_code) {
+            tmpCode = data.tmp_code;
           }
+          // 新格式2：{ qrlogin: { token: "..." } }
+          else if (data.qrlogin?.token) {
+            tmpCode = data.qrlogin.token;
+          }
+        }
+
+        if (tmpCode) {
+          console.log('Received tmp_code:', tmpCode);
+          // 使用 tmp_code 跳转完成授权
+          const goto = `https://passport.feishu.cn/suite/passport/oauth/authorize?client_id=${APP_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&state=STATE`;
+          window.location.href = `${goto}&tmp_code=${tmpCode}`;
         }
       } catch (err) {
         console.error('Message handling error:', err);
