@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Users, RefreshCw, Building2 } from 'lucide-react';
-import { AiEmployeeCard } from '../components/AiEmployeeCard';
+import { Users, RefreshCw } from 'lucide-react';
+import { DepartmentAccordion } from '../components/DepartmentAccordion';
 import {
   fetchAiEmployeesWithStats,
   DepartmentWithStats,
@@ -29,7 +29,6 @@ export default function AiEmployeesPage() {
 
   useEffect(() => {
     loadData();
-    // 每 30 秒自动刷新
     const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -46,14 +45,16 @@ export default function AiEmployeesPage() {
   return (
     <div className="px-4 sm:px-0 pb-8">
       {/* 页面标题 */}
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-semibold text-slate-800 dark:text-white mb-2 flex items-center gap-3">
-              <Users className="w-8 h-8 text-blue-500" />
+            <h1 className="text-2xl font-semibold text-slate-800 dark:text-white mb-1 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
               AI 员工
             </h1>
-            <p className="text-slate-500 dark:text-slate-400">
+            <p className="text-slate-500 dark:text-slate-400 ml-13">
               公司自动化团队 · {totalEmployees} 名员工 · 今日 {totalTasks} 次任务
             </p>
           </div>
@@ -67,9 +68,8 @@ export default function AiEmployeesPage() {
           </button>
         </div>
 
-        {/* 最后刷新时间 */}
         {lastRefresh && (
-          <p className="text-xs text-slate-400 dark:text-slate-500">
+          <p className="text-xs text-slate-400 dark:text-slate-500 ml-13">
             最后更新: {lastRefresh.toLocaleTimeString('zh-CN')}
           </p>
         )}
@@ -92,69 +92,18 @@ export default function AiEmployeesPage() {
         </div>
       )}
 
-      {/* 部门列表 */}
-      {!loading || departments.length > 0 ? (
-        <div className="space-y-8">
-          {departments.map(dept => (
-            <DepartmentSection key={dept.id} department={dept} />
+      {/* 部门列表 - 折叠面板形式 */}
+      {(!loading || departments.length > 0) && (
+        <div className="space-y-3">
+          {departments.map((dept, index) => (
+            <DepartmentAccordion
+              key={dept.id}
+              department={dept}
+              defaultExpanded={index === 0 && dept.employees.length > 0}
+            />
           ))}
         </div>
-      ) : null}
-    </div>
-  );
-}
-
-// 部门区块组件
-function DepartmentSection({ department }: { department: DepartmentWithStats }) {
-  // 空部门不显示
-  if (department.employees.length === 0) {
-    return (
-      <div className="opacity-50">
-        <div className="flex items-center gap-3 mb-4">
-          <span className="text-2xl">{department.icon}</span>
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800 dark:text-white">
-              {department.name}
-            </h2>
-            <p className="text-sm text-slate-400 dark:text-slate-500">
-              {department.description || '暂无员工'}
-            </p>
-          </div>
-        </div>
-        <div className="p-8 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 text-center">
-          <Building2 className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-400 dark:text-slate-500">部门待招聘</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      {/* 部门标题 */}
-      <div className="flex items-center gap-3 mb-4">
-        <span className="text-2xl">{department.icon}</span>
-        <div>
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-white">
-            {department.name}
-          </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            {department.description}
-            {department.todayTotal > 0 && (
-              <span className="ml-2 text-blue-600 dark:text-blue-400">
-                · 今日 {department.todayTotal} 次任务
-              </span>
-            )}
-          </p>
-        </div>
-      </div>
-
-      {/* 员工卡片网格 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {department.employees.map(employee => (
-          <AiEmployeeCard key={employee.id} employee={employee} />
-        ))}
-      </div>
+      )}
     </div>
   );
 }

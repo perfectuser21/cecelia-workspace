@@ -1,6 +1,6 @@
 {
-  "branch": "cp-01191359-fix-ai-employees-loading",
-  "timestamp": "2026-01-19T14:00:00Z",
+  "branch": "cp-01191430-ai-employees-ui-improve",
+  "timestamp": "2026-01-19T14:30:00Z",
   "layers": {
     "L1_automated": {
       "status": "pass",
@@ -15,7 +15,19 @@
       "status": "pass",
       "checks": [
         {
-          "item": "API 返回静态数据而非调用不存在的 API",
+          "item": "emoji 替换为 lucide 图标",
+          "passed": true
+        },
+        {
+          "item": "部门折叠面板组件创建",
+          "passed": true
+        },
+        {
+          "item": "员工详情页路由配置",
+          "passed": true
+        },
+        {
+          "item": "职能详情页路由配置",
           "passed": true
         }
       ]
@@ -24,11 +36,19 @@
       "status": "pass",
       "dod_items": [
         {
-          "item": "页面不再无限转圈",
+          "item": "所有 emoji 替换为统一颜色的图标",
           "passed": true
         },
         {
-          "item": "显示员工卡片（统计为 0）",
+          "item": "部门以折叠面板形式展示",
+          "passed": true
+        },
+        {
+          "item": "点击员工进入详情页",
+          "passed": true
+        },
+        {
+          "item": "点击职能进入职能详情页",
           "passed": true
         }
       ]
