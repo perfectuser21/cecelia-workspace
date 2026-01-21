@@ -5,7 +5,7 @@ services:
     restart: always
     network_mode: host
     environment:
-      - N8N_PORT=5679
+      - N8N_PORT=5678
       - N8N_HOST=dashboard.zenjoymedia.media:3000
       - N8N_PROTOCOL=https
       - N8N_PATH=/n8n/
