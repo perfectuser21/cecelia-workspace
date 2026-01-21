@@ -1,0 +1,269 @@
+# ZenithJoy Autopilot - 回归测试契约
+# 生成日期: 2026-01-22
+# 版本: 1.0.0
+#
+# 用途：定义 QA 验证必须覆盖的功能点
+# 执行：可被 /qa skill 读取，自动化验证
+
+version: "1.0.0"
+instance: autopilot
+total_features: 14
+
+# =============================================================================
+# F1. 工作台
+# =============================================================================
+f1_workbench:
+  title: "工作台"
+  description: "业务仪表盘，每日一言、节日问候、业务概览"
+
+  features:
+    - id: F1.1
+      name: Dashboard
+      route: "/"
+      page: Dashboard
+      priority: P0
+      verification:
+        type: visual
+        checkpoints:
+          - "页面可访问，无白屏"
+          - "每日一言/节日问候区域显示"
+          - "业务数据卡片渲染"
+        evidence: "navigation.config.ts:L87-93"
+
+# =============================================================================
+# F2. 新媒体运营
+# =============================================================================
+f2_media_operations:
+  title: "新媒体运营"
+  description: "核心业务功能，内容采集、发布、数据分析全流程"
+
+  features:
+    - id: F2.1
+      name: 场景入口
+      route: "/media"
+      page: MediaScenarioPage
+      priority: P0
+      verification:
+        type: visual
+        checkpoints:
+          - "场景卡片列表显示"
+          - "点击卡片可进入子功能"
+        evidence: "navigation.config.ts:L94-99"
+
+    - id: F2.2
+      name: 内容管理
+      route: "/media/content"
+      page: ContentData
+      priority: P0
+      verification:
+        type: visual
+        checkpoints:
+          - "内容列表渲染"
+          - "筛选/搜索功能可用"
+        evidence: "pages/media/ContentData.tsx"
+
+    - id: F2.3
+      name: 内容采集
+      route: "/media/content/scraping"
+      page: ScrapingPage
+      priority: P1
+      verification:
+        type: visual
+        checkpoints:
+          - "采集源配置可见"
+          - "采集历史列表显示"
+        evidence: "pages/media/ScrapingPage.tsx"
+
+    - id: F2.4
+      name: 发布管理
+      route: "/media/publish"
+      page: Tasks
+      priority: P0
+      verification:
+        type: visual
+        checkpoints:
+          - "任务队列表格渲染"
+          - "任务状态指示器显示"
+        evidence: "pages/media/Tasks.tsx"
+
+    - id: F2.5
+      name: 执行历史
+      route: "/media/publish/history"
+      page: ExecutionStatus
+      priority: P1
+      verification:
+        type: visual
+        checkpoints:
+          - "执行记录列表显示"
+          - "成功/失败状态可视"
+        evidence: "pages/media/ExecutionStatus.tsx"
+
+    - id: F2.6
+      name: 平台状态
+      route: "/media/publish/platforms"
+      page: PlatformStatus
+      priority: P1
+      verification:
+        type: visual
+        checkpoints:
+          - "各平台账号状态显示"
+          - "在线/离线指示器"
+        evidence: "pages/media/PlatformStatus.tsx"
+
+    - id: F2.7
+      name: 数据分析
+      route: "/media/data"
+      page: PublishStats
+      priority: P1
+      verification:
+        type: visual
+        checkpoints:
+          - "图表渲染正常"
+          - "数据统计显示"
+        evidence: "pages/media/PublishStats.tsx"
+
+# =============================================================================
+# F3. AI 员工系统
+# =============================================================================
+f3_ai_employees:
+  title: "AI 员工系统"
+  description: "将 n8n 工作流抽象为 AI 员工概念，用户友好视图"
+
+  features:
+    - id: F3.1
+      name: 员工列表
+      route: "/ai-employees"
+      page: AiEmployeesPage
+      priority: P0
+      verification:
+        type: visual
+        checkpoints:
+          - "员工卡片列表渲染"
+          - "员工头像/名称显示"
+          - "状态指示器（在线/离线）"
+        evidence: "navigation.config.ts:L100-106"
+
+    - id: F3.2
+      name: 员工详情
+      route: "/ai-employees/:id"
+      page: AiEmployeeDetailPage
+      priority: P1
+      params:
+        test_id: "1"
+      verification:
+        type: visual
+        checkpoints:
+          - "员工详情信息显示"
+          - "能力列表渲染"
+        evidence: "pages/ai-employees/AiEmployeeDetailPage.tsx"
+
+    - id: F3.3
+      name: 能力详情
+      route: "/ai-employees/:id/abilities/:aid"
+      page: AiAbilityDetailPage
+      priority: P2
+      params:
+        test_id: "1"
+        test_aid: "1"
+      verification:
+        type: visual
+        checkpoints:
+          - "能力描述显示"
+          - "参数配置区域"
+        evidence: "pages/ai-employees/AiAbilityDetailPage.tsx"
+
+# =============================================================================
+# F4. 账号管理
+# =============================================================================
+f4_accounts:
+  title: "账号管理"
+  description: "管理社交媒体平台账号，查看账号数据"
+
+  features:
+    - id: F4.1
+      name: 账号列表
+      route: "/accounts"
+      page: AccountsList
+      priority: P0
+      verification:
+        type: visual
+        checkpoints:
+          - "账号列表表格渲染"
+          - "平台图标显示（小红书/抖音/B站/微博）"
+          - "账号状态指示"
+        evidence: "pages/accounts/AccountsList.tsx"
+
+    - id: F4.2
+      name: 账号数据
+      route: "/accounts/:id/metrics"
+      page: AccountMetrics
+      priority: P1
+      params:
+        test_id: "1"
+      verification:
+        type: visual
+        checkpoints:
+          - "数据图表渲染"
+          - "指标卡片显示"
+        evidence: "pages/accounts/AccountMetrics.tsx"
+
+# =============================================================================
+# F5. 认证系统
+# =============================================================================
+f5_auth:
+  title: "认证系统"
+  description: "飞书登录，Core 和 Autopilot 共享"
+
+  features:
+    - id: F5.1
+      name: 飞书登录
+      route: "/login"
+      page: FeishuLogin
+      priority: P0
+      verification:
+        type: functional
+        checkpoints:
+          - "登录页面可访问"
+          - "飞书二维码/登录按钮显示"
+          - "登录成功跳转到首页"
+        evidence: "FeishuLogin.tsx"
+        notes: "需要有效飞书账号测试完整流程"
+
+# =============================================================================
+# 全局检查点
+# =============================================================================
+global_checks:
+  - id: G1
+    name: 侧边栏导航
+    priority: P0
+    checkpoints:
+      - "所有导航项可见"
+      - "当前页面高亮正确"
+      - "收起/展开功能正常"
+
+  - id: G2
+    name: 主题与样式
+    priority: P1
+    checkpoints:
+      - "蓝色主题色正确 (#3467D6)"
+      - "侧边栏渐变背景"
+      - "Logo 显示正确"
+
+  - id: G3
+    name: 响应式
+    priority: P2
+    checkpoints:
+      - "移动端布局不崩溃"
+      - "侧边栏可收起"
+
+# =============================================================================
+# 优先级说明
+# =============================================================================
+# P0: 阻塞性 - 必须通过，否则不能发布
+# P1: 功能性 - 应该通过，影响用户体验
+# P2: 最佳实践 - 可以延后修复
+#
+# 验证类型:
+# - visual: 页面可访问，关键元素渲染
+# - functional: 需要交互验证功能
+# - api: 需要后端 API 正常响应

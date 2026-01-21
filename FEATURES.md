@@ -172,10 +172,10 @@
 ## 待办
 
 ### 高优先级
-- [ ] develop → main（里程碑发布）
+- [x] develop → main（里程碑发布）✅ 2026-01-22
 
 ### 中优先级
-- [ ] 创建 `regression-contract.yaml`
+- [x] 创建 `regression-contract.yaml` ✅ 2026-01-22
 
 ### 低优先级
 - [ ] 补充 Unit 测试
