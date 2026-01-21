@@ -104,13 +104,14 @@
 
 ### F4. 账号管理
 
-> 管理社交媒体平台账号
+> 管理社交媒体平台账号，查看账号数据
 
 | 子功能 | 路由 | 页面 | 说明 |
 |--------|------|------|------|
 | F4.1 账号列表 | `/accounts` | AccountsList | 小红书/抖音/B站/微博账号 |
+| F4.2 账号数据 | `/accounts/:id/metrics` | AccountMetrics | 单个账号的数据分析 |
 
-**Evidence**: `navigation.config.ts:L107-112`, `pages/accounts/AccountsList.tsx`
+**Evidence**: `navigation.config.ts`, `pages/accounts/AccountsList.tsx`, `pages/accounts/AccountMetrics.tsx`
 
 ---
 
@@ -121,9 +122,8 @@
 | 子功能 | 路由 | 页面 | 说明 |
 |--------|------|------|------|
 | F5.1 飞书登录 | `/login` | FeishuLogin | 扫码 + 一键登录 |
-| F5.2 平台授权 | `/login/:platform/:accountId` | LoginPage | 第三方平台授权 |
 
-**Evidence**: `FeishuLogin.tsx`, `LoginPage.tsx`
+**Evidence**: `FeishuLogin.tsx`（在 App.tsx 中引用）
 
 ---
 
@@ -147,6 +147,12 @@
 |------|------|
 | AdminSettingsPage.tsx | 功能已迁移到 Core |
 | ToolsPage.tsx | 功能已迁移到 Core |
+| SettingsPage.tsx | 功能已迁移到 Core |
+| VideoEditor.tsx | 无入口，死代码 |
+| WebsiteContents.tsx | 无入口，死代码 |
+| NotificationCenter.tsx | 无入口，死代码 |
+| accounts/PlatformLogin.tsx | 已淘汰（现用其他方式登录平台） |
+| LoginPage.tsx | 已淘汰（抖音登录改用 PC 端） |
 
 ---
 
@@ -157,8 +163,8 @@
 | F1. 工作台 | 1 | Done |
 | F2. 新媒体运营 | 7 | Done |
 | F3. AI 员工系统 | 3 | Done |
-| F4. 账号管理 | 1 | Done（新增导航） |
-| F5. 认证系统 | 2 | Done |
+| F4. 账号管理 | 2 | Done（+AccountMetrics） |
+| F5. 认证系统 | 1 | Done（-平台授权已删） |
 | **总计** | **14** | |
 
 ---
@@ -167,12 +173,16 @@
 
 ### 高优先级
 - [ ] develop → main（里程碑发布）
-- [ ] 验证前端构建是否正常
 
 ### 中优先级
-- [ ] 清理 Hidden Pages（WebsiteContents, SettingsPage 等）
 - [ ] 创建 `regression-contract.yaml`
 
 ### 低优先级
 - [ ] 补充 Unit 测试
 - [ ] 定义 Golden Paths
+
+### 已完成
+- [x] 清理死代码（8 个文件）
+- [x] 验证前端构建
+- [x] 启用 AccountMetrics（账号数据分析）
+- [x] 移除废弃的平台登录功能

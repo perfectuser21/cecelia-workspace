@@ -101,13 +101,9 @@ export const AccountCard: React.FC<AccountCardProps> = ({
 
       <div className="flex items-center gap-2">
         {account.loginStatus !== 'valid' && (
-          <button
-            onClick={() => onLogin?.(account.id)}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" />
-            重新登录
-          </button>
+          <span className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-yellow-100 text-yellow-700 rounded-lg font-medium text-sm">
+            需在 PC 端重新登录
+          </span>
         )}
         {account.loginStatus === 'valid' && (
           <button

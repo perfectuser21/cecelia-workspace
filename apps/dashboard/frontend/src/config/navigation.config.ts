@@ -53,7 +53,6 @@ export const autopilotPageComponents: Record<string, () => Promise<{ default: Co
   'Tasks': () => import('../pages/Tasks'),
   'PlatformStatus': () => import('../pages/PlatformStatus'),
   'PublishStats': () => import('../pages/PublishStats'),
-  'LoginPage': () => import('../pages/LoginPage'),
   'PlatformStatusDashboard': () => import('../pages/PlatformStatusDashboard'),
   'ScrapingPage': () => import('../pages/ScrapingPage'),
   'MediaScenarioPage': () => import('../pages/MediaScenarioPage'),
@@ -62,6 +61,7 @@ export const autopilotPageComponents: Record<string, () => Promise<{ default: Co
   'AiAbilityDetailPage': () => import('../pages/AiAbilityDetailPage'),
   // 账号管理
   'AccountsList': () => import('../pages/accounts/AccountsList'),
+  'AccountMetrics': () => import('../pages/accounts/AccountMetrics'),
 };
 
 // 向后兼容：保留 pageComponents 导出（仅 Autopilot 组件）
@@ -139,8 +139,8 @@ export const additionalRoutes: RouteConfig[] = [
   { path: '/publish-stats', redirect: '/media/data' },
   { path: '/data-center', redirect: '/media/data/analytics' },
 
-  // 登录相关
-  { path: '/login/:platform/:accountId', component: 'LoginPage', requireAuth: true },
+  // 账号管理详情页
+  { path: '/accounts/:id/metrics', component: 'AccountMetrics', requireAuth: true },
   { path: '/platform-login', component: 'PlatformStatusDashboard', requireAuth: true },
 
   // === 系统管理功能已迁移到 Core ===

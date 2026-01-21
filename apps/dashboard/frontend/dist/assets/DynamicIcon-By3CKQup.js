@@ -1,1 +1,0 @@
-import{j as r,z as a,ao as t,B as c,V as e,ap as i,aq as p,ar as m}from"./index-D1JGPNRX.js";const x={Monitor:m,Code:p,Wallet:i,Video:e,BarChart3:c,Wrench:t,User:a};function u({name:o,...s}){const n=x[o]||a;return r.jsx(n,{...s})}export{u as D};
