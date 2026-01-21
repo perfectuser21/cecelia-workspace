@@ -9,9 +9,9 @@ import { lazy, ComponentType } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
-  Settings,
   Video,
   Users,
+  UserCircle,
 } from 'lucide-react';
 
 // ============ 类型定义 ============
@@ -44,6 +44,7 @@ export interface RouteConfig {
 // ============ 页面组件懒加载映射 ============
 
 // Autopilot 本地页面组件
+// 注意：系统监控功能（Claude/VPS/n8n/Canvas）已迁移到 Core
 export const autopilotPageComponents: Record<string, () => Promise<{ default: ComponentType }>> = {
   'Dashboard': () => import('../pages/Dashboard'),
   'ContentData': () => import('../pages/ContentData'),
@@ -54,13 +55,13 @@ export const autopilotPageComponents: Record<string, () => Promise<{ default: Co
   'PublishStats': () => import('../pages/PublishStats'),
   'LoginPage': () => import('../pages/LoginPage'),
   'PlatformStatusDashboard': () => import('../pages/PlatformStatusDashboard'),
-  'ToolsPage': () => import('../pages/ToolsPage'),
   'ScrapingPage': () => import('../pages/ScrapingPage'),
-  'AdminSettingsPage': () => import('../pages/AdminSettingsPage'),
   'MediaScenarioPage': () => import('../pages/MediaScenarioPage'),
   'AiEmployeesPage': () => import('../pages/AiEmployeesPage'),
   'AiEmployeeDetailPage': () => import('../pages/AiEmployeeDetailPage'),
   'AiAbilityDetailPage': () => import('../pages/AiAbilityDetailPage'),
+  // 账号管理
+  'AccountsList': () => import('../pages/accounts/AccountsList'),
 };
 
 // 向后兼容：保留 pageComponents 导出（仅 Autopilot 组件）
@@ -106,13 +107,13 @@ export const autopilotNavGroups: NavGroup[] = [
         component: 'AiEmployeesPage'
       },
       {
-        path: '/settings',
-        icon: Settings,
-        label: '设置',
-        featureKey: 'settings',
-        requireSuperAdmin: true,
-        component: 'AdminSettingsPage'
+        path: '/accounts',
+        icon: UserCircle,
+        label: '账号管理',
+        featureKey: 'accounts',
+        component: 'AccountsList'
       },
+      // 系统设置已迁移到 Core，访问 core.zenjoymedia.media
     ]
   }
 ];
@@ -137,29 +138,18 @@ export const additionalRoutes: RouteConfig[] = [
   { path: '/platform-status', redirect: '/media/publish/platforms' },
   { path: '/publish-stats', redirect: '/media/data' },
   { path: '/data-center', redirect: '/media/data/analytics' },
-  { path: '/tools', redirect: '/settings' },
-  { path: '/canvas', redirect: '/settings' },
 
   // 登录相关
   { path: '/login/:platform/:accountId', component: 'LoginPage', requireAuth: true },
   { path: '/platform-login', component: 'PlatformStatusDashboard', requireAuth: true },
 
-  // 工具子页面（移入设置）
-  { path: '/tools/session-monitor', redirect: '/settings' },
-
-  // 管理员子页面
-  { path: '/settings/claude-monitor', component: 'ClaudeMonitor', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/vps-monitor', component: 'VpsMonitor', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/claude-stats', component: 'ClaudeStats', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/n8n-workflows', component: 'N8nWorkflows', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/n8n-workflows/:instance/:id', component: 'N8nWorkflowDetail', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/n8n-status', component: 'N8nLiveStatus', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/n8n-status/:executionId', component: 'N8nLiveStatusDetail', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/canvas', component: 'Canvas', requireAuth: true, requireSuperAdmin: true },
-
-  // 旧重定向（已废弃，现在由 Core features 处理）
-  // { path: '/panorama', redirect: '/settings/canvas' },  // 现在是 dev-panorama 功能
-  // { path: '/whiteboard', redirect: '/settings/canvas' }, // 现在由 canvas feature 处理
+  // === 系统管理功能已迁移到 Core ===
+  // 访问 core.zenjoymedia.media 使用以下功能：
+  // - Claude 监控
+  // - VPS 监控
+  // - n8n 工作流
+  // - Canvas 画布
+  // - 系统设置
 ];
 
 // ============ 辅助函数 ============
