@@ -1,0 +1,1 @@
+import{a}from"./index-B9ygI19o.js";const o="/api",n="dev-api-key-2025",t=a.create({baseURL:o,headers:{"Content-Type":"application/json",Authorization:`Bearer ${n}`}});async function p(){return(await t.get("/qa-report")).data}async function i(e){return(await t.get(`/qa-report/${e}`)).data}export{i as a,p as f};

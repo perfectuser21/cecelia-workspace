@@ -41,6 +41,11 @@ const readline = __importStar(require("readline"));
 const claude_stats_types_1 = require("./claude-stats.types");
 // Use mounted path in container, fallback to HOME for local dev
 const CLAUDE_DIR = process.env.CLAUDE_PROJECTS_DIR || path.join(process.env.HOME || '/root', '.claude', 'projects');
+
+// 缓存配置
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 分钟缓存
+let statsCache = null;
+let cacheTimestamp = 0;
 function calculateCost(model, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens) {
     const pricing = claude_stats_types_1.MODEL_PRICING[model] || claude_stats_types_1.DEFAULT_PRICING;
     return ((inputTokens / 1000000) * pricing.input +
@@ -142,6 +147,15 @@ async function getAllJsonlFiles() {
     return files;
 }
 async function getStats(days = 30) {
+    // 检查缓存
+    const now = Date.now();
+    if (statsCache && (now - cacheTimestamp) < CACHE_TTL_MS) {
+        console.log('[claude-stats] 返回缓存数据');
+        return statsCache;
+    }
+    console.log('[claude-stats] 缓存过期，重新计算...');
+    const startTime = Date.now();
+
     const files = await getAllJsonlFiles();
     const sessions = [];
     const cutoffDate = new Date();
@@ -260,11 +274,18 @@ async function getStats(days = 30) {
             messages: s.messages,
         };
     });
-    return {
+    const result = {
         overview,
         daily,
         recent_sessions: recentSessions,
     };
+
+    // 更新缓存
+    statsCache = result;
+    cacheTimestamp = Date.now();
+    console.log(`[claude-stats] 计算完成，耗时 ${Date.now() - startTime}ms，已缓存`);
+
+    return result;
 }
 exports.service = { getStats };
 //# sourceMappingURL=claude-stats.service.js.map

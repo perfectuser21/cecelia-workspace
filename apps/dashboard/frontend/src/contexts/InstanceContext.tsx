@@ -24,6 +24,7 @@ export interface CoreDynamicConfig {
   instanceConfig: InstanceConfig;
   navGroups: NavGroup[];
   pageComponents: Record<string, () => Promise<{ default: any }>>;
+  additionalRoutes?: Array<{ path: string; component: string }>;  // Routes without nav items
 }
 
 // Autopilot 配置（蓝色主题）- 团队运营
@@ -41,6 +42,7 @@ const autopilotConfig: InstanceConfig = {
     'workbench': true,
     'media-scenario': true,  // 新媒体运营场景
     'ai-employees': true,    // AI 员工
+    'accounts': true,        // 账号管理
     'settings': true,
     // 旧 features（保留用于兼容，实际已合并到 media-scenario）
     'execution-status': true,

@@ -155,3 +155,194 @@
   "ip": "192.159.99.95",
   "userAgent": "Mozilla/5.0 (rondo2012@atomicmail.io)"
 }
+2026-01-21 22:37:49 [[32minfo[39m]: [32mNew database connection established[39m 
+2026-01-21 22:37:49 [[32minfo[39m]: [32mDatabase connection pool initialized[39m {
+  "host": "localhost",
+  "database": "n8n_social_metrics"
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mDatabase connected successfully[39m 
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: content/content-publish[39m {
+  "basePath": "/v1/publish",
+  "requiresAuth": true
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: content/contents[39m {
+  "basePath": "/api/contents",
+  "requiresAuth": false
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: content/data-collection[39m {
+  "basePath": "/v1/collect",
+  "requiresAuth": true
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: content/platform-data[39m {
+  "basePath": "/api/platform-data",
+  "requiresAuth": false
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: content/video-editor[39m {
+  "basePath": "/v1/video-editor",
+  "requiresAuth": false
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: infra/claude-monitor[39m {
+  "basePath": "/v1/claude-monitor",
+  "requiresAuth": false
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: infra/claude-stats[39m {
+  "basePath": "/v1/claude-stats",
+  "requiresAuth": false
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: infra/instance-config[39m {
+  "basePath": "/v1/instance-config",
+  "requiresAuth": false
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: infra/logs[39m {
+  "basePath": "/v1/logs",
+  "requiresAuth": true
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: infra/metrics[39m {
+  "basePath": "/v1/metrics",
+  "requiresAuth": true
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: infra/notifications[39m {
+  "basePath": "/v1/notify",
+  "requiresAuth": true
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: infra/vps-monitor[39m {
+  "basePath": "/v1/vps-monitor",
+  "requiresAuth": false
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: dashboard/accounts[39m {
+  "basePath": "/v1/accounts",
+  "requiresAuth": true
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: dashboard/auth[39m {
+  "basePath": "/v1/accounts",
+  "requiresAuth": true
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: dashboard/panorama[39m {
+  "basePath": "/v1/panorama",
+  "requiresAuth": false
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: dashboard/session[39m {
+  "basePath": "/api/session",
+  "requiresAuth": false
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: dashboard/tasks[39m {
+  "basePath": "/api/tasks",
+  "requiresAuth": true
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: integration/n8n-live-status[39m {
+  "basePath": "/v1/n8n-live-status",
+  "requiresAuth": false
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: integration/n8n-workflows[39m {
+  "basePath": "/v1/n8n-workflows",
+  "requiresAuth": false
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: integration/webhook-validator[39m {
+  "basePath": "/api/webhook-validator",
+  "requiresAuth": true
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mLoaded feature: integration/workflow-tracker[39m {
+  "basePath": "/v1/workflow-tracker",
+  "requiresAuth": false
+}
+2026-01-21 22:37:49 [[32minfo[39m]: [32mTotal features loaded: 21[39m 
+2026-01-21 22:37:49 [[32minfo[39m]: [32mServer started on port 3000[39m {
+  "nodeEnv": "development",
+  "port": 3000
+}
+2026-01-21 22:40:25 [[32minfo[39m]: [32mSIGTERM received, shutting down gracefully[39m 
+2026-01-21 22:40:26 [[32minfo[39m]: [32mNew database connection established[39m 
+2026-01-21 22:40:26 [[32minfo[39m]: [32mDatabase connection pool initialized[39m {
+  "host": "localhost",
+  "database": "n8n_social_metrics"
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mDatabase connected successfully[39m 
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: content/content-publish[39m {
+  "basePath": "/v1/publish",
+  "requiresAuth": true
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: content/contents[39m {
+  "basePath": "/api/contents",
+  "requiresAuth": false
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: content/data-collection[39m {
+  "basePath": "/v1/collect",
+  "requiresAuth": true
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: content/platform-data[39m {
+  "basePath": "/api/platform-data",
+  "requiresAuth": false
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: content/video-editor[39m {
+  "basePath": "/v1/video-editor",
+  "requiresAuth": false
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: infra/claude-monitor[39m {
+  "basePath": "/v1/claude-monitor",
+  "requiresAuth": false
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: infra/claude-stats[39m {
+  "basePath": "/v1/claude-stats",
+  "requiresAuth": false
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: infra/instance-config[39m {
+  "basePath": "/v1/instance-config",
+  "requiresAuth": false
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: infra/logs[39m {
+  "basePath": "/v1/logs",
+  "requiresAuth": true
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: infra/metrics[39m {
+  "basePath": "/v1/metrics",
+  "requiresAuth": true
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: infra/notifications[39m {
+  "basePath": "/v1/notify",
+  "requiresAuth": true
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: infra/vps-monitor[39m {
+  "basePath": "/v1/vps-monitor",
+  "requiresAuth": false
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: dashboard/accounts[39m {
+  "basePath": "/v1/accounts",
+  "requiresAuth": true
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: dashboard/auth[39m {
+  "basePath": "/v1/accounts",
+  "requiresAuth": true
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: dashboard/panorama[39m {
+  "basePath": "/v1/panorama",
+  "requiresAuth": false
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: dashboard/session[39m {
+  "basePath": "/api/session",
+  "requiresAuth": false
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: dashboard/tasks[39m {
+  "basePath": "/api/tasks",
+  "requiresAuth": true
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: integration/n8n-live-status[39m {
+  "basePath": "/v1/n8n-live-status",
+  "requiresAuth": false
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: integration/n8n-workflows[39m {
+  "basePath": "/v1/n8n-workflows",
+  "requiresAuth": false
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: integration/webhook-validator[39m {
+  "basePath": "/api/webhook-validator",
+  "requiresAuth": true
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mLoaded feature: integration/workflow-tracker[39m {
+  "basePath": "/v1/workflow-tracker",
+  "requiresAuth": false
+}
+2026-01-21 22:40:26 [[32minfo[39m]: [32mTotal features loaded: 21[39m 
+2026-01-21 22:40:26 [[32minfo[39m]: [32mServer started on port 3000[39m {
+  "nodeEnv": "development",
+  "port": 3000
+}

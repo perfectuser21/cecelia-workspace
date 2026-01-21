@@ -124,8 +124,19 @@ export default function DynamicRouter({ children }: DynamicRouterProps) {
       routes.push(...additionalRoutes);
     }
 
+    // Core: 添加没有 navItem 的路由 (如 /qa/:repo)
+    if (isCore && coreConfig?.additionalRoutes) {
+      for (const route of coreConfig.additionalRoutes) {
+        routes.push({
+          path: route.path,
+          component: route.component,
+          requireAuth: true,
+        });
+      }
+    }
+
     return routes;
-  }, [navGroups, isCore]);
+  }, [navGroups, isCore, coreConfig]);
 
   // 渲染单个路由
   const renderRoute = (route: RouteConfig) => {

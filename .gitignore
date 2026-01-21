@@ -1,3 +1,27 @@
 
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output (keep dist for Docker mount)
+# apps/dashboard/frontend/dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
 # Uploads
 apps/dashboard/data/uploads/

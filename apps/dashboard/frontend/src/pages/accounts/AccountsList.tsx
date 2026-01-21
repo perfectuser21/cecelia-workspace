@@ -51,10 +51,6 @@ export default function AccountsList() {
       });
   };
 
-  const handleLogin = (id: string) => {
-    navigate(`/accounts/${id}/login`);
-  };
-
   const handleViewMetrics = (id: string) => {
     navigate(`/accounts/${id}/metrics`);
   };
@@ -208,7 +204,6 @@ export default function AccountsList() {
             <AccountCard
               key={account.id}
               account={account}
-              onLogin={handleLogin}
               onViewMetrics={handleViewMetrics}
               onDelete={handleDelete}
               onHealthCheck={handleHealthCheck}
