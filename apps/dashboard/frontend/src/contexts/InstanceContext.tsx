@@ -24,6 +24,7 @@ export interface CoreDynamicConfig {
   instanceConfig: InstanceConfig;
   navGroups: NavGroup[];
   pageComponents: Record<string, () => Promise<{ default: any }>>;
+  additionalRoutes?: Array<{ path: string; component: string }>;  // Routes without nav items
 }
 
 // Autopilot 配置（蓝色主题）- 团队运营
