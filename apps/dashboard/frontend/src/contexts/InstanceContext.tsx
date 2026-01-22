@@ -42,7 +42,8 @@ const autopilotConfig: InstanceConfig = {
     'workbench': true,
     'media-scenario': true,  // 新媒体运营场景
     'ai-employees': true,    // AI 员工
-    'settings': true,
+    'accounts': true,        // 账号管理
+    // 'settings' 已迁移到 Core
     // 旧 features（保留用于兼容，实际已合并到 media-scenario）
     'execution-status': true,
     'tasks': true,
