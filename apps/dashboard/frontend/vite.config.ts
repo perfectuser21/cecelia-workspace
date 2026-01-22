@@ -5,9 +5,13 @@ import path from 'path'
 import fs from 'fs'
 
 // Support both local dev (sibling repo) and CI (nested checkout)
+// If zenithjoy-core is not available, Core features will be disabled
 const localCorePath = path.resolve(__dirname, '../../../../zenithjoy-core/features')
 const ciCorePath = path.resolve(__dirname, '../../../zenithjoy-core/features')
-const coreFeaturesPath = fs.existsSync(localCorePath) ? localCorePath : ciCorePath
+const coreAvailable = fs.existsSync(localCorePath) || fs.existsSync(ciCorePath)
+const coreFeaturesPath = fs.existsSync(localCorePath) ? localCorePath
+  : fs.existsSync(ciCorePath) ? ciCorePath
+  : path.resolve(__dirname, './src/stubs/core-features') // fallback stub
 
 export default defineConfig({
   resolve: {
