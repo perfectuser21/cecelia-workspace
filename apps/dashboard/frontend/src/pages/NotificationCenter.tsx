@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Bell, CheckCheck, Trash2, AlertCircle, CheckCircle, XCircle, Info, ExternalLink } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Bell, CheckCheck, AlertCircle, CheckCircle, XCircle, Info, ExternalLink } from 'lucide-react';
 import { settingsApi, Notification } from '../api/settings.api';
 
 export default function NotificationCenter() {

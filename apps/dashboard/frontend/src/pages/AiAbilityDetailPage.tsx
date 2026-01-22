@@ -13,7 +13,7 @@ export default function AiAbilityDetailPage() {
   const [employeeName, setEmployeeName] = useState<string>('');
   const [tasks, setTasks] = useState<EmployeeTask[]>([]);
   const [loading, setLoading] = useState(true);
-  const [autoRunEnabled, setAutoRunEnabled] = useState(true); // 静态展示，暂不可操作
+  const [autoRunEnabled] = useState(true); // 静态展示，暂不可操作
 
   useEffect(() => {
     if (!employeeId || !abilityId) {

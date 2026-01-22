@@ -65,7 +65,7 @@ function convertCoreNavGroups(
     title: group.title,
     items: group.items.map(item => ({
       path: item.path,
-      icon: (LucideIcons as Record<string, LucideIcons.LucideIcon>)[item.icon] || LucideIcons.Circle,
+      icon: (LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>)[item.icon] || LucideIcons.Circle,
       label: item.label,
       featureKey: item.featureKey,
       component: item.component,

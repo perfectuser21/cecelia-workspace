@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Save, TestTube, Check, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Save, TestTube } from 'lucide-react';
 import { settingsApi, SystemSettings } from '../api/settings.api';
 
 export default function SettingsPage() {

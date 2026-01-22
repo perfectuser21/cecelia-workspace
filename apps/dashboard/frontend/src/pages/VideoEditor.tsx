@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Upload, Film, Scissors, Square, Type, Download, Trash2, RefreshCw,
   Play, Pause, ArrowLeft, CheckCircle2, XCircle, Loader2, Clock, Sparkles, Wand2,
-  Volume2, VolumeX, SkipBack, SkipForward, Maximize2, ChevronRight, ChevronDown,
-  Zap, Timer, Layers, FileVideo, Eye, EyeOff, Edit3, RotateCcw
+  Volume2, VolumeX, SkipBack, SkipForward, ChevronRight, ChevronDown,
+  Zap, Timer, Layers, FileVideo, Eye, Edit3, RotateCcw
 } from 'lucide-react';
 import {
   videoEditorApi,
@@ -15,7 +15,6 @@ import {
   PROCESSING_STEPS,
   StepInfo,
   AiAnalysisResult,
-  TranscriptSegment,
   AiEditOperation,
 } from '../api/video-editor.api';
 
