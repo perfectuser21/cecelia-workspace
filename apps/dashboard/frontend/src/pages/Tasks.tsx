@@ -67,7 +67,7 @@ export default function Tasks() {
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [updatingTasks, setUpdatingTasks] = useState<Set<string>>(new Set());
+  const [, setUpdatingTasks] = useState<Set<string>>(new Set());
 
   // 时间分配 { taskId: { date: 'YYYY-MM-DD', minutes: number } }
   const [taskSchedule, setTaskSchedule] = useState<Record<string, { date: string; minutes: number }>>(() => {
@@ -206,12 +206,6 @@ export default function Tasks() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [viewType, selectedDate]);
-
-  // 获取某日期的任务
-  const getTasksForDate = (date: Date) => {
-    const dateStr = formatDate(date);
-    return allTasks.filter(t => t.due === dateStr);
-  };
 
   // 获取某日期某时间槽的任务
   const getTasksInSlot = (date: Date, minutes: number) => {

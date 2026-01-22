@@ -7,8 +7,6 @@ import {
   Wifi,
   WifiOff,
   ExternalLink,
-  TrendingUp,
-  TrendingDown,
   Activity,
   Zap,
 } from 'lucide-react';
@@ -115,12 +113,6 @@ export default function PlatformStatus() {
     if (rate >= 80) return 'text-green-500';
     if (rate >= 50) return 'text-yellow-500';
     return 'text-red-500';
-  };
-
-  const getStatusBg = (rate: number): string => {
-    if (rate >= 80) return 'bg-green-100 dark:bg-green-900/30';
-    if (rate >= 50) return 'bg-yellow-100 dark:bg-yellow-900/30';
-    return 'bg-red-100 dark:bg-red-900/30';
   };
 
   // Get all platforms (from metadata + stats)

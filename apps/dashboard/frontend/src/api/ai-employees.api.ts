@@ -119,46 +119,6 @@ function mapExecutionToTask(execution: N8nExecution): EmployeeTask | null {
 }
 
 /**
- * 聚合员工统计数据
- * TODO: 等 n8n-live-status API 实现后启用
- */
-function _aggregateEmployeeStats(
-  employee: AiEmployee,
-  executions: N8nExecution[]
-): EmployeeTaskStats {
-  const tasks: EmployeeTask[] = [];
-  let success = 0;
-  let error = 0;
-  let running = 0;
-
-  for (const execution of executions) {
-    const task = mapExecutionToTask(execution);
-    if (task) {
-      // 检查是否属于这个员工的职能
-      const isThisEmployee = employee.abilities.some(a => a.id === task.abilityId);
-      if (isThisEmployee) {
-        tasks.push(task);
-        if (task.status === 'success') success++;
-        else if (task.status === 'error') error++;
-        else if (task.status === 'running' || task.status === 'waiting') running++;
-      }
-    }
-  }
-
-  const total = tasks.length;
-  const successRate = total > 0 ? Math.round((success / total) * 100) : 0;
-
-  return {
-    todayTotal: total,
-    todaySuccess: success,
-    todayError: error,
-    todayRunning: running,
-    successRate,
-    recentTasks: tasks.slice(0, 5),
-  };
-}
-
-/**
  * 创建默认的员工统计数据（无 API 数据时使用）
  */
 function createDefaultStats(): EmployeeTaskStats {
