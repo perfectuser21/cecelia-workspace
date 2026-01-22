@@ -107,26 +107,34 @@ export default function DynamicRouter({ children }: DynamicRouterProps) {
   const allRoutes: RouteConfig[] = useMemo(() => {
     const routes: RouteConfig[] = [];
 
-    // 从导航配置中提取路由
-    for (const group of navGroups) {
-      for (const item of group.items) {
+    // Core: 使用 allRoutes（包含所有路由，不仅是导航项）
+    if (isCore && coreConfig?.allRoutes) {
+      for (const route of coreConfig.allRoutes) {
         routes.push({
-          path: item.path,
-          component: item.component,
-          redirect: item.redirect,
-          requireAuth: true,
-          requireSuperAdmin: item.requireSuperAdmin,
+          path: route.path,
+          component: route.component,
+          requireAuth: route.requireAuth ?? true,
         });
       }
-    }
-
-    // 添加额外路由（仅对 Autopilot 或所有实例）
-    if (!isCore) {
+    } else {
+      // Autopilot: 从导航配置中提取路由
+      for (const group of navGroups) {
+        for (const item of group.items) {
+          routes.push({
+            path: item.path,
+            component: item.component,
+            redirect: item.redirect,
+            requireAuth: true,
+            requireSuperAdmin: item.requireSuperAdmin,
+          });
+        }
+      }
+      // 添加额外路由
       routes.push(...additionalRoutes);
     }
 
     return routes;
-  }, [navGroups, isCore]);
+  }, [navGroups, isCore, coreConfig]);
 
   // 渲染单个路由
   const renderRoute = (route: RouteConfig) => {
