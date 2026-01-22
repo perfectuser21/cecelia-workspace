@@ -4,7 +4,8 @@
  * 根据配置文件动态生成路由，无需手动添加 Route
  */
 
-import { Suspense, lazy, ComponentType, useMemo } from 'react';
+import type { ComponentType} from 'react';
+import { Suspense, lazy, useMemo } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useInstance } from '../contexts/InstanceContext';
