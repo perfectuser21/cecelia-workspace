@@ -10,7 +10,6 @@ import { lazy } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
-  Settings,
   Video,
   Users,
   KeyRound,
@@ -55,7 +54,6 @@ export const autopilotPageComponents: Record<string, () => Promise<{ default: Co
   'PublishStats': () => import('../pages/PublishStats'),
   'LoginPage': () => import('../pages/LoginPage'),
   'ScrapingPage': () => import('../pages/ScrapingPage'),
-  'AdminSettingsPage': () => import('../pages/AdminSettingsPage'),
   'MediaScenarioPage': () => import('../pages/MediaScenarioPage'),
   'AiEmployeesPage': () => import('../pages/AiEmployeesPage'),
   'AiEmployeeDetailPage': () => import('../pages/AiEmployeeDetailPage'),
@@ -112,14 +110,7 @@ export const autopilotNavGroups: NavGroup[] = [
         featureKey: 'accounts',
         component: 'AccountsList'
       },
-      {
-        path: '/settings',
-        icon: Settings,
-        label: '设置',
-        featureKey: 'settings',
-        requireSuperAdmin: true,
-        component: 'AdminSettingsPage'
-      },
+      // 管理员设置已迁移到 Core: core.zenjoymedia.media
     ]
   }
 ];
