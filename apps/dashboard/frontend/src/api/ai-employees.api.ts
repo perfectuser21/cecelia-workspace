@@ -7,7 +7,6 @@
 import {
   AI_DEPARTMENTS,
   AiEmployee,
-  AiAbility,
   Department,
   matchAbilityByWorkflow,
 } from '../config/ai-employees.config';
@@ -121,8 +120,9 @@ function mapExecutionToTask(execution: N8nExecution): EmployeeTask | null {
 
 /**
  * 聚合员工统计数据
+ * TODO: 等 n8n-live-status API 实现后启用
  */
-function aggregateEmployeeStats(
+function _aggregateEmployeeStats(
   employee: AiEmployee,
   executions: N8nExecution[]
 ): EmployeeTaskStats {

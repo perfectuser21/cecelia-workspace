@@ -1,0 +1,215 @@
+{
+  "meta": {
+    "project": "zenithjoy-autopilot",
+    "feature_branch": "feature/qa-infrastructure",
+    "created_at": "2026-01-22T10:00:00Z",
+    "status": "approved"
+  },
+  "background": "zenithjoy-autopilot 当前 QA 基础设施极度薄弱：TypeScript 严格模式关闭、无 lint、无测试。需要逐步建立 L1-L3 质量保障体系。",
+  "goals": [
+    "建立 L1 自动化检查（lint + type-check）",
+    "建立 L2 功能验证（单元测试）",
+    "建立 L3 最佳实践（E2E + 安全扫描）",
+    "所有检查集成到 CI/CD"
+  ],
+  "non_goals": [
+    "L4 过度优化暂不涉及",
+    "不修改业务逻辑代码",
+    "不追求 100% 测试覆盖率"
+  ],
+  "checkpoints": [
+    {
+      "id": "CP-001",
+      "name": "TypeScript 严格模式",
+      "type": "config",
+      "depends_on": null,
+      "size": "medium",
+      "layer": "L1",
+      "description": "启用 TypeScript 严格模式，修复所有类型错误。这是类型安全的基础。",
+      "dod": [
+        "tsconfig.json 中 strict: true",
+        "noImplicitAny: true",
+        "noUnusedLocals: true",
+        "noUnusedParameters: true",
+        "所有类型错误已修复",
+        "npm run build 通过"
+      ],
+      "verify_commands": [
+        "cd apps/dashboard/frontend && npx tsc --noEmit"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "CP-002",
+      "name": "ESLint 配置",
+      "type": "config",
+      "depends_on": "CP-001",
+      "size": "medium",
+      "layer": "L1",
+      "description": "添加 ESLint 配置，统一代码规范。使用 @typescript-eslint 插件。",
+      "dod": [
+        "安装 eslint 及相关依赖",
+        "创建 .eslintrc.cjs 配置文件",
+        "package.json 添加 lint 脚本",
+        "修复所有 lint 错误",
+        "npm run lint 通过"
+      ],
+      "verify_commands": [
+        "cd apps/dashboard/frontend && npm run lint"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "CP-003",
+      "name": "Prettier 配置",
+      "type": "config",
+      "depends_on": "CP-002",
+      "size": "small",
+      "layer": "L1",
+      "description": "添加 Prettier 配置，统一代码格式。与 ESLint 集成避免冲突。",
+      "dod": [
+        "安装 prettier 及 eslint-config-prettier",
+        "创建 .prettierrc 配置文件",
+        "package.json 添加 format 脚本",
+        "npm run format 通过"
+      ],
+      "verify_commands": [
+        "cd apps/dashboard/frontend && npm run format -- --check"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "CP-004",
+      "name": "CI 增加 L1 检查",
+      "type": "config",
+      "depends_on": "CP-003",
+      "size": "small",
+      "layer": "L1",
+      "description": "更新 GitHub Actions CI，添加 type-check 和 lint 步骤。L1 层完成验收。",
+      "dod": [
+        "ci.yml 添加 type-check 步骤",
+        "ci.yml 添加 lint 步骤",
+        "PR 必须通过所有检查才能合并",
+        ".quality-report.json 中 L1_automated 标记为 pass"
+      ],
+      "verify_commands": [
+        "cat .github/workflows/ci.yml | grep -E 'lint|type-check'"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "CP-005",
+      "name": "Vitest 测试框架",
+      "type": "config",
+      "depends_on": "CP-004",
+      "size": "medium",
+      "layer": "L2",
+      "description": "安装并配置 Vitest 测试框架。Vitest 与 Vite 深度集成，配置简单。",
+      "dod": [
+        "安装 vitest 及 @testing-library/react",
+        "创建 vitest.config.ts",
+        "创建 src/test/setup.ts",
+        "package.json 添加 test 脚本",
+        "npm run test 可运行"
+      ],
+      "verify_commands": [
+        "cd apps/dashboard/frontend && npm run test -- --run"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "CP-006",
+      "name": "核心组件单元测试",
+      "type": "test",
+      "depends_on": "CP-005",
+      "size": "large",
+      "layer": "L2",
+      "description": "为核心组件编写单元测试。优先覆盖工具函数和关键 hooks。",
+      "dod": [
+        "创建 src/__tests__/ 目录",
+        "至少 5 个测试文件",
+        "覆盖核心工具函数",
+        "覆盖关键 hooks",
+        "测试全部通过"
+      ],
+      "verify_commands": [
+        "cd apps/dashboard/frontend && npm run test -- --run --coverage"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "CP-007",
+      "name": "CI 增加 L2 测试",
+      "type": "config",
+      "depends_on": "CP-006",
+      "size": "small",
+      "layer": "L2",
+      "description": "更新 CI 添加测试步骤。L2 层完成验收。",
+      "dod": [
+        "ci.yml 添加 test 步骤",
+        "测试失败阻止 PR 合并",
+        ".quality-report.json 中 L2_verification 标记为 pass"
+      ],
+      "verify_commands": [
+        "cat .github/workflows/ci.yml | grep test"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "CP-008",
+      "name": "Playwright E2E 框架",
+      "type": "config",
+      "depends_on": "CP-007",
+      "size": "medium",
+      "layer": "L3",
+      "description": "安装并配置 Playwright E2E 测试框架。",
+      "dod": [
+        "安装 @playwright/test",
+        "创建 playwright.config.ts",
+        "创建 e2e/ 目录",
+        "package.json 添加 test:e2e 脚本"
+      ],
+      "verify_commands": [
+        "cd apps/dashboard/frontend && npx playwright --version"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "CP-009",
+      "name": "E2E 关键流程测试",
+      "type": "test",
+      "depends_on": "CP-008",
+      "size": "large",
+      "layer": "L3",
+      "description": "编写关键用户流程的 E2E 测试。",
+      "dod": [
+        "登录流程测试",
+        "主导航测试",
+        "核心功能测试",
+        "所有 E2E 测试通过"
+      ],
+      "verify_commands": [
+        "cd apps/dashboard/frontend && npm run test:e2e"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "CP-010",
+      "name": "安全依赖扫描",
+      "type": "config",
+      "depends_on": "CP-007",
+      "size": "small",
+      "layer": "L3",
+      "description": "集成 npm audit 到 CI，检查依赖安全漏洞。",
+      "dod": [
+        "ci.yml 添加 npm audit 步骤",
+        "高危漏洞阻止 PR 合并",
+        ".quality-report.json 中 L3_acceptance 标记为 pass"
+      ],
+      "verify_commands": [
+        "cd apps/dashboard/frontend && npm audit --audit-level=high"
+      ],
+      "status": "pending"
+    }
+  ]
+}

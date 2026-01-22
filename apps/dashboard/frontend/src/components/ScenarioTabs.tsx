@@ -17,7 +17,7 @@ interface ScenarioTabsProps {
   basePath: string;
 }
 
-export default function ScenarioTabs({ tabs, basePath }: ScenarioTabsProps) {
+export default function ScenarioTabs({ tabs }: ScenarioTabsProps) {
   const location = useLocation();
 
   // 判断当前激活的 tab

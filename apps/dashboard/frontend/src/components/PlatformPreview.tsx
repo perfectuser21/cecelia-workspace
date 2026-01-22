@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Globe, Smartphone } from 'lucide-react';
+import { useState } from 'react';
+import { Smartphone } from 'lucide-react';
 
 interface PlatformPreviewProps {
   title: string;

@@ -1,10 +1,9 @@
-import React, { useState, useMemo } from 'react';
-import { Check, Image as ImageIcon } from 'lucide-react';
-import { PlatformSpec, publishApi } from '../api/publish.api';
+import { useState, useMemo } from 'react';
+import { Check } from 'lucide-react';
+import { PlatformSpec } from '../api/publish.api';
 
 interface ImageCropperProps {
   imageUrl: string;
-  imagePath: string;
   platforms: PlatformSpec[];
   selectedPlatforms: string[];
   onCropComplete?: (platform: string, aspectRatio: string) => void;
@@ -32,7 +31,6 @@ const ratioNames: Record<string, string> = {
 
 export default function ImageCropper({
   imageUrl,
-  imagePath,
   platforms,
   selectedPlatforms,
 }: ImageCropperProps) {

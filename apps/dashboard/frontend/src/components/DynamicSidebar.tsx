@@ -18,16 +18,17 @@ import {
 
 // 将 Core 的 NavGroup 格式转换为带 LucideIcon 的格式
 function convertCoreNavGroups(
-  coreNavGroups: Array<{ title: string; items: Array<{ path: string; icon: string; label: string; featureKey: string; component?: string }> }>
+  coreNavGroups: Array<{ title: string; items: Array<{ path: string; icon: string; label: string; featureKey: string; component?: string; requireSuperAdmin?: boolean }> }>
 ): NavGroup[] {
   return coreNavGroups.map(group => ({
     title: group.title,
     items: group.items.map(item => ({
       path: item.path,
-      icon: (LucideIcons as any)[item.icon] || Circle,
+      icon: (LucideIcons as Record<string, LucideIcons.LucideIcon>)[item.icon] || Circle,
       label: item.label,
       featureKey: item.featureKey,
       component: item.component,
+      requireSuperAdmin: item.requireSuperAdmin,
     })),
   }));
 }

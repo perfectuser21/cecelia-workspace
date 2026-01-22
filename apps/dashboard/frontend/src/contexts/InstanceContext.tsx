@@ -1,5 +1,19 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import type { NavGroup } from '../config/navigation.config';
+
+// Core NavGroup 类型（icon 为字符串名称，从 Core 模块动态加载）
+export interface CoreNavItem {
+  path: string;
+  icon: string;  // 图标名称字符串，如 "LayoutDashboard"
+  label: string;
+  featureKey: string;
+  component?: string;
+  requireSuperAdmin?: boolean;
+}
+
+export interface CoreNavGroup {
+  title: string;
+  items: CoreNavItem[];
+}
 
 // 主题配置
 interface ThemeConfig {
@@ -22,8 +36,8 @@ export interface InstanceConfig {
 // Core 动态配置类型
 export interface CoreDynamicConfig {
   instanceConfig: InstanceConfig;
-  navGroups: NavGroup[];
-  pageComponents: Record<string, () => Promise<{ default: any }>>;
+  navGroups: CoreNavGroup[];  // 使用 CoreNavGroup（icon 为 string）
+  pageComponents: Record<string, () => Promise<{ default: unknown }>>;
 }
 
 // Autopilot 配置（蓝色主题）- 团队运营
@@ -62,8 +76,9 @@ let cachedCoreConfig: CoreDynamicConfig | null = null;
 export async function loadCoreConfig(): Promise<CoreDynamicConfig> {
   if (cachedCoreConfig) return cachedCoreConfig;
 
+  // @ts-expect-error - @features/core 模块仅在 Core 实例中存在，由 tsconfig paths 映射
   const { buildCoreConfig } = await import('@features/core');
-  cachedCoreConfig = await buildCoreConfig();
+  cachedCoreConfig = await buildCoreConfig() as CoreDynamicConfig;
   return cachedCoreConfig;
 }
 
