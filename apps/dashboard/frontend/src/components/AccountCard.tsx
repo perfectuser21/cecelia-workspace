@@ -5,7 +5,7 @@ import type { Account } from '../api/accounts.api';
 
 interface AccountCardProps {
   account: Account;
-  onLogin?: (id: string) => void;
+  onLogin?: (platform: string, accountId: string) => void;
   onViewMetrics?: (id: string) => void;
   onDelete?: (id: string) => void;
   onHealthCheck?: (id: string) => void;
@@ -102,7 +102,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
       <div className="flex items-center gap-2">
         {account.loginStatus !== 'valid' && (
           <button
-            onClick={() => onLogin?.(account.id)}
+            onClick={() => onLogin?.(account.platform, account.accountId)}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
