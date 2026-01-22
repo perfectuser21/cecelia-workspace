@@ -51,7 +51,6 @@ export const autopilotPageComponents: Record<string, () => Promise<{ default: Co
   'ContentPublish': () => import('../pages/ContentPublish'),
   'ExecutionStatus': () => import('../pages/ExecutionStatus'),
   'Tasks': () => import('../pages/Tasks'),
-  'PlatformStatus': () => import('../pages/PlatformStatus'),
   'PublishStats': () => import('../pages/PublishStats'),
   'LoginPage': () => import('../pages/LoginPage'),
   'ScrapingPage': () => import('../pages/ScrapingPage'),
