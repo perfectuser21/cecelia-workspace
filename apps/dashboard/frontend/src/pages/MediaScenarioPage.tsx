@@ -17,7 +17,7 @@ const ContentPublish = lazy(() => import('./ContentPublish'));
 const ScrapingPage = lazy(() => import('./ScrapingPage'));
 const Tasks = lazy(() => import('./Tasks'));
 const ExecutionStatus = lazy(() => import('./ExecutionStatus'));
-const PlatformStatus = lazy(() => import('./PlatformStatus'));
+// PlatformStatus 已合并到 PublishStats
 const PublishStats = lazy(() => import('./PublishStats'));
 const ContentData = lazy(() => import('./ContentData'));
 
@@ -118,7 +118,7 @@ function PublishTab() {
     <>
       <SubTabs tabs={PUBLISH_SUB_TABS} />
       <Suspense fallback={<LoadingFallback />}>
-        {isHistoryPage ? <ExecutionStatus /> : isPlatformsPage ? <PlatformStatus /> : <Tasks />}
+        {isHistoryPage ? <ExecutionStatus /> : isPlatformsPage ? <PublishStats /> : <Tasks />}
       </Suspense>
     </>
   );
