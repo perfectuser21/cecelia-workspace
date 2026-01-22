@@ -1,12 +1,15 @@
 {
   "name": "social-metrics-frontend",
   "version": "1.0.0",
+  "type": "module",
   "description": "Frontend dashboard for social media metrics collection",
   "private": true,
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint src --ext ts,tsx --fix"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
@@ -19,13 +22,22 @@
     "recharts": "^2.15.4"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
+    "@typescript-eslint/eslint-plugin": "^8.53.1",
+    "@typescript-eslint/parser": "^8.53.1",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
+    "eslint": "^9.39.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.26",
+    "globals": "^17.0.0",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6",
     "typescript": "^5.3.3",
+    "typescript-eslint": "^8.53.1",
     "vite": "^5.0.8",
     "vite-plugin-pwa": "^1.2.0"
   }

@@ -440,7 +440,7 @@ export default function Dashboard() {
       } else {
         throw new Error('采集失败');
       }
-    } catch (error) {
+    } catch {
       setTasks(prev =>
         prev.map(task =>
           task.id === newTask.id
