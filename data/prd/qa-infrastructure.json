@@ -37,7 +37,8 @@
       "verify_commands": [
         "cd apps/dashboard/frontend && npx tsc --noEmit"
       ],
-      "status": "pending"
+      "status": "done",
+      "pr_url": "https://github.com/perfectuser21/zenithjoy-autopilot/pull/22"
     },
     {
       "id": "CP-002",
@@ -57,7 +58,8 @@
       "verify_commands": [
         "cd apps/dashboard/frontend && npm run lint"
       ],
-      "status": "pending"
+      "status": "done",
+      "pr_url": "https://github.com/perfectuser21/zenithjoy-autopilot/pull/22"
     },
     {
       "id": "CP-003",
@@ -76,7 +78,7 @@
       "verify_commands": [
         "cd apps/dashboard/frontend && npm run format -- --check"
       ],
-      "status": "pending"
+      "status": "done"
     },
     {
       "id": "CP-004",
@@ -95,7 +97,7 @@
       "verify_commands": [
         "cat .github/workflows/ci.yml | grep -E 'lint|type-check'"
       ],
-      "status": "pending"
+      "status": "done"
     },
     {
       "id": "CP-005",

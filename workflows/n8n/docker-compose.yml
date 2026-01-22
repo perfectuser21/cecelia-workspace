@@ -30,10 +30,11 @@ services:
       # Notion API key for workflows using $env.NOTION_API_KEY
       - NOTION_API_KEY=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
     volumes:
-      - n8n_data:/home/node/.n8n
+      - n8n-self-hosted_n8n_data:/home/node/.n8n
     networks:
       - n8n-network
       - npm-network
+      - dashboard_n8n-network
 
 networks:
   n8n-network:
@@ -41,6 +42,9 @@ networks:
   npm-network:
     external: true
     name: n8n-social-media-scraper_n8n-network
+  dashboard_n8n-network:
+    external: true
 
 volumes:
-  n8n_data:
+  n8n-self-hosted_n8n_data:
+    external: true
