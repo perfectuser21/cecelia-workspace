@@ -52,8 +52,8 @@ export default function AccountsList() {
       });
   };
 
-  const handleLogin = (id: string) => {
-    navigate(`/accounts/${id}/login`);
+  const handleLogin = (platform: string, accountId: string) => {
+    navigate(`/login/${platform}/${accountId}`);
   };
 
   const handleViewMetrics = (id: string) => {
