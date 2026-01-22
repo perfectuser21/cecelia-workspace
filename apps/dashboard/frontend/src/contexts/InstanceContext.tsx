@@ -61,12 +61,18 @@ const autopilotConfig: InstanceConfig = {
 let cachedCoreConfig: CoreDynamicConfig | null = null;
 
 // 异步加载 Core 配置
-export async function loadCoreConfig(): Promise<CoreDynamicConfig> {
+// 注意: 在 CI 或没有 zenithjoy-core 的环境会失败，这是预期的
+export async function loadCoreConfig(): Promise<CoreDynamicConfig | null> {
   if (cachedCoreConfig) return cachedCoreConfig;
 
-  const { buildCoreConfig } = await import('@features/core');
-  cachedCoreConfig = await buildCoreConfig();
-  return cachedCoreConfig;
+  try {
+    const { buildCoreConfig } = await import('@features/core');
+    cachedCoreConfig = await buildCoreConfig();
+    return cachedCoreConfig;
+  } catch (error) {
+    console.warn('Core features not available:', error);
+    return null;
+  }
 }
 
 // 检测是否为 Core 实例
