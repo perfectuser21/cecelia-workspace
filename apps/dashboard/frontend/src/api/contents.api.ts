@@ -7,8 +7,8 @@ const contentsClient = axios.create({
   baseURL: `${API_BASE_URL}/contents`,
   headers: {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${API_KEY}`
-  }
+    Authorization: `Bearer ${API_KEY}`,
+  },
 });
 
 export interface WebsiteContent {
@@ -52,13 +52,15 @@ export interface CreateContentInput {
 
 export const contentsApi = {
   // Get all contents (admin)
-  getAll: async (options: {
-    lang?: string;
-    type?: string;
-    status?: string;
-    limit?: number;
-    offset?: number;
-  } = {}): Promise<{ data: WebsiteContent[]; total: number }> => {
+  getAll: async (
+    options: {
+      lang?: string;
+      type?: string;
+      status?: string;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<{ data: WebsiteContent[]; total: number }> => {
     const params = new URLSearchParams();
     if (options.lang) params.append('lang', options.lang);
     if (options.type) params.append('type', options.type);

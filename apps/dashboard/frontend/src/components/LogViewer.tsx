@@ -10,9 +10,7 @@ interface LogViewerProps {
 export const LogViewer: React.FC<LogViewerProps> = ({ logs, title = '日志', onClose }) => {
   const [filter, setFilter] = useState('');
 
-  const filteredLogs = logs.filter(log =>
-    log.toLowerCase().includes(filter.toLowerCase())
-  );
+  const filteredLogs = logs.filter(log => log.toLowerCase().includes(filter.toLowerCase()));
 
   const handleDownload = () => {
     const blob = new Blob([logs.join('\n')], { type: 'text/plain' });
@@ -60,7 +58,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ logs, title = '日志', on
             type="text"
             placeholder="搜索日志..."
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+            onChange={e => setFilter(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -79,10 +77,10 @@ export const LogViewer: React.FC<LogViewerProps> = ({ logs, title = '日志', on
                   log.toLowerCase().includes('error') || log.toLowerCase().includes('failed')
                     ? 'text-red-400 bg-red-900/20'
                     : log.toLowerCase().includes('warn')
-                    ? 'text-yellow-400 bg-yellow-900/20'
-                    : log.toLowerCase().includes('success')
-                    ? 'text-green-400 bg-green-900/20'
-                    : 'text-gray-300'
+                      ? 'text-yellow-400 bg-yellow-900/20'
+                      : log.toLowerCase().includes('success')
+                        ? 'text-green-400 bg-green-900/20'
+                        : 'text-gray-300'
                 }`}
               >
                 <span className="text-gray-500 mr-3">{String(index + 1).padStart(4, '0')}</span>

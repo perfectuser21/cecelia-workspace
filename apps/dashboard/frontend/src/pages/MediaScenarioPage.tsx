@@ -9,7 +9,17 @@
 
 import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
-import { FileText, Send, BarChart3, Database, ListTodo, Activity, Radio, TrendingUp, PieChart } from 'lucide-react';
+import {
+  FileText,
+  Send,
+  BarChart3,
+  Database,
+  ListTodo,
+  Activity,
+  Radio,
+  TrendingUp,
+  PieChart,
+} from 'lucide-react';
 import ScenarioTabs, { type TabItem } from '../components/ScenarioTabs';
 
 // 懒加载页面组件
@@ -67,7 +77,7 @@ function SubTabs({ tabs }: { tabs: TabItem[] }) {
 
   return (
     <div className="flex flex-wrap gap-2 mb-6">
-      {tabs.map((tab) => {
+      {tabs.map(tab => {
         const active = isActive(tab.path);
         const Icon = tab.icon;
 
@@ -78,9 +88,10 @@ function SubTabs({ tabs }: { tabs: TabItem[] }) {
             className={`
               inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium
               transition-all duration-200
-              ${active
-                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm'
-                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+              ${
+                active
+                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm'
+                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
               }
             `}
           >

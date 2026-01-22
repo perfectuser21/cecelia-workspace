@@ -71,7 +71,7 @@ export const accountsApi = {
   // List all accounts
   getAccounts: async (platform?: string) => {
     const response = await apiClient.get<Account[]>('/v1/accounts', {
-      params: { platform }
+      params: { platform },
     });
     return response.data;
   },
@@ -83,11 +83,7 @@ export const accountsApi = {
   },
 
   // Add new account
-  addAccount: async (data: {
-    platform: string;
-    accountId: string;
-    displayName: string;
-  }) => {
+  addAccount: async (data: { platform: string; accountId: string; displayName: string }) => {
     const response = await apiClient.post<Account>('/v1/accounts', data);
     return response.data;
   },
@@ -105,9 +101,7 @@ export const accountsApi = {
 
   // Health check
   healthCheck: async (id: string) => {
-    const response = await apiClient.post<HealthCheckResult>(
-      `/v1/accounts/${id}/healthcheck`
-    );
+    const response = await apiClient.post<HealthCheckResult>(`/v1/accounts/${id}/healthcheck`);
     return response.data;
   },
 
@@ -123,33 +117,28 @@ export const accountsApi = {
   initiateLogin: async (platform: string, accountId: string) => {
     const response = await apiClient.post<LoginSession>('/v1/login/initiate', {
       platform,
-      accountId
+      accountId,
     });
     return response.data;
   },
 
   // Get login status
   getLoginStatus: async (sessionId: string) => {
-    const response = await apiClient.get<LoginSession>(
-      `/v1/login/status/${sessionId}`
-    );
+    const response = await apiClient.get<LoginSession>(`/v1/login/status/${sessionId}`);
     return response.data;
   },
 
   // Refresh QR code
   refreshQRCode: async (sessionId: string) => {
-    const response = await apiClient.post<LoginSession>(
-      `/v1/login/refresh/${sessionId}`
-    );
+    const response = await apiClient.post<LoginSession>(`/v1/login/refresh/${sessionId}`);
     return response.data;
   },
 
   // Get account metrics
   getAccountMetrics: async (id: string, startDate?: string, endDate?: string) => {
-    const response = await apiClient.get<AccountMetrics>(
-      `/v1/accounts/${id}/metrics`,
-      { params: { startDate, endDate } }
-    );
+    const response = await apiClient.get<AccountMetrics>(`/v1/accounts/${id}/metrics`, {
+      params: { startDate, endDate },
+    });
     return response.data;
   },
 
@@ -157,7 +146,7 @@ export const accountsApi = {
   exportAccountData: async (id: string, format: 'csv' | 'json' = 'csv') => {
     const response = await apiClient.get(`/v1/accounts/${id}/export`, {
       params: { format },
-      responseType: 'blob'
+      responseType: 'blob',
     });
     return response.data;
   },

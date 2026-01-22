@@ -116,7 +116,8 @@ export default function PublishStats() {
   const totalPublished = stats.total - (stats.byStatus.draft || 0);
   const totalSuccess = stats.byStatus.completed || 0;
   const totalFailed = (stats.byStatus.failed || 0) + (stats.byStatus.partial || 0);
-  const successRate = totalPublished > 0 ? ((totalSuccess / totalPublished) * 100).toFixed(1) : '0.0';
+  const successRate =
+    totalPublished > 0 ? ((totalSuccess / totalPublished) * 100).toFixed(1) : '0.0';
 
   // 准备状态分布饼图数据
   const statusChartData = Object.entries(stats.byStatus)
@@ -190,9 +191,7 @@ export default function PublishStats() {
             <span className="text-sm text-gray-500 dark:text-gray-400">成功数</span>
           </div>
           <div className="text-2xl font-bold text-gray-900 dark:text-white">{totalSuccess}</div>
-          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            全部成功完成
-          </div>
+          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">全部成功完成</div>
         </div>
 
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5">
@@ -203,9 +202,7 @@ export default function PublishStats() {
             <span className="text-sm text-gray-500 dark:text-gray-400">失败数</span>
           </div>
           <div className="text-2xl font-bold text-gray-900 dark:text-white">{totalFailed}</div>
-          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            部分或全部失败
-          </div>
+          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">部分或全部失败</div>
         </div>
 
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5">
@@ -216,9 +213,7 @@ export default function PublishStats() {
             <span className="text-sm text-gray-500 dark:text-gray-400">成功率</span>
           </div>
           <div className="text-2xl font-bold text-gray-900 dark:text-white">{successRate}%</div>
-          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            全部完成的比例
-          </div>
+          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">全部完成的比例</div>
         </div>
       </div>
 
@@ -265,15 +260,8 @@ export default function PublishStats() {
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={platformChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
-                <XAxis
-                  dataKey="platform"
-                  stroke="#94a3b8"
-                  style={{ fontSize: '12px' }}
-                />
-                <YAxis
-                  stroke="#94a3b8"
-                  style={{ fontSize: '12px' }}
-                />
+                <XAxis dataKey="platform" stroke="#94a3b8" style={{ fontSize: '12px' }} />
+                <YAxis stroke="#94a3b8" style={{ fontSize: '12px' }} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: '#1e293b',
@@ -337,13 +325,19 @@ export default function PublishStats() {
             <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
               {platformChartData.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-400 dark:text-gray-500">
+                  <td
+                    colSpan={5}
+                    className="px-6 py-12 text-center text-gray-400 dark:text-gray-500"
+                  >
                     暂无数据
                   </td>
                 </tr>
               ) : (
-                platformChartData.map((platform) => (
-                  <tr key={platform.platform} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                platformChartData.map(platform => (
+                  <tr
+                    key={platform.platform}
+                    className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
+                  >
                     <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
                       {platform.platform}
                     </td>
@@ -357,13 +351,15 @@ export default function PublishStats() {
                       {platform.failed}
                     </td>
                     <td className="px-6 py-4 text-sm text-right">
-                      <span className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-medium ${
-                        parseFloat(platform.successRate) >= 80
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                          : parseFloat(platform.successRate) >= 50
-                          ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
-                          : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-                      }`}>
+                      <span
+                        className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-medium ${
+                          parseFloat(platform.successRate) >= 80
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                            : parseFloat(platform.successRate) >= 50
+                              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
+                              : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                        }`}
+                      >
                         {platform.successRate}%
                       </span>
                     </td>
@@ -386,15 +382,8 @@ export default function PublishStats() {
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={trendChartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
-              <XAxis
-                dataKey="date"
-                stroke="#94a3b8"
-                style={{ fontSize: '12px' }}
-              />
-              <YAxis
-                stroke="#94a3b8"
-                style={{ fontSize: '12px' }}
-              />
+              <XAxis dataKey="date" stroke="#94a3b8" style={{ fontSize: '12px' }} />
+              <YAxis stroke="#94a3b8" style={{ fontSize: '12px' }} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: '#1e293b',

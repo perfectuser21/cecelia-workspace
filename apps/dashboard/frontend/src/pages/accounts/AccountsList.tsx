@@ -40,7 +40,8 @@ export default function AccountsList() {
     const displayName = prompt('请输入显示名称');
     if (!displayName) return;
 
-    accountsApi.addAccount({ platform, accountId, displayName })
+    accountsApi
+      .addAccount({ platform, accountId, displayName })
       .then(() => {
         alert('账号添加成功');
         loadAccounts();
@@ -105,9 +106,8 @@ export default function AccountsList() {
     weibo: accounts.filter(a => a.platform === 'weibo').length,
   };
 
-  const filteredAccounts = filter === 'all'
-    ? accounts
-    : accounts.filter(a => a.platform === filter);
+  const filteredAccounts =
+    filter === 'all' ? accounts : accounts.filter(a => a.platform === filter);
 
   if (loading) {
     return (
@@ -151,9 +151,7 @@ export default function AccountsList() {
           <button
             onClick={() => setFilter('all')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              filter === 'all'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
+              filter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
             全部 ({platformCounts.all})
@@ -171,9 +169,7 @@ export default function AccountsList() {
           <button
             onClick={() => setFilter('douyin')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              filter === 'douyin'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
+              filter === 'douyin' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
             抖音 ({platformCounts.douyin})
@@ -181,9 +177,7 @@ export default function AccountsList() {
           <button
             onClick={() => setFilter('bilibili')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              filter === 'bilibili'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
+              filter === 'bilibili' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
             B站 ({platformCounts.bilibili})
@@ -191,9 +185,7 @@ export default function AccountsList() {
           <button
             onClick={() => setFilter('weibo')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              filter === 'weibo'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
+              filter === 'weibo' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
             微博 ({platformCounts.weibo})

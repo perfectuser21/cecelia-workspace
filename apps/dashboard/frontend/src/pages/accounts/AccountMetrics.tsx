@@ -1,7 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Download, Calendar, TrendingUp, Eye, Heart } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 import { MetricCard } from '../../components/MetricCard';
 import { accountsApi, AccountMetrics as AccountMetricsType } from '../../api/accounts.api';
 
@@ -91,7 +100,9 @@ export default function AccountMetrics() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{metrics.displayName}</h1>
-            <p className="text-gray-500 mt-1">{metrics.platform} - {metrics.accountId}</p>
+            <p className="text-gray-500 mt-1">
+              {metrics.platform} - {metrics.accountId}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -99,9 +110,7 @@ export default function AccountMetrics() {
             <button
               onClick={() => setTimeRange('week')}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                timeRange === 'week'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
+                timeRange === 'week' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
               近7天
@@ -109,9 +118,7 @@ export default function AccountMetrics() {
             <button
               onClick={() => setTimeRange('month')}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                timeRange === 'month'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
+                timeRange === 'month' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
               近30天
@@ -119,9 +126,7 @@ export default function AccountMetrics() {
             <button
               onClick={() => setTimeRange('all')}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                timeRange === 'all'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
+                timeRange === 'all' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
               全部

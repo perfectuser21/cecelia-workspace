@@ -12,7 +12,7 @@ import {
   Filter,
   X,
   Calendar,
-  Clock
+  Clock,
 } from 'lucide-react';
 
 interface ContentItem {
@@ -68,13 +68,7 @@ interface Stats {
 const API_BASE = import.meta.env.VITE_API_URL || 'https://dashboard.zenjoymedia.media';
 
 // 详情弹窗组件
-function DetailModal({
-  item,
-  onClose
-}: {
-  item: ContentItem;
-  onClose: () => void;
-}) {
+function DetailModal({ item, onClose }: { item: ContentItem; onClose: () => void }) {
   const [metrics, setMetrics] = useState<MetricSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -111,12 +105,18 @@ function DetailModal({
         <div className="flex items-start justify-between p-6 border-b border-gray-100">
           <div className="flex-1 min-w-0 pr-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                item.content_type === '图文'
-                  ? 'bg-orange-100 text-orange-700'
-                  : 'bg-blue-100 text-blue-700'
-              }`}>
-                {item.content_type === '图文' ? <Image className="w-3 h-3 mr-1" /> : <Video className="w-3 h-3 mr-1" />}
+              <span
+                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                  item.content_type === '图文'
+                    ? 'bg-orange-100 text-orange-700'
+                    : 'bg-blue-100 text-blue-700'
+                }`}
+              >
+                {item.content_type === '图文' ? (
+                  <Image className="w-3 h-3 mr-1" />
+                ) : (
+                  <Video className="w-3 h-3 mr-1" />
+                )}
                 {item.content_type}
               </span>
               <span className="text-xs text-gray-400">ID: {item.id}</span>
@@ -129,10 +129,7 @@ function DetailModal({
               </span>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
@@ -181,7 +178,9 @@ function DetailModal({
               <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
                 <div className="bg-gray-50 rounded-lg p-3 text-center">
                   <Eye className="w-4 h-4 text-gray-400 mx-auto mb-1" />
-                  <p className="text-lg font-bold text-gray-900">{formatNumber(item.latest_views)}</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {formatNumber(item.latest_views)}
+                  </p>
                   <p className="text-xs text-gray-500">播放</p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-3 text-center">
@@ -215,19 +214,25 @@ function DetailModal({
                 <div className="grid grid-cols-4 gap-3">
                   <div className="bg-blue-50 rounded-lg p-3 text-center">
                     <p className="text-lg font-bold text-blue-700">
-                      {metrics[metrics.length - 1]?.completion_rate ? `${metrics[metrics.length - 1].completion_rate}%` : '-'}
+                      {metrics[metrics.length - 1]?.completion_rate
+                        ? `${metrics[metrics.length - 1].completion_rate}%`
+                        : '-'}
                     </p>
                     <p className="text-xs text-blue-600">完播率</p>
                   </div>
                   <div className="bg-blue-50 rounded-lg p-3 text-center">
                     <p className="text-lg font-bold text-blue-700">
-                      {metrics[metrics.length - 1]?.completion_rate_5s ? `${metrics[metrics.length - 1].completion_rate_5s}%` : '-'}
+                      {metrics[metrics.length - 1]?.completion_rate_5s
+                        ? `${metrics[metrics.length - 1].completion_rate_5s}%`
+                        : '-'}
                     </p>
                     <p className="text-xs text-blue-600">5s完播</p>
                   </div>
                   <div className="bg-orange-50 rounded-lg p-3 text-center">
                     <p className="text-lg font-bold text-orange-700">
-                      {metrics[metrics.length - 1]?.bounce_rate ? `${metrics[metrics.length - 1].bounce_rate}%` : '-'}
+                      {metrics[metrics.length - 1]?.bounce_rate
+                        ? `${metrics[metrics.length - 1].bounce_rate}%`
+                        : '-'}
                     </p>
                     <p className="text-xs text-orange-600">跳出率</p>
                   </div>
@@ -254,9 +259,7 @@ function DetailModal({
                 <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
               </div>
             ) : metrics.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                暂无历史数据，持续采集中...
-              </div>
+              <div className="text-center py-8 text-gray-500">暂无历史数据，持续采集中...</div>
             ) : (
               <>
                 {/* 播放量柱状图 */}
@@ -302,8 +305,12 @@ function DetailModal({
                         </th>
                         {item.content_type !== '图文' && (
                           <>
-                            <th className="text-right py-2 px-2 text-gray-500 font-medium">完播率</th>
-                            <th className="text-right py-2 px-2 text-gray-500 font-medium">5s完播</th>
+                            <th className="text-right py-2 px-2 text-gray-500 font-medium">
+                              完播率
+                            </th>
+                            <th className="text-right py-2 px-2 text-gray-500 font-medium">
+                              5s完播
+                            </th>
                           </>
                         )}
                         <th className="text-right py-2 px-2 text-gray-500 font-medium">点赞</th>
@@ -401,7 +408,7 @@ export default function ContentData() {
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
   const [filter, setFilter] = useState({
-    platform: '',  // 默认显示全部平台
+    platform: '', // 默认显示全部平台
     content_type: '',
   });
 
@@ -437,7 +444,9 @@ export default function ContentData() {
       const [contentsRes, statsRes, groupedRes] = await Promise.all([
         fetch(`${API_BASE}/api/platform-data?${params}`),
         fetch(`${API_BASE}/api/platform-data/stats?${params}`),
-        fetch(`${API_BASE}/api/platform-data/grouped?form=${encodeURIComponent(selectedForm)}&page=${currentPage}&limit=20`)
+        fetch(
+          `${API_BASE}/api/platform-data/grouped?form=${encodeURIComponent(selectedForm)}&page=${currentPage}&limit=20`
+        ),
       ]);
 
       const contentsData = await contentsRes.json();
@@ -468,21 +477,23 @@ export default function ContentData() {
     return num?.toLocaleString() || '0';
   };
 
-  const videoStats = stats?.by_type.find(s => s.content_type === '视频' || s.content_type?.includes('视频'));
+  const videoStats = stats?.by_type.find(
+    s => s.content_type === '视频' || s.content_type?.includes('视频')
+  );
   const imageStats = stats?.by_type.find(s => s.content_type === '图文');
 
   return (
     <div className="space-y-6">
       {/* 详情弹窗 */}
-      {selectedItem && (
-        <DetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
-      )}
+      {selectedItem && <DetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />}
 
       {/* 页面标题 */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">数据中心</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">查看各平台内容数据表现，点击查看详情</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            查看各平台内容数据表现，点击查看详情
+          </p>
         </div>
         <button
           onClick={fetchData}
@@ -562,17 +573,23 @@ export default function ContentData() {
             </div>
             <div>
               <h3 className="font-semibold text-gray-900 dark:text-white">图文内容</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{imageStats?.count || 0} 篇</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {imageStats?.count || 0} 篇
+              </p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">总播放</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">{formatNumber(parseInt(imageStats?.total_views || '0'))}</p>
+              <p className="text-lg font-bold text-gray-900 dark:text-white">
+                {formatNumber(parseInt(imageStats?.total_views || '0'))}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">平均播放</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">{formatNumber(Math.round(parseFloat(imageStats?.avg_views || '0')))}</p>
+              <p className="text-lg font-bold text-gray-900 dark:text-white">
+                {formatNumber(Math.round(parseFloat(imageStats?.avg_views || '0')))}
+              </p>
             </div>
           </div>
         </div>
@@ -584,17 +601,23 @@ export default function ContentData() {
             </div>
             <div>
               <h3 className="font-semibold text-gray-900 dark:text-white">视频内容</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{videoStats?.count || 0} 个</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {videoStats?.count || 0} 个
+              </p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">总播放</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">{formatNumber(parseInt(videoStats?.total_views || '0'))}</p>
+              <p className="text-lg font-bold text-gray-900 dark:text-white">
+                {formatNumber(parseInt(videoStats?.total_views || '0'))}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">平均播放</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">{formatNumber(Math.round(parseFloat(videoStats?.avg_views || '0')))}</p>
+              <p className="text-lg font-bold text-gray-900 dark:text-white">
+                {formatNumber(Math.round(parseFloat(videoStats?.avg_views || '0')))}
+              </p>
             </div>
           </div>
         </div>
@@ -632,7 +655,7 @@ export default function ContentData() {
           <>
             {/* 平台筛选 - Tab 样式 */}
             <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-              {platforms.map((p) => (
+              {platforms.map(p => (
                 <button
                   key={p.value}
                   onClick={() => setFilter({ ...filter, platform: p.value })}
@@ -650,7 +673,7 @@ export default function ContentData() {
             {/* 类型筛选 */}
             <select
               value={filter.content_type}
-              onChange={(e) => setFilter({ ...filter, content_type: e.target.value })}
+              onChange={e => setFilter({ ...filter, content_type: e.target.value })}
               className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">全部类型</option>
@@ -662,9 +685,7 @@ export default function ContentData() {
               <option value="文字">文字</option>
             </select>
 
-            <span className="text-sm text-gray-500">
-              共 {contents.length} 条内容
-            </span>
+            <span className="text-sm text-gray-500">共 {contents.length} 条内容</span>
           </>
         )}
       </div>
@@ -674,7 +695,7 @@ export default function ContentData() {
         <div className="space-y-4">
           {/* 形式切换标签 */}
           <div className="flex gap-2">
-            {(['视频', '图文', '长文'] as const).map((formType) => {
+            {(['视频', '图文', '长文'] as const).map(formType => {
               const stats = groupedData?.form_stats[formType];
               const icon = formType === '视频' ? '🎬' : formType === '图文' ? '📷' : '📝';
               const isActive = selectedForm === formType;
@@ -707,17 +728,24 @@ export default function ContentData() {
                 <span className="font-bold text-lg">{groupedData.pagination.total_items}</span>
                 <span className="text-gray-500"> 条{selectedForm}内容</span>
                 <span className="text-gray-400 text-sm ml-2">
-                  (平均{selectedForm === '视频' ? '播放' : '阅读'}: {formatNumber(groupedData.averages?.avg_views || 0)})
+                  (平均{selectedForm === '视频' ? '播放' : '阅读'}:{' '}
+                  {formatNumber(groupedData.averages?.avg_views || 0)})
                 </span>
               </div>
               <div className="flex gap-6 text-sm">
                 <div>
-                  <span className="text-gray-500">总{selectedForm === '视频' ? '播放' : '阅读'}：</span>
-                  <span className="font-bold">{formatNumber(groupedData.form_stats[selectedForm]?.total_views || 0)}</span>
+                  <span className="text-gray-500">
+                    总{selectedForm === '视频' ? '播放' : '阅读'}：
+                  </span>
+                  <span className="font-bold">
+                    {formatNumber(groupedData.form_stats[selectedForm]?.total_views || 0)}
+                  </span>
                 </div>
                 <div>
                   <span className="text-gray-500">总点赞：</span>
-                  <span className="font-bold">{formatNumber(groupedData.form_stats[selectedForm]?.total_likes || 0)}</span>
+                  <span className="font-bold">
+                    {formatNumber(groupedData.form_stats[selectedForm]?.total_likes || 0)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -735,13 +763,18 @@ export default function ContentData() {
             </div>
           ) : (
             <div className="space-y-2">
-              {groupedData.data.map((content) => {
+              {groupedData.data.map(content => {
                 const isExpanded = expandedItems.has(content.id);
                 const hasMultiplePlatforms = content.items.length > 1;
-                const publishDate = new Date(content.first_publish_time).toLocaleDateString('zh-CN');
+                const publishDate = new Date(content.first_publish_time).toLocaleDateString(
+                  'zh-CN'
+                );
 
                 return (
-                  <div key={content.id} className={`bg-white rounded-lg border overflow-hidden ${content.is_top_performer ? 'border-yellow-400 ring-1 ring-yellow-200' : 'border-gray-200'}`}>
+                  <div
+                    key={content.id}
+                    className={`bg-white rounded-lg border overflow-hidden ${content.is_top_performer ? 'border-yellow-400 ring-1 ring-yellow-200' : 'border-gray-200'}`}
+                  >
                     {/* 主行 - 点击展开 */}
                     <div
                       className={`p-4 flex items-center justify-between ${hasMultiplePlatforms ? 'cursor-pointer hover:bg-gray-50' : ''}`}
@@ -766,14 +799,23 @@ export default function ContentData() {
                               🔥 热门
                             </span>
                           )}
-                          <h4 className="font-medium text-gray-900 line-clamp-1">{content.title}</h4>
+                          <h4 className="font-medium text-gray-900 line-clamp-1">
+                            {content.title}
+                          </h4>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs text-gray-400">{publishDate}</span>
-                          {content.platforms.map((p) => {
-                            const pInfo = platformNames[p] || { name: p, bg: 'bg-gray-200', text: 'text-gray-700' };
+                          {content.platforms.map(p => {
+                            const pInfo = platformNames[p] || {
+                              name: p,
+                              bg: 'bg-gray-200',
+                              text: 'text-gray-700',
+                            };
                             return (
-                              <span key={p} className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs ${pInfo.bg} ${pInfo.text}`}>
+                              <span
+                                key={p}
+                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs ${pInfo.bg} ${pInfo.text}`}
+                              >
                                 {pInfo.name}
                               </span>
                             );
@@ -785,19 +827,27 @@ export default function ContentData() {
                         {selectedForm === '视频' && (
                           <>
                             <div className="text-right">
-                              <div className="font-bold text-gray-900">{formatNumber(parseInt(content.total_views))}</div>
+                              <div className="font-bold text-gray-900">
+                                {formatNumber(parseInt(content.total_views))}
+                              </div>
                               <div className="text-xs text-gray-500">播放</div>
                             </div>
                             <div className="text-right">
-                              <div className="font-bold text-gray-900">{formatNumber(parseInt(content.total_likes))}</div>
+                              <div className="font-bold text-gray-900">
+                                {formatNumber(parseInt(content.total_likes))}
+                              </div>
                               <div className="text-xs text-gray-500">点赞</div>
                             </div>
                             <div className="text-right">
-                              <div className="font-bold text-gray-900">{formatNumber(parseInt(content.total_comments))}</div>
+                              <div className="font-bold text-gray-900">
+                                {formatNumber(parseInt(content.total_comments))}
+                              </div>
                               <div className="text-xs text-gray-500">评论</div>
                             </div>
                             <div className="text-right">
-                              <div className="font-bold text-gray-900">{formatNumber(parseInt(content.total_shares))}</div>
+                              <div className="font-bold text-gray-900">
+                                {formatNumber(parseInt(content.total_shares))}
+                              </div>
                               <div className="text-xs text-gray-500">分享</div>
                             </div>
                           </>
@@ -806,15 +856,21 @@ export default function ContentData() {
                         {selectedForm === '图文' && (
                           <>
                             <div className="text-right">
-                              <div className="font-bold text-gray-900">{formatNumber(parseInt(content.total_views))}</div>
+                              <div className="font-bold text-gray-900">
+                                {formatNumber(parseInt(content.total_views))}
+                              </div>
                               <div className="text-xs text-gray-500">阅读</div>
                             </div>
                             <div className="text-right">
-                              <div className="font-bold text-gray-900">{formatNumber(parseInt(content.total_likes))}</div>
+                              <div className="font-bold text-gray-900">
+                                {formatNumber(parseInt(content.total_likes))}
+                              </div>
                               <div className="text-xs text-gray-500">点赞</div>
                             </div>
                             <div className="text-right">
-                              <div className="font-bold text-gray-900">{formatNumber(parseInt(content.total_comments))}</div>
+                              <div className="font-bold text-gray-900">
+                                {formatNumber(parseInt(content.total_comments))}
+                              </div>
                               <div className="text-xs text-gray-500">评论</div>
                             </div>
                           </>
@@ -823,21 +879,29 @@ export default function ContentData() {
                         {selectedForm === '长文' && (
                           <>
                             <div className="text-right">
-                              <div className="font-bold text-gray-900">{formatNumber(parseInt(content.total_views))}</div>
+                              <div className="font-bold text-gray-900">
+                                {formatNumber(parseInt(content.total_views))}
+                              </div>
                               <div className="text-xs text-gray-500">阅读</div>
                             </div>
                             <div className="text-right">
-                              <div className="font-bold text-gray-900">{formatNumber(parseInt(content.total_likes))}</div>
+                              <div className="font-bold text-gray-900">
+                                {formatNumber(parseInt(content.total_likes))}
+                              </div>
                               <div className="text-xs text-gray-500">点赞</div>
                             </div>
                             <div className="text-right">
-                              <div className="font-bold text-gray-900">{formatNumber(parseInt(content.total_favorites || '0'))}</div>
+                              <div className="font-bold text-gray-900">
+                                {formatNumber(parseInt(content.total_favorites || '0'))}
+                              </div>
                               <div className="text-xs text-gray-500">收藏</div>
                             </div>
                           </>
                         )}
                         {hasMultiplePlatforms && (
-                          <div className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                          <div
+                            className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                          >
                             ▼
                           </div>
                         )}
@@ -850,28 +914,52 @@ export default function ContentData() {
                         <table className="w-full text-sm">
                           <thead className="bg-gray-100">
                             <tr>
-                              <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">平台</th>
-                              <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">{selectedForm === '视频' ? '播放' : '阅读'}</th>
-                              <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">点赞</th>
-                              <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">评论</th>
-                              <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">{selectedForm === '长文' ? '收藏' : '分享'}</th>
+                              <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">
+                                平台
+                              </th>
+                              <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">
+                                {selectedForm === '视频' ? '播放' : '阅读'}
+                              </th>
+                              <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">
+                                点赞
+                              </th>
+                              <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">
+                                评论
+                              </th>
+                              <th className="text-right px-4 py-2 text-xs font-medium text-gray-500">
+                                {selectedForm === '长文' ? '收藏' : '分享'}
+                              </th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
-                            {content.items.map((item) => {
-                              const pInfo = platformNames[item.platform] || { name: item.platform, bg: 'bg-gray-200', text: 'text-gray-700' };
+                            {content.items.map(item => {
+                              const pInfo = platformNames[item.platform] || {
+                                name: item.platform,
+                                bg: 'bg-gray-200',
+                                text: 'text-gray-700',
+                              };
                               return (
                                 <tr key={item.id} className="bg-white">
                                   <td className="px-4 py-2">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${pInfo.bg} ${pInfo.text}`}>
+                                    <span
+                                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${pInfo.bg} ${pInfo.text}`}
+                                    >
                                       {pInfo.name}
                                     </span>
                                   </td>
-                                  <td className="px-4 py-2 text-right font-medium">{formatNumber(item.views)}</td>
-                                  <td className="px-4 py-2 text-right text-gray-600">{formatNumber(item.likes)}</td>
-                                  <td className="px-4 py-2 text-right text-gray-600">{formatNumber(item.comments)}</td>
+                                  <td className="px-4 py-2 text-right font-medium">
+                                    {formatNumber(item.views)}
+                                  </td>
                                   <td className="px-4 py-2 text-right text-gray-600">
-                                    {formatNumber(selectedForm === '长文' ? (item.favorites || 0) : item.shares)}
+                                    {formatNumber(item.likes)}
+                                  </td>
+                                  <td className="px-4 py-2 text-right text-gray-600">
+                                    {formatNumber(item.comments)}
+                                  </td>
+                                  <td className="px-4 py-2 text-right text-gray-600">
+                                    {formatNumber(
+                                      selectedForm === '长文' ? item.favorites || 0 : item.shares
+                                    )}
                                   </td>
                                 </tr>
                               );
@@ -900,7 +988,9 @@ export default function ContentData() {
                 第 {currentPage} / {groupedData.pagination.total_pages} 页
               </span>
               <button
-                onClick={() => setCurrentPage(p => Math.min(groupedData.pagination.total_pages, p + 1))}
+                onClick={() =>
+                  setCurrentPage(p => Math.min(groupedData.pagination.total_pages, p + 1))
+                }
                 disabled={currentPage === groupedData.pagination.total_pages}
                 className="px-3 py-1 rounded border border-gray-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
               >
@@ -913,109 +1003,153 @@ export default function ContentData() {
 
       {/* 内容列表 */}
       {viewMode === 'list' && (
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-slate-700/50 border-b border-gray-200 dark:border-slate-600">
-              <tr>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">平台</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">内容</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">类型</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">播放量</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">点赞</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">评论</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">分享</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">收藏</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">涨粉</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">发布时间</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-slate-700/50 border-b border-gray-200 dark:border-slate-600">
                 <tr>
-                  <td colSpan={10} className="text-center py-12 text-gray-500">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
-                    加载中...
-                  </td>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                    平台
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                    内容
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                    类型
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                    播放量
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                    点赞
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                    评论
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                    分享
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                    收藏
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                    涨粉
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                    发布时间
+                  </th>
                 </tr>
-              ) : contents.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="text-center py-12 text-gray-500">
-                    暂无数据，请先运行数据采集
-                  </td>
-                </tr>
-              ) : (
-                contents.map((item) => {
-                  // 平台名称映射
-                  const platformNames: Record<string, { name: string; bg: string; text: string }> = {
-                    douyin: { name: '抖音', bg: 'bg-gray-900', text: 'text-white' },
-                    kuaishou: { name: '快手', bg: 'bg-orange-500', text: 'text-white' },
-                    xiaohongshu: { name: '小红书', bg: 'bg-red-500', text: 'text-white' },
-                    toutiao: { name: '头条', bg: 'bg-red-600', text: 'text-white' },
-                    weibo: { name: '微博', bg: 'bg-orange-400', text: 'text-white' },
-                    channels: { name: '视频号', bg: 'bg-green-500', text: 'text-white' },
-                  };
-                  const pInfo = platformNames[item.platform] || { name: item.platform, bg: 'bg-gray-200', text: 'text-gray-700' };
-
-                  return (
-                  <tr
-                    key={item.id}
-                    className="hover:bg-blue-50 cursor-pointer transition-colors"
-                    onClick={() => setSelectedItem(item)}
-                  >
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${pInfo.bg} ${pInfo.text}`}>
-                        {pInfo.name}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="max-w-xs">
-                        <p className="text-sm font-medium text-gray-900 truncate" title={item.title}>
-                          {item.title?.substring(0, 50) || '-'}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        item.content_type === '视频' ? 'bg-blue-100 text-blue-700' :
-                        item.content_type === '图文' ? 'bg-orange-100 text-orange-700' :
-                        item.content_type === '微头条' ? 'bg-purple-100 text-purple-700' :
-                        item.content_type === '文章' ? 'bg-green-100 text-green-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {item.content_type === '视频' ? <Video className="w-3 h-3 mr-1" /> : <Image className="w-3 h-3 mr-1" />}
-                        {item.content_type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-900">
-                      {formatNumber(item.latest_views || 0)}
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-900">
-                      {item.latest_likes || 0}
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-500">
-                      {item.latest_comments || 0}
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-500">
-                      {item.latest_shares || 0}
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-500">
-                      {item.latest_favorites || 0}
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-500">
-                      {item.latest_follower_gain || 0}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
-                      {item.publish_time ? new Date(item.publish_time).toLocaleDateString('zh-CN') : '-'}
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {loading ? (
+                  <tr>
+                    <td colSpan={10} className="text-center py-12 text-gray-500">
+                      <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
+                      加载中...
                     </td>
                   </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                ) : contents.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="text-center py-12 text-gray-500">
+                      暂无数据，请先运行数据采集
+                    </td>
+                  </tr>
+                ) : (
+                  contents.map(item => {
+                    // 平台名称映射
+                    const platformNames: Record<
+                      string,
+                      { name: string; bg: string; text: string }
+                    > = {
+                      douyin: { name: '抖音', bg: 'bg-gray-900', text: 'text-white' },
+                      kuaishou: { name: '快手', bg: 'bg-orange-500', text: 'text-white' },
+                      xiaohongshu: { name: '小红书', bg: 'bg-red-500', text: 'text-white' },
+                      toutiao: { name: '头条', bg: 'bg-red-600', text: 'text-white' },
+                      weibo: { name: '微博', bg: 'bg-orange-400', text: 'text-white' },
+                      channels: { name: '视频号', bg: 'bg-green-500', text: 'text-white' },
+                    };
+                    const pInfo = platformNames[item.platform] || {
+                      name: item.platform,
+                      bg: 'bg-gray-200',
+                      text: 'text-gray-700',
+                    };
+
+                    return (
+                      <tr
+                        key={item.id}
+                        className="hover:bg-blue-50 cursor-pointer transition-colors"
+                        onClick={() => setSelectedItem(item)}
+                      >
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${pInfo.bg} ${pInfo.text}`}
+                          >
+                            {pInfo.name}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="max-w-xs">
+                            <p
+                              className="text-sm font-medium text-gray-900 truncate"
+                              title={item.title}
+                            >
+                              {item.title?.substring(0, 50) || '-'}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              item.content_type === '视频'
+                                ? 'bg-blue-100 text-blue-700'
+                                : item.content_type === '图文'
+                                  ? 'bg-orange-100 text-orange-700'
+                                  : item.content_type === '微头条'
+                                    ? 'bg-purple-100 text-purple-700'
+                                    : item.content_type === '文章'
+                                      ? 'bg-green-100 text-green-700'
+                                      : 'bg-gray-100 text-gray-700'
+                            }`}
+                          >
+                            {item.content_type === '视频' ? (
+                              <Video className="w-3 h-3 mr-1" />
+                            ) : (
+                              <Image className="w-3 h-3 mr-1" />
+                            )}
+                            {item.content_type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm text-gray-900">
+                          {formatNumber(item.latest_views || 0)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm text-gray-900">
+                          {item.latest_likes || 0}
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm text-gray-500">
+                          {item.latest_comments || 0}
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm text-gray-500">
+                          {item.latest_shares || 0}
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm text-gray-500">
+                          {item.latest_favorites || 0}
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm text-gray-500">
+                          {item.latest_follower_gain || 0}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {item.publish_time
+                            ? new Date(item.publish_time).toLocaleDateString('zh-CN')
+                            : '-'}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
       )}
     </div>
   );

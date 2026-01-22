@@ -7,12 +7,7 @@
 
 import { lazy, ComponentType } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import {
-  LayoutDashboard,
-  Settings,
-  Video,
-  Users,
-} from 'lucide-react';
+import { LayoutDashboard, Settings, Video, Users } from 'lucide-react';
 
 // ============ 类型定义 ============
 
@@ -24,8 +19,8 @@ export interface NavItem {
   // 权限控制
   requireSuperAdmin?: boolean;
   // 路由配置
-  component?: string;  // 组件路径，用于懒加载
-  redirect?: string;   // 重定向目标
+  component?: string; // 组件路径，用于懒加载
+  redirect?: string; // 重定向目标
 }
 
 export interface NavGroup {
@@ -45,22 +40,22 @@ export interface RouteConfig {
 
 // Autopilot 本地页面组件
 export const autopilotPageComponents: Record<string, () => Promise<{ default: ComponentType }>> = {
-  'Dashboard': () => import('../pages/Dashboard'),
-  'ContentData': () => import('../pages/ContentData'),
-  'ContentPublish': () => import('../pages/ContentPublish'),
-  'ExecutionStatus': () => import('../pages/ExecutionStatus'),
-  'Tasks': () => import('../pages/Tasks'),
-  'PlatformStatus': () => import('../pages/PlatformStatus'),
-  'PublishStats': () => import('../pages/PublishStats'),
-  'LoginPage': () => import('../pages/LoginPage'),
-  'PlatformStatusDashboard': () => import('../pages/PlatformStatusDashboard'),
-  'ToolsPage': () => import('../pages/ToolsPage'),
-  'ScrapingPage': () => import('../pages/ScrapingPage'),
-  'AdminSettingsPage': () => import('../pages/AdminSettingsPage'),
-  'MediaScenarioPage': () => import('../pages/MediaScenarioPage'),
-  'AiEmployeesPage': () => import('../pages/AiEmployeesPage'),
-  'AiEmployeeDetailPage': () => import('../pages/AiEmployeeDetailPage'),
-  'AiAbilityDetailPage': () => import('../pages/AiAbilityDetailPage'),
+  Dashboard: () => import('../pages/Dashboard'),
+  ContentData: () => import('../pages/ContentData'),
+  ContentPublish: () => import('../pages/ContentPublish'),
+  ExecutionStatus: () => import('../pages/ExecutionStatus'),
+  Tasks: () => import('../pages/Tasks'),
+  PlatformStatus: () => import('../pages/PlatformStatus'),
+  PublishStats: () => import('../pages/PublishStats'),
+  LoginPage: () => import('../pages/LoginPage'),
+  PlatformStatusDashboard: () => import('../pages/PlatformStatusDashboard'),
+  ToolsPage: () => import('../pages/ToolsPage'),
+  ScrapingPage: () => import('../pages/ScrapingPage'),
+  AdminSettingsPage: () => import('../pages/AdminSettingsPage'),
+  MediaScenarioPage: () => import('../pages/MediaScenarioPage'),
+  AiEmployeesPage: () => import('../pages/AiEmployeesPage'),
+  AiEmployeeDetailPage: () => import('../pages/AiEmployeeDetailPage'),
+  AiAbilityDetailPage: () => import('../pages/AiAbilityDetailPage'),
 };
 
 // 向后兼容：保留 pageComponents 导出（仅 Autopilot 组件）
@@ -82,28 +77,28 @@ export function getPageComponent(name: string) {
 
 export const autopilotNavGroups: NavGroup[] = [
   {
-    title: '',  // 无分组标题，扁平展示
+    title: '', // 无分组标题，扁平展示
     items: [
       {
         path: '/',
         icon: LayoutDashboard,
         label: '工作台',
         featureKey: 'workbench',
-        component: 'Dashboard'
+        component: 'Dashboard',
       },
       {
         path: '/media',
         icon: Video,
         label: '新媒体运营',
         featureKey: 'media-scenario',
-        component: 'MediaScenarioPage'
+        component: 'MediaScenarioPage',
       },
       {
         path: '/ai-employees',
         icon: Users,
         label: 'AI 员工',
         featureKey: 'ai-employees',
-        component: 'AiEmployeesPage'
+        component: 'AiEmployeesPage',
       },
       {
         path: '/settings',
@@ -111,10 +106,10 @@ export const autopilotNavGroups: NavGroup[] = [
         label: '设置',
         featureKey: 'settings',
         requireSuperAdmin: true,
-        component: 'AdminSettingsPage'
+        component: 'AdminSettingsPage',
       },
-    ]
-  }
+    ],
+  },
 ];
 
 // ============ 额外路由配置（不在菜单显示） ============
@@ -122,7 +117,11 @@ export const autopilotNavGroups: NavGroup[] = [
 export const additionalRoutes: RouteConfig[] = [
   // === AI 员工详情页路由 ===
   { path: '/ai-employees/:employeeId', component: 'AiEmployeeDetailPage', requireAuth: true },
-  { path: '/ai-employees/:employeeId/abilities/:abilityId', component: 'AiAbilityDetailPage', requireAuth: true },
+  {
+    path: '/ai-employees/:employeeId/abilities/:abilityId',
+    component: 'AiAbilityDetailPage',
+    requireAuth: true,
+  },
 
   // === 新媒体运营场景子路由 ===
   // 这些路由由 MediaScenarioPage 内部处理嵌套路由
@@ -148,13 +147,48 @@ export const additionalRoutes: RouteConfig[] = [
   { path: '/tools/session-monitor', redirect: '/settings' },
 
   // 管理员子页面
-  { path: '/settings/claude-monitor', component: 'ClaudeMonitor', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/vps-monitor', component: 'VpsMonitor', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/claude-stats', component: 'ClaudeStats', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/n8n-workflows', component: 'N8nWorkflows', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/n8n-workflows/:instance/:id', component: 'N8nWorkflowDetail', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/n8n-status', component: 'N8nLiveStatus', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/n8n-status/:executionId', component: 'N8nLiveStatusDetail', requireAuth: true, requireSuperAdmin: true },
+  {
+    path: '/settings/claude-monitor',
+    component: 'ClaudeMonitor',
+    requireAuth: true,
+    requireSuperAdmin: true,
+  },
+  {
+    path: '/settings/vps-monitor',
+    component: 'VpsMonitor',
+    requireAuth: true,
+    requireSuperAdmin: true,
+  },
+  {
+    path: '/settings/claude-stats',
+    component: 'ClaudeStats',
+    requireAuth: true,
+    requireSuperAdmin: true,
+  },
+  {
+    path: '/settings/n8n-workflows',
+    component: 'N8nWorkflows',
+    requireAuth: true,
+    requireSuperAdmin: true,
+  },
+  {
+    path: '/settings/n8n-workflows/:instance/:id',
+    component: 'N8nWorkflowDetail',
+    requireAuth: true,
+    requireSuperAdmin: true,
+  },
+  {
+    path: '/settings/n8n-status',
+    component: 'N8nLiveStatus',
+    requireAuth: true,
+    requireSuperAdmin: true,
+  },
+  {
+    path: '/settings/n8n-status/:executionId',
+    component: 'N8nLiveStatusDetail',
+    requireAuth: true,
+    requireSuperAdmin: true,
+  },
   { path: '/settings/canvas', component: 'Canvas', requireAuth: true, requireSuperAdmin: true },
 
   // 旧重定向（已废弃，现在由 Core features 处理）
@@ -189,7 +223,7 @@ export function filterNavGroups(
         // 检查超级管理员权限
         if (item.requireSuperAdmin && !isSuperAdmin) return false;
         return true;
-      })
+      }),
     }))
     .filter(group => group.items.length > 0);
 }

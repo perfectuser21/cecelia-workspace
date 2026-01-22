@@ -33,7 +33,9 @@ function StatusBadge({ status }: { status: string }) {
   };
 
   return (
-    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${style.bg} ${style.text}`}>
+    <span
+      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${style.bg} ${style.text}`}
+    >
       {labels[status] || status}
     </span>
   );
@@ -63,9 +65,11 @@ function ContentTypeIcon({ type }: { type: ContentType }) {
 // Language badge
 function LangBadge({ lang }: { lang: Lang }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-      lang === 'zh' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-    }`}>
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+        lang === 'zh' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+      }`}
+    >
       {lang === 'zh' ? '中文' : 'EN'}
     </span>
   );
@@ -110,24 +114,20 @@ function FAQEditor({
           <input
             type="text"
             value={item.question}
-            onChange={(e) => updateFAQ(index, 'question', e.target.value)}
+            onChange={e => updateFAQ(index, 'question', e.target.value)}
             placeholder="问题"
             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
           />
           <textarea
             value={item.answer}
-            onChange={(e) => updateFAQ(index, 'answer', e.target.value)}
+            onChange={e => updateFAQ(index, 'answer', e.target.value)}
             placeholder="答案"
             rows={2}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none resize-none"
           />
         </div>
       ))}
-      <button
-        type="button"
-        onClick={addFAQ}
-        className="text-sm text-blue-600 hover:text-blue-800"
-      >
+      <button type="button" onClick={addFAQ} className="text-sm text-blue-600 hover:text-blue-800">
         + 添加 FAQ
       </button>
     </div>
@@ -135,13 +135,7 @@ function FAQEditor({
 }
 
 // Tags Editor component
-function TagsEditor({
-  tags,
-  onChange,
-}: {
-  tags: string[];
-  onChange: (tags: string[]) => void;
-}) {
+function TagsEditor({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
   const [input, setInput] = useState('');
 
   const addTag = () => {
@@ -152,13 +146,13 @@ function TagsEditor({
   };
 
   const removeTag = (tag: string) => {
-    onChange(tags.filter((t) => t !== tag));
+    onChange(tags.filter(t => t !== tag));
   };
 
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
-        {tags.map((tag) => (
+        {tags.map(tag => (
           <span
             key={tag}
             className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full text-sm"
@@ -178,8 +172,8 @@ function TagsEditor({
         <input
           type="text"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
           placeholder="输入标签后按 Enter"
           className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
         />
@@ -236,8 +230,8 @@ function ListEditor({
         <input
           type="text"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addItem())}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addItem())}
           placeholder={placeholder}
           className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
         />
@@ -433,7 +427,7 @@ export default function WebsiteContents() {
         <div className="flex gap-4 mb-6">
           <select
             value={filterLang}
-            onChange={(e) => setFilterLang(e.target.value)}
+            onChange={e => setFilterLang(e.target.value)}
             className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
           >
             <option value="">全部语言</option>
@@ -442,7 +436,7 @@ export default function WebsiteContents() {
           </select>
           <select
             value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
+            onChange={e => setFilterType(e.target.value)}
             className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
           >
             <option value="">全部类型</option>
@@ -452,7 +446,7 @@ export default function WebsiteContents() {
           </select>
           <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            onChange={e => setFilterStatus(e.target.value)}
             className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
           >
             <option value="">全部状态</option>
@@ -480,20 +474,34 @@ export default function WebsiteContents() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">标题</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">语言</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">更新时间</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    标题
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    类型
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    语言
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    状态
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    更新时间
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    操作
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {contents.map((content) => (
+                {contents.map(content => (
                   <tr key={content.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="font-medium text-gray-900">{content.title}</div>
-                      <div className="text-sm text-gray-500">/{content.lang}/blog/{content.slug}</div>
+                      <div className="text-sm text-gray-500">
+                        /{content.lang}/blog/{content.slug}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <ContentTypeIcon type={content.content_type} />
@@ -583,7 +591,9 @@ export default function WebsiteContents() {
             <label className="block text-sm font-medium text-gray-700 mb-2">内容类型 *</label>
             <select
               value={formData.content_type}
-              onChange={(e) => setFormData({ ...formData, content_type: e.target.value as ContentType })}
+              onChange={e =>
+                setFormData({ ...formData, content_type: e.target.value as ContentType })
+              }
               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
             >
               <option value="article">文章</option>
@@ -595,7 +605,7 @@ export default function WebsiteContents() {
             <label className="block text-sm font-medium text-gray-700 mb-2">语言 *</label>
             <select
               value={formData.lang}
-              onChange={(e) => setFormData({ ...formData, lang: e.target.value as Lang })}
+              onChange={e => setFormData({ ...formData, lang: e.target.value as Lang })}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
             >
               <option value="zh">中文</option>
@@ -610,11 +620,18 @@ export default function WebsiteContents() {
           <input
             type="text"
             value={formData.slug}
-            onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
+            onChange={e =>
+              setFormData({
+                ...formData,
+                slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+              })
+            }
             placeholder="url-friendly-slug"
             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
           />
-          <p className="text-xs text-gray-500 mt-1">访问地址: /{formData.lang}/blog/{formData.slug || 'your-slug'}</p>
+          <p className="text-xs text-gray-500 mt-1">
+            访问地址: /{formData.lang}/blog/{formData.slug || 'your-slug'}
+          </p>
         </div>
 
         <div>
@@ -622,7 +639,7 @@ export default function WebsiteContents() {
           <input
             type="text"
             value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            onChange={e => setFormData({ ...formData, title: e.target.value })}
             placeholder="输入内容标题"
             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
           />
@@ -632,7 +649,7 @@ export default function WebsiteContents() {
           <label className="block text-sm font-medium text-gray-700 mb-2">描述 (SEO)</label>
           <textarea
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={e => setFormData({ ...formData, description: e.target.value })}
             placeholder="简短的内容描述，用于 SEO"
             rows={2}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none resize-none"
@@ -646,7 +663,7 @@ export default function WebsiteContents() {
             <input
               type="url"
               value={formData.video_url}
-              onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
+              onChange={e => setFormData({ ...formData, video_url: e.target.value })}
               placeholder="https://..."
               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
             />
@@ -658,7 +675,7 @@ export default function WebsiteContents() {
           <label className="block text-sm font-medium text-gray-700 mb-2">正文 (Markdown)</label>
           <textarea
             value={formData.body}
-            onChange={(e) => setFormData({ ...formData, body: e.target.value })}
+            onChange={e => setFormData({ ...formData, body: e.target.value })}
             placeholder="支持 Markdown 格式"
             rows={12}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none font-mono text-sm"
@@ -672,7 +689,7 @@ export default function WebsiteContents() {
             <input
               type="text"
               value={formData.reading_time}
-              onChange={(e) => setFormData({ ...formData, reading_time: e.target.value })}
+              onChange={e => setFormData({ ...formData, reading_time: e.target.value })}
               placeholder="5 分钟"
               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
             />
@@ -682,7 +699,7 @@ export default function WebsiteContents() {
             <input
               type="url"
               value={formData.thumbnail_url}
-              onChange={(e) => setFormData({ ...formData, thumbnail_url: e.target.value })}
+              onChange={e => setFormData({ ...formData, thumbnail_url: e.target.value })}
               placeholder="https://..."
               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
             />
@@ -694,7 +711,7 @@ export default function WebsiteContents() {
           <label className="block text-sm font-medium text-gray-700 mb-2">标签</label>
           <TagsEditor
             tags={formData.tags || []}
-            onChange={(tags) => setFormData({ ...formData, tags })}
+            onChange={tags => setFormData({ ...formData, tags })}
           />
         </div>
 
@@ -703,19 +720,23 @@ export default function WebsiteContents() {
           <h3 className="font-medium text-blue-900">GEO 优化 (AI 可引用性)</h3>
 
           <div>
-            <label className="block text-sm font-medium text-blue-800 mb-2">核心要点 (Key Takeaways)</label>
+            <label className="block text-sm font-medium text-blue-800 mb-2">
+              核心要点 (Key Takeaways)
+            </label>
             <ListEditor
               items={formData.key_takeaways || []}
-              onChange={(items) => setFormData({ ...formData, key_takeaways: items })}
+              onChange={items => setFormData({ ...formData, key_takeaways: items })}
               placeholder="输入一个核心要点"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-blue-800 mb-2">可引用金句 (Quotable Insights)</label>
+            <label className="block text-sm font-medium text-blue-800 mb-2">
+              可引用金句 (Quotable Insights)
+            </label>
             <ListEditor
               items={formData.quotable_insights || []}
-              onChange={(items) => setFormData({ ...formData, quotable_insights: items })}
+              onChange={items => setFormData({ ...formData, quotable_insights: items })}
               placeholder="输入一个可引用的金句"
             />
           </div>
@@ -724,10 +745,7 @@ export default function WebsiteContents() {
         {/* FAQ */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">常见问题 (FAQ)</label>
-          <FAQEditor
-            faq={formData.faq || []}
-            onChange={(faq) => setFormData({ ...formData, faq })}
-          />
+          <FAQEditor faq={formData.faq || []} onChange={faq => setFormData({ ...formData, faq })} />
         </div>
 
         {/* Actions */}

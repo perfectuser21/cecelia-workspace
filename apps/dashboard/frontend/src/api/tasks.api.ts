@@ -16,10 +16,10 @@ export interface Task {
   done: boolean;
   url: string;
   assignee: string;
-  priority: string | null;  // 高/中/低
-  highlight: boolean;       // 每日亮点
-  stage: string | null;     // 阶段
-  notes: string | null;     // 备注
+  priority: string | null; // 高/中/低
+  highlight: boolean; // 每日亮点
+  stage: string | null; // 阶段
+  notes: string | null; // 备注
 }
 
 export interface TaskUser {

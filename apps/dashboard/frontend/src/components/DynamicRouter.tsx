@@ -59,13 +59,25 @@ function getLazyComponent(
 
 // 将 Core 的 NavGroup 格式转换为 Autopilot 的 NavGroup 格式
 function convertCoreNavGroups(
-  coreNavGroups: Array<{ title: string; items: Array<{ path: string; icon: string; label: string; featureKey: string; component?: string; requireSuperAdmin?: boolean }> }>
+  coreNavGroups: Array<{
+    title: string;
+    items: Array<{
+      path: string;
+      icon: string;
+      label: string;
+      featureKey: string;
+      component?: string;
+      requireSuperAdmin?: boolean;
+    }>;
+  }>
 ): NavGroup[] {
   return coreNavGroups.map(group => ({
     title: group.title,
     items: group.items.map(item => ({
       path: item.path,
-      icon: (LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>)[item.icon] || LucideIcons.Circle,
+      icon:
+        (LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>)[item.icon] ||
+        LucideIcons.Circle,
       label: item.label,
       featureKey: item.featureKey,
       component: item.component,
@@ -85,7 +97,7 @@ function PlaceholderPage({ title }: { title: string }) {
 }
 
 interface DynamicRouterProps {
-  children?: React.ReactNode;  // 额外的静态路由（如登录页）
+  children?: React.ReactNode; // 额外的静态路由（如登录页）
 }
 
 export default function DynamicRouter({ children }: DynamicRouterProps) {
@@ -168,11 +180,7 @@ export default function DynamicRouter({ children }: DynamicRouterProps) {
 
     // 需要超级管理员权限
     if (route.requireSuperAdmin) {
-      element = (
-        <PrivateRoute>
-          {isSuperAdmin ? element : <Navigate to="/" replace />}
-        </PrivateRoute>
-      );
+      element = <PrivateRoute>{isSuperAdmin ? element : <Navigate to="/" replace />}</PrivateRoute>;
     } else if (route.requireAuth) {
       element = <PrivateRoute>{element}</PrivateRoute>;
     }

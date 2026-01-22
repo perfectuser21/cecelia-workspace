@@ -3,7 +3,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 // Core NavGroup 类型（icon 为字符串名称，从 Core 模块动态加载）
 export interface CoreNavItem {
   path: string;
-  icon: string;  // 图标名称字符串，如 "LayoutDashboard"
+  icon: string; // 图标名称字符串，如 "LayoutDashboard"
   label: string;
   featureKey: string;
   component?: string;
@@ -36,7 +36,7 @@ export interface InstanceConfig {
 // Core 动态配置类型
 export interface CoreDynamicConfig {
   instanceConfig: InstanceConfig;
-  navGroups: CoreNavGroup[];  // 使用 CoreNavGroup（icon 为 string）
+  navGroups: CoreNavGroup[]; // 使用 CoreNavGroup（icon 为 string）
   pageComponents: Record<string, () => Promise<{ default: unknown }>>;
 }
 
@@ -52,20 +52,20 @@ const autopilotConfig: InstanceConfig = {
   },
   features: {
     // 主导航
-    'workbench': true,
-    'media-scenario': true,  // 新媒体运营场景
-    'ai-employees': true,    // AI 员工
-    'settings': true,
+    workbench: true,
+    'media-scenario': true, // 新媒体运营场景
+    'ai-employees': true, // AI 员工
+    settings: true,
     // 旧 features（保留用于兼容，实际已合并到 media-scenario）
     'execution-status': true,
-    'tasks': true,
+    tasks: true,
     'data-center': true,
-    'content': true,
+    content: true,
     'platform-status': true,
     'publish-stats': true,
-    'scraping': true,
-    'tools': true,
-    'canvas': true,
+    scraping: true,
+    tools: true,
+    canvas: true,
   },
 };
 
@@ -78,7 +78,7 @@ export async function loadCoreConfig(): Promise<CoreDynamicConfig> {
 
   // @ts-expect-error - @features/core 模块仅在 Core 实例中存在，由 tsconfig paths 映射
   const { buildCoreConfig } = await import('@features/core');
-  cachedCoreConfig = await buildCoreConfig() as CoreDynamicConfig;
+  cachedCoreConfig = (await buildCoreConfig()) as CoreDynamicConfig;
   return cachedCoreConfig;
 }
 
@@ -138,7 +138,10 @@ export function InstanceProvider({ children }: { children: ReactNode }) {
   const applyTheme = (theme: ThemeConfig, instance: string) => {
     const root = document.documentElement;
     root.style.setProperty('--primary-color', theme.primaryColor);
-    root.style.setProperty('--sidebar-gradient', theme.sidebarGradient || 'linear-gradient(180deg, #1e3a8a 0%, #1e2a5e 100%)');
+    root.style.setProperty(
+      '--sidebar-gradient',
+      theme.sidebarGradient || 'linear-gradient(180deg, #1e3a8a 0%, #1e2a5e 100%)'
+    );
 
     // 计算派生颜色
     const primaryHex = theme.primaryColor;
@@ -172,7 +175,9 @@ export function InstanceProvider({ children }: { children: ReactNode }) {
   const isCore = config?.instance === 'core';
 
   return (
-    <InstanceContext.Provider value={{ config, loading, error, isFeatureEnabled, isCore, coreConfig }}>
+    <InstanceContext.Provider
+      value={{ config, loading, error, isFeatureEnabled, isCore, coreConfig }}
+    >
       {children}
     </InstanceContext.Provider>
   );
@@ -191,7 +196,7 @@ function adjustColor(hex: string, percent: number): string {
   const num = parseInt(hex.replace('#', ''), 16);
   const amt = Math.round(2.55 * percent);
   const R = Math.min(255, Math.max(0, (num >> 16) + amt));
-  const G = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + amt));
-  const B = Math.min(255, Math.max(0, (num & 0x0000FF) + amt));
+  const G = Math.min(255, Math.max(0, ((num >> 8) & 0x00ff) + amt));
+  const B = Math.min(255, Math.max(0, (num & 0x0000ff) + amt));
   return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
 }

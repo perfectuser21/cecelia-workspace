@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Bell, CheckCheck, AlertCircle, CheckCircle, XCircle, Info, ExternalLink } from 'lucide-react';
+import {
+  Bell,
+  CheckCheck,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  Info,
+  ExternalLink,
+} from 'lucide-react';
 import { settingsApi, Notification } from '../api/settings.api';
 
 export default function NotificationCenter() {
@@ -85,7 +93,7 @@ export default function NotificationCenter() {
       login: '登录',
       collection: '采集',
       workflow: '工作流',
-      system: '系统'
+      system: '系统',
     };
     return labels[category];
   };
@@ -107,7 +115,7 @@ export default function NotificationCenter() {
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
@@ -149,9 +157,7 @@ export default function NotificationCenter() {
         <button
           onClick={() => setFilter('all')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            filter === 'all'
-              ? 'bg-blue-600 text-white'
-              : 'text-gray-600 hover:bg-gray-100'
+            filter === 'all' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
           全部 ({notifications.length})
@@ -159,9 +165,7 @@ export default function NotificationCenter() {
         <button
           onClick={() => setFilter('unread')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            filter === 'unread'
-              ? 'bg-blue-600 text-white'
-              : 'text-gray-600 hover:bg-gray-100'
+            filter === 'unread' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
           未读 ({unreadCount})
@@ -175,9 +179,7 @@ export default function NotificationCenter() {
             <div
               key={notification.id}
               className={`bg-white rounded-xl border-2 transition-all ${
-                notification.isRead
-                  ? 'border-gray-200'
-                  : 'border-blue-200 bg-blue-50/30'
+                notification.isRead ? 'border-gray-200' : 'border-blue-200 bg-blue-50/30'
               }`}
             >
               <div className="p-5">

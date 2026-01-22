@@ -183,9 +183,7 @@ export async function fetchEmployeeTasks(employeeId: string): Promise<EmployeeTa
       ...liveStatus.recentCompleted,
     ];
 
-    const employee = AI_DEPARTMENTS.flatMap(d => d.employees).find(
-      e => e.id === employeeId
-    );
+    const employee = AI_DEPARTMENTS.flatMap(d => d.employees).find(e => e.id === employeeId);
     if (!employee) return [];
 
     const tasks: EmployeeTask[] = [];

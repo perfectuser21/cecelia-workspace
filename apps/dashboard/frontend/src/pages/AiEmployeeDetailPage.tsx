@@ -11,14 +11,8 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { DynamicIcon } from '../components/DynamicIcon';
-import {
-  getEmployeeById,
-  getDepartmentByEmployeeId,
-} from '../config/ai-employees.config';
-import {
-  fetchEmployeeTasks,
-  type EmployeeTask,
-} from '../api/ai-employees.api';
+import { getEmployeeById, getDepartmentByEmployeeId } from '../config/ai-employees.config';
+import { fetchEmployeeTasks, type EmployeeTask } from '../api/ai-employees.api';
 
 export default function AiEmployeeDetailPage() {
   const { employeeId } = useParams<{ employeeId: string }>();
@@ -81,9 +75,10 @@ export default function AiEmployeeDetailPage() {
     success: tasks.filter(t => t.status === 'success').length,
     error: tasks.filter(t => t.status === 'error').length,
     running: tasks.filter(t => t.status === 'running' || t.status === 'waiting').length,
-    successRate: tasks.length > 0
-      ? Math.round((tasks.filter(t => t.status === 'success').length / tasks.length) * 100)
-      : 0,
+    successRate:
+      tasks.length > 0
+        ? Math.round((tasks.filter(t => t.status === 'success').length / tasks.length) * 100)
+        : 0,
   };
 
   return (
@@ -103,16 +98,17 @@ export default function AiEmployeeDetailPage() {
           <div className="flex items-center gap-4">
             {/* 员工图标 */}
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 flex items-center justify-center shadow-inner">
-              <DynamicIcon name={employee.icon} className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+              <DynamicIcon
+                name={employee.icon}
+                className="w-8 h-8 text-blue-600 dark:text-blue-400"
+              />
             </div>
             {/* 名称和角色 */}
             <div>
               <h1 className="text-2xl font-semibold text-slate-800 dark:text-white mb-1">
                 {employee.name}
               </h1>
-              <p className="text-slate-500 dark:text-slate-400 mb-1">
-                {employee.role}
-              </p>
+              <p className="text-slate-500 dark:text-slate-400 mb-1">{employee.role}</p>
               {department && (
                 <div className="flex items-center gap-2 text-sm text-slate-400 dark:text-slate-500">
                   <DynamicIcon name={department.icon} className="w-4 h-4" />
@@ -135,9 +131,7 @@ export default function AiEmployeeDetailPage() {
 
         {/* 员工描述 */}
         {employee.description && (
-          <p className="text-slate-600 dark:text-slate-400 mb-6">
-            {employee.description}
-          </p>
+          <p className="text-slate-600 dark:text-slate-400 mb-6">{employee.description}</p>
         )}
 
         {/* 职能列表 */}
@@ -199,9 +193,7 @@ export default function AiEmployeeDetailPage() {
       {/* 最近任务列表 */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-white">
-            最近任务
-          </h2>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-white">最近任务</h2>
           {lastRefresh && (
             <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
               最后更新: {lastRefresh.toLocaleTimeString('zh-CN')}
@@ -223,9 +215,7 @@ export default function AiEmployeeDetailPage() {
         {!loading || tasks.length > 0 ? (
           <div className="divide-y divide-slate-200 dark:divide-slate-700">
             {tasks.length > 0 ? (
-              tasks.map(task => (
-                <TaskListItem key={task.id} task={task} />
-              ))
+              tasks.map(task => <TaskListItem key={task.id} task={task} />)
             ) : (
               <div className="px-6 py-12 text-center">
                 <Clock className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
@@ -332,9 +322,7 @@ function TaskListItem({ task }: { task: EmployeeTask }) {
               <h3 className="text-base font-medium text-slate-800 dark:text-white truncate">
                 {task.workflowName || task.abilityName}
               </h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                {task.abilityName}
-              </p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">{task.abilityName}</p>
             </div>
             <span className="text-sm text-slate-400 dark:text-slate-500 whitespace-nowrap">
               {formatTime(task.startedAt)}

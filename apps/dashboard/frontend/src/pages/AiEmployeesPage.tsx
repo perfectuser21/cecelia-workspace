@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Users, RefreshCw } from 'lucide-react';
 import { DepartmentAccordion } from '../components/DepartmentAccordion';
-import {
-  fetchAiEmployeesWithStats,
-  DepartmentWithStats,
-} from '../api/ai-employees.api';
+import { fetchAiEmployeesWithStats, DepartmentWithStats } from '../api/ai-employees.api';
 
 export default function AiEmployeesPage() {
   const [departments, setDepartments] = useState<DepartmentWithStats[]>([]);
@@ -33,14 +30,8 @@ export default function AiEmployeesPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const totalEmployees = departments.reduce(
-    (sum, dept) => sum + dept.employees.length,
-    0
-  );
-  const totalTasks = departments.reduce(
-    (sum, dept) => sum + dept.todayTotal,
-    0
-  );
+  const totalEmployees = departments.reduce((sum, dept) => sum + dept.employees.length, 0);
+  const totalTasks = departments.reduce((sum, dept) => sum + dept.todayTotal, 0);
 
   return (
     <div className="px-4 sm:px-0 pb-8">

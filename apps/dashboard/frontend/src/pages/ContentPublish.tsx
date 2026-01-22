@@ -45,7 +45,9 @@ function PlatformIcon({ platform }: { platform: string }) {
   };
 
   return (
-    <div className={`w-8 h-8 rounded-lg ${colors[platform] || 'bg-gray-500'} flex items-center justify-center text-white text-xs font-bold`}>
+    <div
+      className={`w-8 h-8 rounded-lg ${colors[platform] || 'bg-gray-500'} flex items-center justify-center text-white text-xs font-bold`}
+    >
       {platform.charAt(0).toUpperCase()}
     </div>
   );
@@ -54,12 +56,36 @@ function PlatformIcon({ platform }: { platform: string }) {
 // Status badge component
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
-    draft: { bg: 'bg-gray-100 dark:bg-slate-700', text: 'text-gray-600 dark:text-gray-400', icon: <FileText className="w-3 h-3" /> },
-    pending: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', icon: <Clock className="w-3 h-3" /> },
-    processing: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400', icon: <Loader2 className="w-3 h-3 animate-spin" /> },
-    completed: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', icon: <CheckCircle2 className="w-3 h-3" /> },
-    failed: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', icon: <XCircle className="w-3 h-3" /> },
-    partial: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400', icon: <Clock className="w-3 h-3" /> },
+    draft: {
+      bg: 'bg-gray-100 dark:bg-slate-700',
+      text: 'text-gray-600 dark:text-gray-400',
+      icon: <FileText className="w-3 h-3" />,
+    },
+    pending: {
+      bg: 'bg-yellow-100 dark:bg-yellow-900/30',
+      text: 'text-yellow-700 dark:text-yellow-400',
+      icon: <Clock className="w-3 h-3" />,
+    },
+    processing: {
+      bg: 'bg-blue-100 dark:bg-blue-900/30',
+      text: 'text-blue-700 dark:text-blue-400',
+      icon: <Loader2 className="w-3 h-3 animate-spin" />,
+    },
+    completed: {
+      bg: 'bg-green-100 dark:bg-green-900/30',
+      text: 'text-green-700 dark:text-green-400',
+      icon: <CheckCircle2 className="w-3 h-3" />,
+    },
+    failed: {
+      bg: 'bg-red-100 dark:bg-red-900/30',
+      text: 'text-red-700 dark:text-red-400',
+      icon: <XCircle className="w-3 h-3" />,
+    },
+    partial: {
+      bg: 'bg-orange-100 dark:bg-orange-900/30',
+      text: 'text-orange-700 dark:text-orange-400',
+      icon: <Clock className="w-3 h-3" />,
+    },
   };
 
   const style = styles[status] || styles.draft;
@@ -73,7 +99,9 @@ function StatusBadge({ status }: { status: string }) {
   };
 
   return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${style.bg} ${style.text}`}>
+    <span
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${style.bg} ${style.text}`}
+    >
       {style.icon}
       {labels[status] || status}
     </span>
@@ -90,17 +118,22 @@ const platformDisplayNames: Record<string, string> = {
 };
 
 // Result status badge component
-function ResultStatusBadge({ result, isProcessing }: {
+function ResultStatusBadge({
+  result,
+  isProcessing,
+}: {
   result?: { success: boolean; url?: string; error?: string };
   isProcessing: boolean;
 }) {
   if (!result) {
     return (
-      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${
-        isProcessing
-          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-          : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400'
-      }`}>
+      <span
+        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${
+          isProcessing
+            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+            : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400'
+        }`}
+      >
         {isProcessing ? (
           <>
             <Loader2 className="w-3 h-3 animate-spin" />
@@ -155,7 +188,7 @@ function ResultSummary({ task }: { task: PublishTask }) {
   return (
     <div className="relative">
       <div
-        onClick={(e) => {
+        onClick={e => {
           e.stopPropagation();
           setShowDetail(!showDetail);
         }}
@@ -171,10 +204,14 @@ function ResultSummary({ task }: { task: PublishTask }) {
 
           if (result?.success) {
             statusClass = 'border-green-400 bg-green-50 dark:bg-green-900/30';
-            statusIcon = <CheckCircle2 className="w-2.5 h-2.5 text-green-500 absolute -bottom-0.5 -right-0.5" />;
+            statusIcon = (
+              <CheckCircle2 className="w-2.5 h-2.5 text-green-500 absolute -bottom-0.5 -right-0.5" />
+            );
           } else if (result && !result.success) {
             statusClass = 'border-red-400 bg-red-50 dark:bg-red-900/30';
-            statusIcon = <XCircle className="w-2.5 h-2.5 text-red-500 absolute -bottom-0.5 -right-0.5" />;
+            statusIcon = (
+              <XCircle className="w-2.5 h-2.5 text-red-500 absolute -bottom-0.5 -right-0.5" />
+            );
           } else if (isProcessing) {
             statusClass = 'border-blue-400 bg-blue-50 dark:bg-blue-900/30 animate-pulse';
           }
@@ -198,21 +235,28 @@ function ResultSummary({ task }: { task: PublishTask }) {
       {showDetail && (
         <div
           className="absolute z-20 top-full left-0 mt-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl p-4 min-w-[280px]"
-          onClick={(e) => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
         >
-          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">发布结果详情</div>
+          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">
+            发布结果详情
+          </div>
           <div className="space-y-2">
             {task.targetPlatforms.map(platform => {
               const result = task.results?.[platform];
               return (
-                <div key={platform} className="flex items-center gap-3 py-2 border-b border-gray-100 dark:border-slate-700 last:border-0">
+                <div
+                  key={platform}
+                  className="flex items-center gap-3 py-2 border-b border-gray-100 dark:border-slate-700 last:border-0"
+                >
                   <span className="text-lg">{platformEmojis[platform]}</span>
                   <div className="flex-1">
                     <div className="text-sm font-medium text-gray-900 dark:text-white">
                       {platformDisplayNames[platform] || platform}
                     </div>
                     {result?.error && (
-                      <div className="text-xs text-red-500 truncate max-w-[180px]">{result.error}</div>
+                      <div className="text-xs text-red-500 truncate max-w-[180px]">
+                        {result.error}
+                      </div>
                     )}
                     {result?.url && (
                       <a
@@ -220,7 +264,7 @@ function ResultSummary({ task }: { task: PublishTask }) {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-blue-500 hover:underline truncate block max-w-[180px]"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={e => e.stopPropagation()}
                       >
                         查看链接 →
                       </a>
@@ -393,11 +437,12 @@ export default function ContentPublish() {
     // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(task =>
-        task.title.toLowerCase().includes(query) ||
-        task.titleZh?.toLowerCase().includes(query) ||
-        task.titleEn?.toLowerCase().includes(query) ||
-        task.content?.toLowerCase().includes(query)
+      filtered = filtered.filter(
+        task =>
+          task.title.toLowerCase().includes(query) ||
+          task.titleZh?.toLowerCase().includes(query) ||
+          task.titleEn?.toLowerCase().includes(query) ||
+          task.content?.toLowerCase().includes(query)
       );
     }
 
@@ -447,9 +492,7 @@ export default function ContentPublish() {
 
     setIsBatchDeleting(true);
     try {
-      await Promise.all(
-        Array.from(selectedTaskIds).map(id => publishApi.deleteTask(id))
-      );
+      await Promise.all(Array.from(selectedTaskIds).map(id => publishApi.deleteTask(id)));
       setSelectedTaskIds(new Set());
       await loadData();
     } catch (error: any) {
@@ -475,9 +518,7 @@ export default function ContentPublish() {
     if (!confirm(`确定要发布选中的 ${draftTasks.length} 个草稿任务吗？`)) return;
 
     try {
-      await Promise.all(
-        draftTasks.map(task => publishApi.submitTask(task.id))
-      );
+      await Promise.all(draftTasks.map(task => publishApi.submitTask(task.id)));
       setSelectedTaskIds(new Set());
       await loadData();
     } catch (error: any) {
@@ -551,9 +592,7 @@ export default function ContentPublish() {
 
   const handlePlatformToggle = (platformName: string) => {
     setSelectedPlatforms(prev =>
-      prev.includes(platformName)
-        ? prev.filter(p => p !== platformName)
-        : [...prev, platformName]
+      prev.includes(platformName) ? prev.filter(p => p !== platformName) : [...prev, platformName]
     );
   };
 
@@ -712,7 +751,8 @@ export default function ContentPublish() {
 
   // List view
   if (viewMode === 'list') {
-    const allSelected = selectedTaskIds.size > 0 && selectedTaskIds.size === filteredAndPaginatedTasks.tasks.length;
+    const allSelected =
+      selectedTaskIds.size > 0 && selectedTaskIds.size === filteredAndPaginatedTasks.tasks.length;
     const someSelected = selectedTaskIds.size > 0;
 
     return (
@@ -862,13 +902,27 @@ export default function ContentPublish() {
                         className="w-4 h-4 rounded border-gray-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
                       />
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">标题</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">类型</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">平台</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">状态</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">结果</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">创建时间</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">操作</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      标题
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      类型
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      平台
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      状态
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      结果
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      创建时间
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      操作
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
@@ -878,7 +932,7 @@ export default function ContentPublish() {
                       onClick={() => handleViewDetail(task.id)}
                       className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
                     >
-                      <td className="w-12 px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                      <td className="w-12 px-4 py-4" onClick={e => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={selectedTaskIds.has(task.id)}
@@ -887,9 +941,13 @@ export default function ContentPublish() {
                         />
                       </td>
                       <td className="px-6 py-4">
-                        <div className="font-medium text-gray-900 dark:text-white">{task.title}</div>
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {task.title}
+                        </div>
                         {task.content && (
-                          <div className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs">{task.content}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs">
+                            {task.content}
+                          </div>
                         )}
                       </td>
                       <td className="px-6 py-4">
@@ -897,7 +955,11 @@ export default function ContentPublish() {
                           {task.mediaType === 'image' && <ImageIcon className="w-4 h-4" />}
                           {task.mediaType === 'video' && <Film className="w-4 h-4" />}
                           {task.mediaType === 'text' && <FileText className="w-4 h-4" />}
-                          {task.mediaType === 'image' ? '图文' : task.mediaType === 'video' ? '视频' : '文章'}
+                          {task.mediaType === 'image'
+                            ? '图文'
+                            : task.mediaType === 'video'
+                              ? '视频'
+                              : '文章'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -910,7 +972,7 @@ export default function ContentPublish() {
                       <td className="px-6 py-4">
                         <StatusBadge status={task.status} />
                       </td>
-                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-6 py-4" onClick={e => e.stopPropagation()}>
                         <ResultSummary task={task} />
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
@@ -919,7 +981,7 @@ export default function ContentPublish() {
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={(e) => {
+                            onClick={e => {
                               e.stopPropagation();
                               handleViewDetail(task.id);
                             }}
@@ -931,7 +993,7 @@ export default function ContentPublish() {
                           {task.status === 'draft' && (
                             <>
                               <button
-                                onClick={(e) => {
+                                onClick={e => {
                                   e.stopPropagation();
                                   handleSubmitTask(task.id);
                                 }}
@@ -940,7 +1002,7 @@ export default function ContentPublish() {
                                 发布
                               </button>
                               <button
-                                onClick={(e) => {
+                                onClick={e => {
                                   e.stopPropagation();
                                   handleDeleteTask(task.id);
                                 }}
@@ -952,7 +1014,7 @@ export default function ContentPublish() {
                           )}
                           {['completed', 'failed', 'partial'].includes(task.status) && (
                             <button
-                              onClick={(e) => {
+                              onClick={e => {
                                 e.stopPropagation();
                                 handleDeleteTask(task.id);
                               }}
@@ -984,34 +1046,39 @@ export default function ContentPublish() {
                     <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                   </button>
                   <div className="flex items-center gap-1">
-                    {Array.from({ length: Math.min(5, filteredAndPaginatedTasks.totalPages) }, (_, i) => {
-                      let pageNum;
-                      if (filteredAndPaginatedTasks.totalPages <= 5) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= 3) {
-                        pageNum = i + 1;
-                      } else if (currentPage >= filteredAndPaginatedTasks.totalPages - 2) {
-                        pageNum = filteredAndPaginatedTasks.totalPages - 4 + i;
-                      } else {
-                        pageNum = currentPage - 2 + i;
+                    {Array.from(
+                      { length: Math.min(5, filteredAndPaginatedTasks.totalPages) },
+                      (_, i) => {
+                        let pageNum;
+                        if (filteredAndPaginatedTasks.totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= filteredAndPaginatedTasks.totalPages - 2) {
+                          pageNum = filteredAndPaginatedTasks.totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                              currentPage === pageNum
+                                ? 'bg-blue-600 text-white'
+                                : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-400'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
                       }
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => setCurrentPage(pageNum)}
-                          className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                            currentPage === pageNum
-                              ? 'bg-blue-600 text-white'
-                              : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-400'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
+                    )}
                   </div>
                   <button
-                    onClick={() => setCurrentPage(p => Math.min(filteredAndPaginatedTasks.totalPages, p + 1))}
+                    onClick={() =>
+                      setCurrentPage(p => Math.min(filteredAndPaginatedTasks.totalPages, p + 1))
+                    }
                     disabled={currentPage === filteredAndPaginatedTasks.totalPages}
                     className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
@@ -1028,7 +1095,8 @@ export default function ContentPublish() {
 
   // Detail view
   if (viewMode === 'detail') {
-    const isProcessing = selectedTask?.status === 'processing' || selectedTask?.status === 'pending';
+    const isProcessing =
+      selectedTask?.status === 'processing' || selectedTask?.status === 'pending';
 
     return (
       <div className="max-w-4xl mx-auto">
@@ -1073,11 +1141,15 @@ export default function ContentPublish() {
             {selectedTask.progress && selectedTask.status !== 'draft' && (
               <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">发布进度</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    发布进度
+                  </span>
                   <span className="text-sm text-gray-500 dark:text-gray-400">
                     {selectedTask.progress.completed}/{selectedTask.progress.total} 平台
                     {selectedTask.progress.failed > 0 && (
-                      <span className="text-red-500 ml-2">({selectedTask.progress.failed} 失败)</span>
+                      <span className="text-red-500 ml-2">
+                        ({selectedTask.progress.failed} 失败)
+                      </span>
                     )}
                   </span>
                 </div>
@@ -1088,7 +1160,9 @@ export default function ContentPublish() {
                         ? 'bg-gradient-to-r from-green-500 to-orange-500'
                         : 'bg-gradient-to-r from-blue-500 to-green-500'
                     }`}
-                    style={{ width: `${(selectedTask.progress.completed / selectedTask.progress.total) * 100}%` }}
+                    style={{
+                      width: `${(selectedTask.progress.completed / selectedTask.progress.total) * 100}%`,
+                    }}
                   />
                 </div>
               </div>
@@ -1109,7 +1183,11 @@ export default function ContentPublish() {
                     {selectedTask.mediaType === 'image' && <ImageIcon className="w-4 h-4" />}
                     {selectedTask.mediaType === 'video' && <Film className="w-4 h-4" />}
                     {selectedTask.mediaType === 'text' && <FileText className="w-4 h-4" />}
-                    {selectedTask.mediaType === 'image' ? '图文' : selectedTask.mediaType === 'video' ? '视频' : '文章'}
+                    {selectedTask.mediaType === 'image'
+                      ? '图文'
+                      : selectedTask.mediaType === 'video'
+                        ? '视频'
+                        : '文章'}
                   </div>
                 </div>
                 <div>
@@ -1120,7 +1198,11 @@ export default function ContentPublish() {
                   <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">发布人</div>
                   <div className="flex items-center gap-2">
                     {selectedTask.creatorAvatar ? (
-                      <img src={selectedTask.creatorAvatar} alt="" className="w-5 h-5 rounded-full" />
+                      <img
+                        src={selectedTask.creatorAvatar}
+                        alt=""
+                        className="w-5 h-5 rounded-full"
+                      />
                     ) : (
                       <User className="w-4 h-4 text-gray-400" />
                     )}
@@ -1174,7 +1256,9 @@ export default function ContentPublish() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-1">
-                        <span className="w-4 h-4 rounded bg-red-500 text-white text-[10px] flex items-center justify-center">中</span>
+                        <span className="w-4 h-4 rounded bg-red-500 text-white text-[10px] flex items-center justify-center">
+                          中
+                        </span>
                         中文标题
                       </div>
                       <input
@@ -1187,7 +1271,9 @@ export default function ContentPublish() {
                     {selectedTask.mediaType !== 'video' && (
                       <div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-1">
-                          <span className="w-4 h-4 rounded bg-blue-500 text-white text-[10px] flex items-center justify-center">EN</span>
+                          <span className="w-4 h-4 rounded bg-blue-500 text-white text-[10px] flex items-center justify-center">
+                            EN
+                          </span>
                           English Title
                         </div>
                         <input
@@ -1203,7 +1289,9 @@ export default function ContentPublish() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-1">
-                        <span className="w-4 h-4 rounded bg-red-500 text-white text-[10px] flex items-center justify-center">中</span>
+                        <span className="w-4 h-4 rounded bg-red-500 text-white text-[10px] flex items-center justify-center">
+                          中
+                        </span>
                         中文标题
                       </div>
                       <div className="text-gray-900 dark:text-white font-medium">
@@ -1213,10 +1301,14 @@ export default function ContentPublish() {
                     {selectedTask.titleEn && selectedTask.titleEn !== selectedTask.titleZh && (
                       <div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-1">
-                          <span className="w-4 h-4 rounded bg-blue-500 text-white text-[10px] flex items-center justify-center">EN</span>
+                          <span className="w-4 h-4 rounded bg-blue-500 text-white text-[10px] flex items-center justify-center">
+                            EN
+                          </span>
                           English Title
                         </div>
-                        <div className="text-gray-900 dark:text-white font-medium">{selectedTask.titleEn}</div>
+                        <div className="text-gray-900 dark:text-white font-medium">
+                          {selectedTask.titleEn}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1236,7 +1328,9 @@ export default function ContentPublish() {
                     </div>
                     {selectedTask.mediaType !== 'video' && (
                       <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">English Content</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                          English Content
+                        </div>
                         <textarea
                           value={editContentEn}
                           onChange={e => setEditContentEn(e.target.value)}
@@ -1286,7 +1380,8 @@ export default function ContentPublish() {
                 {selectedTask.originalFiles && selectedTask.originalFiles.length > 0 && (
                   <div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                      {selectedTask.mediaType === 'video' ? '视频' : '图片'} ({selectedTask.originalFiles.length})
+                      {selectedTask.mediaType === 'video' ? '视频' : '图片'} (
+                      {selectedTask.originalFiles.length})
                     </div>
                     <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
                       {selectedTask.originalFiles.slice(0, 12).map((file, idx) => (
@@ -1342,8 +1437,7 @@ export default function ContentPublish() {
                 <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">发布结果</h3>
                 {isProcessing && (
                   <span className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    每 10 秒自动刷新
+                    <Loader2 className="w-3 h-3 animate-spin" />每 10 秒自动刷新
                   </span>
                 )}
               </div>
@@ -1382,10 +1476,7 @@ export default function ContentPublish() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <ResultStatusBadge
-                            result={result}
-                            isProcessing={isProcessing}
-                          />
+                          <ResultStatusBadge result={result} isProcessing={isProcessing} />
                         </td>
                         <td className="px-6 py-4">
                           {result?.url ? (
@@ -1541,7 +1632,9 @@ export default function ContentPublish() {
       <div className="space-y-8">
         {/* Media type selector */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-6">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">内容类型</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            内容类型
+          </label>
           <div className="flex gap-4">
             {[
               { type: 'image' as const, icon: ImageIcon, label: '图文' },
@@ -1552,9 +1645,10 @@ export default function ContentPublish() {
                 onClick={() => setMediaType(type)}
                 className={`
                   flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all magnetic-btn
-                  ${mediaType === type
-                    ? 'border-blue-600 bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25'
-                    : 'border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700'
+                  ${
+                    mediaType === type
+                      ? 'border-blue-600 bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25'
+                      : 'border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700'
                   }
                 `}
               >
@@ -1569,7 +1663,9 @@ export default function ContentPublish() {
         {mediaType === 'video' && (
           <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-6 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">视频标题</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                视频标题
+              </label>
               <input
                 type="text"
                 value={titleZh}
@@ -1579,7 +1675,9 @@ export default function ContentPublish() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">视频描述（可选）</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                视频描述（可选）
+              </label>
               <textarea
                 value={contentZh}
                 onChange={e => setContentZh(e.target.value)}
@@ -1597,11 +1695,15 @@ export default function ContentPublish() {
             {/* 中文版 */}
             <div className="space-y-4 p-6 bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700">
               <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 text-white text-xs flex items-center justify-center shadow-lg shadow-red-500/25">中</span>
+                <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 text-white text-xs flex items-center justify-center shadow-lg shadow-red-500/25">
+                  中
+                </span>
                 中文版
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">标题</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  标题
+                </label>
                 <input
                   type="text"
                   value={titleZh}
@@ -1611,7 +1713,9 @@ export default function ContentPublish() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">正文</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  正文
+                </label>
                 <textarea
                   value={contentZh}
                   onChange={e => setContentZh(e.target.value)}
@@ -1625,11 +1729,15 @@ export default function ContentPublish() {
             {/* 英文版 */}
             <div className="space-y-4 p-6 bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700">
               <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs flex items-center justify-center shadow-lg shadow-blue-500/25">EN</span>
+                <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs flex items-center justify-center shadow-lg shadow-blue-500/25">
+                  EN
+                </span>
                 English Version
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Title</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Title
+                </label>
                 <input
                   type="text"
                   value={titleEn}
@@ -1639,7 +1747,9 @@ export default function ContentPublish() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Content</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Content
+                </label>
                 <textarea
                   value={contentEn}
                   onChange={e => setContentEn(e.target.value)}
@@ -1685,7 +1795,9 @@ export default function ContentPublish() {
 
         {/* Platform selector */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-6">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">发布平台</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            发布平台
+          </label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {platforms.map(platform => (
               <button
@@ -1693,19 +1805,24 @@ export default function ContentPublish() {
                 onClick={() => handlePlatformToggle(platform.name)}
                 className={`
                   flex items-center gap-3 p-4 rounded-xl border-2 transition-all
-                  ${selectedPlatforms.includes(platform.name)
-                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20'
-                    : 'border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 bg-gray-50 dark:bg-slate-700'
+                  ${
+                    selectedPlatforms.includes(platform.name)
+                      ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20'
+                      : 'border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 bg-gray-50 dark:bg-slate-700'
                   }
                 `}
               >
                 <PlatformIcon platform={platform.name} />
                 <div className="text-left">
-                  <div className="font-medium text-gray-900 dark:text-white">{platform.displayName}</div>
+                  <div className="font-medium text-gray-900 dark:text-white">
+                    {platform.displayName}
+                  </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
                     {mediaType === 'image' && `最多 ${platform.maxImages} 张图`}
-                    {mediaType === 'video' && `最长 ${Math.floor(platform.videoSpecs.maxDuration / 60)} 分钟`}
-                    {mediaType === 'text' && (platform.contentLimit > 0 ? `${platform.contentLimit} 字` : '无限制')}
+                    {mediaType === 'video' &&
+                      `最长 ${Math.floor(platform.videoSpecs.maxDuration / 60)} 分钟`}
+                    {mediaType === 'text' &&
+                      (platform.contentLimit > 0 ? `${platform.contentLimit} 字` : '无限制')}
                   </div>
                 </div>
                 {selectedPlatforms.includes(platform.name) && (

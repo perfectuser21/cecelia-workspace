@@ -53,12 +53,15 @@ export interface DailyReport {
   total_followers_delta: number;
   total_impressions: number;
   total_engagements: number;
-  by_platform: Record<string, {
-    accounts: number;
-    followers_delta: number;
-    impressions: number;
-    engagements: number;
-  }>;
+  by_platform: Record<
+    string,
+    {
+      accounts: number;
+      followers_delta: number;
+      impressions: number;
+      engagements: number;
+    }
+  >;
 }
 
 export interface TimeRange {
@@ -71,7 +74,7 @@ export const metricsApi = {
   // Get dashboard metrics
   getDashboardMetrics: async (timeRange: 'today' | 'week' | 'month' = 'week') => {
     const response = await apiClient.get<DashboardMetrics>('/v1/metrics/dashboard', {
-      params: { timeRange }
+      params: { timeRange },
     });
     return response.data;
   },
@@ -84,7 +87,7 @@ export const metricsApi = {
     endDate?: string
   ) => {
     const response = await apiClient.get<MetricsData[]>('/v1/metrics', {
-      params: { platform, accountId, startDate, endDate }
+      params: { platform, accountId, startDate, endDate },
     });
     return response.data;
   },
@@ -111,7 +114,7 @@ export const metricsApi = {
   triggerCollection: async (platform?: string, accountId?: string) => {
     const response = await apiClient.post('/v1/collect/trigger', {
       platform,
-      accountId
+      accountId,
     });
     return response.data;
   },

@@ -1,5 +1,17 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { CheckSquare, Plus, RefreshCw, AlertCircle, Loader2, GripVertical, Star, ChevronLeft, ChevronRight, Sparkles, ExternalLink } from 'lucide-react';
+import {
+  CheckSquare,
+  Plus,
+  RefreshCw,
+  AlertCircle,
+  Loader2,
+  GripVertical,
+  Star,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  ExternalLink,
+} from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useAuth } from '../contexts/AuthContext';
 import { Task, fetchTasks, updateTaskStatus, createTask } from '../api/tasks.api';
@@ -8,8 +20,20 @@ type ViewType = 'day' | 'week';
 
 // 工作时间配置（北京时间）
 const WORK_PERIODS = [
-  { name: '上午', start: 8 * 60, end: 12 * 60, icon: '☀️', gradient: 'from-amber-500/20 via-orange-500/10 to-yellow-500/20' },
-  { name: '下午', start: 13 * 60 + 30, end: 18 * 60, icon: '🌤️', gradient: 'from-blue-500/20 via-indigo-500/10 to-purple-500/20' },
+  {
+    name: '上午',
+    start: 8 * 60,
+    end: 12 * 60,
+    icon: '☀️',
+    gradient: 'from-amber-500/20 via-orange-500/10 to-yellow-500/20',
+  },
+  {
+    name: '下午',
+    start: 13 * 60 + 30,
+    end: 18 * 60,
+    icon: '🌤️',
+    gradient: 'from-blue-500/20 via-indigo-500/10 to-purple-500/20',
+  },
 ];
 
 // 生成 15 分钟间隔的时间槽
@@ -31,15 +55,28 @@ const TIME_SLOTS = (() => {
 
 // 优先级配置
 const PRIORITY_CONFIG: Record<string, { color: string; bg: string; border: string }> = {
-  '高': { color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/30', border: 'border-rose-200 dark:border-rose-700' },
-  '中': { color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/30', border: 'border-amber-200 dark:border-amber-700' },
-  '低': { color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/30', border: 'border-sky-200 dark:border-sky-700' },
+  高: {
+    color: 'text-rose-600 dark:text-rose-400',
+    bg: 'bg-rose-50 dark:bg-rose-900/30',
+    border: 'border-rose-200 dark:border-rose-700',
+  },
+  中: {
+    color: 'text-amber-600 dark:text-amber-400',
+    bg: 'bg-amber-50 dark:bg-amber-900/30',
+    border: 'border-amber-200 dark:border-amber-700',
+  },
+  低: {
+    color: 'text-sky-600 dark:text-sky-400',
+    bg: 'bg-sky-50 dark:bg-sky-900/30',
+    border: 'border-sky-200 dark:border-sky-700',
+  },
 };
 
 // 日期工具函数
 const formatDate = (date: Date) => date.toISOString().split('T')[0];
 const formatDateDisplay = (date: Date) => `${date.getMonth() + 1}月${date.getDate()}日`;
-const getWeekday = (date: Date) => ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
+const getWeekday = (date: Date) =>
+  ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
 const getWeekdayShort = (date: Date) => ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
 const isWeekend = (date: Date) => date.getDay() === 0 || date.getDay() === 6;
 
@@ -70,7 +107,9 @@ export default function Tasks() {
   const [, setUpdatingTasks] = useState<Set<string>>(new Set());
 
   // 时间分配 { taskId: { date: 'YYYY-MM-DD', minutes: number } }
-  const [taskSchedule, setTaskSchedule] = useState<Record<string, { date: string; minutes: number }>>(() => {
+  const [taskSchedule, setTaskSchedule] = useState<
+    Record<string, { date: string; minutes: number }>
+  >(() => {
     try {
       const saved = localStorage.getItem('zenithjoy_task_schedule');
       return saved ? JSON.parse(saved) : {};
@@ -175,7 +214,11 @@ export default function Tasks() {
     const handleKeyDown = (e: KeyboardEvent) => {
       // 忽略在输入框中的按键
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT'
+      ) {
         return;
       }
 
@@ -306,7 +349,10 @@ export default function Tasks() {
         setTaskSchedule(prev => ({ ...prev, [draggableId]: { date: dateStr, minutes } }));
         const hour = Math.floor(minutes / 60);
         const min = minutes % 60;
-        showToast('success', `已安排到 ${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`);
+        showToast(
+          'success',
+          `已安排到 ${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`
+        );
       }
     }
   };
@@ -316,7 +362,9 @@ export default function Tasks() {
     if (!priority || !PRIORITY_CONFIG[priority]) return null;
     const config = PRIORITY_CONFIG[priority];
     return (
-      <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-md border ${config.bg} ${config.color} ${config.border}`}>
+      <span
+        className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-md border ${config.bg} ${config.color} ${config.border}`}
+      >
         {priority}
       </span>
     );
@@ -357,11 +405,13 @@ export default function Tasks() {
 
   // 渲染任务卡片
   const TaskCard = ({ task, compact = false }: { task: Task; compact?: boolean }) => (
-    <div className={`group flex items-center gap-1.5 px-2.5 py-2 rounded-xl border transition-all duration-200 cursor-grab active:cursor-grabbing active:scale-[0.98] ${
-      task.highlight
-        ? 'bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/20 border-amber-200/80 dark:border-amber-700/50 shadow-sm shadow-amber-500/10'
-        : 'bg-white dark:bg-slate-700/80 border-gray-200/80 dark:border-slate-600/80'
-    } hover:shadow-lg hover:border-gray-300 dark:hover:border-slate-500 hover:-translate-y-0.5`}>
+    <div
+      className={`group flex items-center gap-1.5 px-2.5 py-2 rounded-xl border transition-all duration-200 cursor-grab active:cursor-grabbing active:scale-[0.98] ${
+        task.highlight
+          ? 'bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/20 border-amber-200/80 dark:border-amber-700/50 shadow-sm shadow-amber-500/10'
+          : 'bg-white dark:bg-slate-700/80 border-gray-200/80 dark:border-slate-600/80'
+      } hover:shadow-lg hover:border-gray-300 dark:hover:border-slate-500 hover:-translate-y-0.5`}
+    >
       <GripVertical className="w-3 h-3 text-gray-300 dark:text-gray-500 flex-shrink-0 opacity-50 group-hover:opacity-100" />
       {task.highlight && (
         <div className="relative flex-shrink-0">
@@ -374,7 +424,7 @@ export default function Tasks() {
           href={task.url}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
           className={`font-medium text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate transition-colors ${compact ? 'text-[11px] max-w-[80px]' : 'text-sm max-w-[140px]'}`}
         >
           {task.title}
@@ -383,7 +433,7 @@ export default function Tasks() {
           href={task.url}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
           className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
         >
           <ExternalLink className="w-3 h-3 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
@@ -391,7 +441,10 @@ export default function Tasks() {
       </div>
       {!compact && <PriorityBadge priority={task.priority} />}
       <button
-        onClick={(e) => { e.stopPropagation(); setConfirmTask(task); }}
+        onClick={e => {
+          e.stopPropagation();
+          setConfirmTask(task);
+        }}
         className="ml-auto p-1 opacity-0 group-hover:opacity-100 hover:bg-green-100 dark:hover:bg-green-900/40 rounded-lg transition-all duration-200"
       >
         <CheckSquare className="w-3.5 h-3.5 text-gray-400 hover:text-green-500 dark:hover:text-green-400" />
@@ -427,18 +480,31 @@ export default function Tasks() {
       {/* 确认框 */}
       {confirmTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setConfirmTask(null)} />
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setConfirmTask(null)}
+          />
           <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
             <div className="flex justify-center mb-4">
               <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
                 <CheckSquare className="w-7 h-7 text-green-500" />
               </div>
             </div>
-            <h3 className="text-lg font-bold text-center text-gray-900 dark:text-white mb-2">完成任务？</h3>
+            <h3 className="text-lg font-bold text-center text-gray-900 dark:text-white mb-2">
+              完成任务？
+            </h3>
             <p className="text-center text-gray-600 dark:text-gray-300 mb-1">{confirmTask.title}</p>
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setConfirmTask(null)} className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-xl font-medium">取消</button>
-              <button onClick={confirmToggleDone} className="flex-1 px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl font-medium flex items-center justify-center gap-2">
+              <button
+                onClick={() => setConfirmTask(null)}
+                className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-xl font-medium"
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmToggleDone}
+                className="flex-1 px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl font-medium flex items-center justify-center gap-2"
+              >
                 <CheckSquare className="w-4 h-4" /> 完成
               </button>
             </div>
@@ -448,9 +514,11 @@ export default function Tasks() {
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 ${
-          toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-        }`}>
+        <div
+          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 ${
+            toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+          }`}
+        >
           {toast.message}
         </div>
       )}
@@ -460,13 +528,22 @@ export default function Tasks() {
         <div className="flex items-center gap-4">
           {/* 日期导航 */}
           <div className="flex items-center gap-0.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl border border-gray-200/60 dark:border-slate-700/60 p-1 shadow-sm">
-            <button onClick={goPrev} className="p-2.5 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-xl transition-colors">
+            <button
+              onClick={goPrev}
+              className="p-2.5 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-xl transition-colors"
+            >
               <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />
             </button>
-            <button onClick={goToday} className="px-4 py-2 text-sm font-semibold bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl shadow-sm hover:shadow-md transition-all">
+            <button
+              onClick={goToday}
+              className="px-4 py-2 text-sm font-semibold bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl shadow-sm hover:shadow-md transition-all"
+            >
               今天
             </button>
-            <button onClick={goNext} className="p-2.5 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-xl transition-colors">
+            <button
+              onClick={goNext}
+              className="p-2.5 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-xl transition-colors"
+            >
               <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" />
             </button>
           </div>
@@ -476,8 +553,7 @@ export default function Tasks() {
             <h2 className="text-xl font-bold bg-gradient-to-r from-gray-900 via-gray-700 to-gray-900 dark:from-white dark:via-gray-300 dark:to-white bg-clip-text text-transparent">
               {viewType === 'day'
                 ? `${formatDateDisplay(selectedDate)} ${getWeekday(selectedDate)}`
-                : `${formatDateDisplay(weekDates[0])} - ${formatDateDisplay(weekDates[6])}`
-              }
+                : `${formatDateDisplay(weekDates[0])} - ${formatDateDisplay(weekDates[6])}`}
             </h2>
             {viewType === 'day' && isWeekend(selectedDate) && (
               <span className="px-2.5 py-1 text-xs font-semibold bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-full shadow-sm flex items-center gap-1">
@@ -490,10 +566,14 @@ export default function Tasks() {
           {/* 任务统计 */}
           <div className="px-3 py-1.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-xl border border-gray-200/60 dark:border-slate-700/60 shadow-sm flex items-center gap-2">
             <span className="text-xs text-gray-500 dark:text-gray-400">今日</span>
-            <span className="text-sm font-bold text-gray-900 dark:text-white">{taskStats.today.total}</span>
+            <span className="text-sm font-bold text-gray-900 dark:text-white">
+              {taskStats.today.total}
+            </span>
             <span className="text-xs text-gray-400 dark:text-gray-500">|</span>
             <span className="text-xs text-gray-500 dark:text-gray-400">本周</span>
-            <span className="text-sm font-bold text-gray-900 dark:text-white">{taskStats.week.total}</span>
+            <span className="text-sm font-bold text-gray-900 dark:text-white">
+              {taskStats.week.total}
+            </span>
           </div>
         </div>
 
@@ -569,7 +649,11 @@ export default function Tasks() {
               disabled={!newTaskTitle.trim() || creating}
               className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md shadow-blue-500/30 transition-all duration-200"
             >
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              {creating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
               <span className="hidden sm:inline">添加</span>
             </button>
           </div>
@@ -585,7 +669,9 @@ export default function Tasks() {
           <div className="text-center">
             <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-2" />
             <p className="text-gray-500 mb-4">{error}</p>
-            <button onClick={loadTasks} className="px-4 py-2 bg-blue-500 text-white rounded-lg">重试</button>
+            <button onClick={loadTasks} className="px-4 py-2 bg-blue-500 text-white rounded-lg">
+              重试
+            </button>
           </div>
         </div>
       ) : allTasks.length === 0 ? (
@@ -603,7 +689,8 @@ export default function Tasks() {
               太棒了，任务都完成了！
             </h3>
             <p className="text-gray-500 dark:text-gray-400 mb-6 leading-relaxed">
-              暂无待办任务，享受今天的美好时光<br />
+              暂无待办任务，享受今天的美好时光
+              <br />
               或者创建新任务开始新的征程
             </p>
             <div className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-2xl shadow-lg shadow-blue-500/30 font-medium">
@@ -620,7 +707,9 @@ export default function Tasks() {
               <div className="bg-gradient-to-b from-white to-gray-50/50 dark:from-slate-800 dark:to-slate-800/50 rounded-2xl border border-gray-200/60 dark:border-slate-700/60 p-4 h-full overflow-y-auto shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-2 h-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500" />
-                  <h3 className="text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">待安排</h3>
+                  <h3 className="text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                    待安排
+                  </h3>
                 </div>
                 {displayDates.map(date => {
                   const unscheduled = getUnscheduledTasks(date);
@@ -630,9 +719,13 @@ export default function Tasks() {
                   return (
                     <div key={formatDate(date)} className="mb-5 last:mb-0">
                       {viewType === 'week' && (
-                        <p className={`text-xs font-medium mb-2 flex items-center gap-1.5 ${
-                          weekend ? 'text-violet-500 dark:text-violet-400' : 'text-gray-500 dark:text-gray-400'
-                        }`}>
+                        <p
+                          className={`text-xs font-medium mb-2 flex items-center gap-1.5 ${
+                            weekend
+                              ? 'text-violet-500 dark:text-violet-400'
+                              : 'text-gray-500 dark:text-gray-400'
+                          }`}
+                        >
                           {weekend && <span className="text-[10px]">✨</span>}
                           {getWeekday(date)} {date.getDate()}日
                         </p>
@@ -648,8 +741,12 @@ export default function Tasks() {
                           >
                             {unscheduled.map((task, index) => (
                               <Draggable key={task.id} draggableId={task.id} index={index}>
-                                {(provided) => (
-                                  <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}>
+                                {provided => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                  >
                                     <TaskCard task={task} />
                                   </div>
                                 )}
@@ -691,26 +788,30 @@ export default function Tasks() {
                               : ''
                         }`}
                       >
-                        <p className={`text-xs font-medium ${
-                          today
-                            ? 'text-blue-600 dark:text-blue-400'
-                            : weekend
-                              ? 'text-violet-500 dark:text-violet-400'
-                              : 'text-gray-500 dark:text-gray-400'
-                        }`}>
+                        <p
+                          className={`text-xs font-medium ${
+                            today
+                              ? 'text-blue-600 dark:text-blue-400'
+                              : weekend
+                                ? 'text-violet-500 dark:text-violet-400'
+                                : 'text-gray-500 dark:text-gray-400'
+                          }`}
+                        >
                           周{getWeekdayShort(date)}
                         </p>
                         <div className="flex items-center justify-center gap-1">
                           {today && (
                             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                           )}
-                          <p className={`text-lg font-bold ${
-                            today
-                              ? 'text-blue-600 dark:text-blue-400'
-                              : weekend
-                                ? 'text-violet-600 dark:text-violet-400'
-                                : 'text-gray-900 dark:text-white'
-                          }`}>
+                          <p
+                            className={`text-lg font-bold ${
+                              today
+                                ? 'text-blue-600 dark:text-blue-400'
+                                : weekend
+                                  ? 'text-violet-600 dark:text-violet-400'
+                                  : 'text-gray-900 dark:text-white'
+                            }`}
+                          >
                             {date.getDate()}
                           </p>
                         </div>
@@ -726,18 +827,31 @@ export default function Tasks() {
                 <div className="sticky top-0 z-10 backdrop-blur-sm bg-gradient-to-r from-amber-100/90 via-orange-50/90 to-yellow-100/90 dark:from-amber-900/50 dark:via-orange-900/40 dark:to-yellow-900/50 px-4 py-2 border-b border-amber-200/50 dark:border-amber-700/30">
                   <div className="flex items-center gap-2">
                     <span className="text-base">☀️</span>
-                    <span className="text-xs font-semibold text-amber-800 dark:text-amber-200">上午</span>
-                    <span className="text-xs text-amber-600/70 dark:text-amber-300/70">8:00 - 12:00</span>
+                    <span className="text-xs font-semibold text-amber-800 dark:text-amber-200">
+                      上午
+                    </span>
+                    <span className="text-xs text-amber-600/70 dark:text-amber-300/70">
+                      8:00 - 12:00
+                    </span>
                   </div>
                 </div>
 
                 {TIME_SLOTS.filter(s => s.minutes < 12 * 60).map(slot => (
-                  <div key={slot.minutes} className={`flex border-b ${slot.isHourStart ? 'border-gray-200/60 dark:border-slate-600/60' : 'border-gray-100/40 dark:border-slate-700/40'}`}>
+                  <div
+                    key={slot.minutes}
+                    className={`flex border-b ${slot.isHourStart ? 'border-gray-200/60 dark:border-slate-600/60' : 'border-gray-100/40 dark:border-slate-700/40'}`}
+                  >
                     {/* 时间标签 */}
-                    <div className={`w-14 flex-shrink-0 py-1.5 px-2 text-right border-r border-gray-100/50 dark:border-slate-700/50 ${
-                      slot.isHourStart ? 'bg-gradient-to-r from-gray-50 to-transparent dark:from-slate-700/30' : ''
-                    }`}>
-                      <span className={`text-[11px] font-mono ${slot.isHourStart ? 'font-semibold text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'}`}>
+                    <div
+                      className={`w-14 flex-shrink-0 py-1.5 px-2 text-right border-r border-gray-100/50 dark:border-slate-700/50 ${
+                        slot.isHourStart
+                          ? 'bg-gradient-to-r from-gray-50 to-transparent dark:from-slate-700/30'
+                          : ''
+                      }`}
+                    >
+                      <span
+                        className={`text-[11px] font-mono ${slot.isHourStart ? 'font-semibold text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'}`}
+                      >
                         {slot.isHourStart ? slot.label : slot.label.split(':')[1]}
                       </span>
                     </div>
@@ -748,7 +862,10 @@ export default function Tasks() {
                       const today = isToday(date);
                       const dateStr = formatDate(date);
                       return (
-                        <Droppable key={`${dateStr}-${slot.minutes}`} droppableId={`slot|${dateStr}|${slot.minutes}`}>
+                        <Droppable
+                          key={`${dateStr}-${slot.minutes}`}
+                          droppableId={`slot|${dateStr}|${slot.minutes}`}
+                        >
                           {(provided, snapshot) => (
                             <div
                               ref={provided.innerRef}
@@ -765,15 +882,19 @@ export default function Tasks() {
                             >
                               {getTasksInSlot(date, slot.minutes).map((task, index) => (
                                 <Draggable key={task.id} draggableId={task.id} index={index}>
-                                  {(provided) => (
-                                    <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}>
+                                  {provided => (
+                                    <div
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      {...provided.dragHandleProps}
+                                    >
                                       <TaskCard task={task} compact={viewType === 'week'} />
                                     </div>
                                   )}
                                 </Draggable>
                               ))}
                               {provided.placeholder}
-                            <CurrentTimeLine dateStr={dateStr} slotMinutes={slot.minutes} />
+                              <CurrentTimeLine dateStr={dateStr} slotMinutes={slot.minutes} />
                             </div>
                           )}
                         </Droppable>
@@ -785,7 +906,9 @@ export default function Tasks() {
                 {/* 午休 */}
                 <div className="bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 dark:from-slate-700/60 dark:via-slate-600/40 dark:to-slate-700/60 px-4 py-3 flex items-center justify-center gap-2 border-y border-gray-200/50 dark:border-slate-600/50">
                   <span className="text-lg">🍽️</span>
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">午休时间</span>
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    午休时间
+                  </span>
                   <span className="text-xs text-gray-400 dark:text-gray-500">12:00 - 13:30</span>
                 </div>
 
@@ -793,17 +916,30 @@ export default function Tasks() {
                 <div className="sticky top-0 z-10 backdrop-blur-sm bg-gradient-to-r from-blue-100/90 via-indigo-50/90 to-sky-100/90 dark:from-blue-900/50 dark:via-indigo-900/40 dark:to-sky-900/50 px-4 py-2 border-b border-blue-200/50 dark:border-blue-700/30">
                   <div className="flex items-center gap-2">
                     <span className="text-base">🌤️</span>
-                    <span className="text-xs font-semibold text-blue-800 dark:text-blue-200">下午</span>
-                    <span className="text-xs text-blue-600/70 dark:text-blue-300/70">13:30 - 18:00</span>
+                    <span className="text-xs font-semibold text-blue-800 dark:text-blue-200">
+                      下午
+                    </span>
+                    <span className="text-xs text-blue-600/70 dark:text-blue-300/70">
+                      13:30 - 18:00
+                    </span>
                   </div>
                 </div>
 
                 {TIME_SLOTS.filter(s => s.minutes >= 13 * 60 + 30).map(slot => (
-                  <div key={slot.minutes} className={`flex border-b ${slot.isHourStart ? 'border-gray-200/60 dark:border-slate-600/60' : 'border-gray-100/40 dark:border-slate-700/40'}`}>
-                    <div className={`w-14 flex-shrink-0 py-1.5 px-2 text-right border-r border-gray-100/50 dark:border-slate-700/50 ${
-                      slot.isHourStart ? 'bg-gradient-to-r from-gray-50 to-transparent dark:from-slate-700/30' : ''
-                    }`}>
-                      <span className={`text-[11px] font-mono ${slot.isHourStart ? 'font-semibold text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'}`}>
+                  <div
+                    key={slot.minutes}
+                    className={`flex border-b ${slot.isHourStart ? 'border-gray-200/60 dark:border-slate-600/60' : 'border-gray-100/40 dark:border-slate-700/40'}`}
+                  >
+                    <div
+                      className={`w-14 flex-shrink-0 py-1.5 px-2 text-right border-r border-gray-100/50 dark:border-slate-700/50 ${
+                        slot.isHourStart
+                          ? 'bg-gradient-to-r from-gray-50 to-transparent dark:from-slate-700/30'
+                          : ''
+                      }`}
+                    >
+                      <span
+                        className={`text-[11px] font-mono ${slot.isHourStart ? 'font-semibold text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'}`}
+                      >
                         {slot.isHourStart ? slot.label : slot.label.split(':')[1]}
                       </span>
                     </div>
@@ -813,7 +949,10 @@ export default function Tasks() {
                       const today = isToday(date);
                       const dateStr = formatDate(date);
                       return (
-                        <Droppable key={`${dateStr}-${slot.minutes}`} droppableId={`slot|${dateStr}|${slot.minutes}`}>
+                        <Droppable
+                          key={`${dateStr}-${slot.minutes}`}
+                          droppableId={`slot|${dateStr}|${slot.minutes}`}
+                        >
                           {(provided, snapshot) => (
                             <div
                               ref={provided.innerRef}
@@ -830,15 +969,19 @@ export default function Tasks() {
                             >
                               {getTasksInSlot(date, slot.minutes).map((task, index) => (
                                 <Draggable key={task.id} draggableId={task.id} index={index}>
-                                  {(provided) => (
-                                    <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}>
+                                  {provided => (
+                                    <div
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      {...provided.dragHandleProps}
+                                    >
                                       <TaskCard task={task} compact={viewType === 'week'} />
                                     </div>
                                   )}
                                 </Draggable>
                               ))}
                               {provided.placeholder}
-                            <CurrentTimeLine dateStr={dateStr} slotMinutes={slot.minutes} />
+                              <CurrentTimeLine dateStr={dateStr} slotMinutes={slot.minutes} />
                             </div>
                           )}
                         </Droppable>

@@ -6,22 +6,27 @@
 
 // 图标类型（lucide-react 图标名称）
 export type IconName =
-  | 'Monitor' | 'Code' | 'Wallet'  // 部门图标
-  | 'Video' | 'BarChart3' | 'Wrench' | 'User';  // 员工图标
+  | 'Monitor'
+  | 'Code'
+  | 'Wallet' // 部门图标
+  | 'Video'
+  | 'BarChart3'
+  | 'Wrench'
+  | 'User'; // 员工图标
 
 // 职能
 export interface AiAbility {
   id: string;
   name: string;
   description?: string;
-  workflowKeywords: string[];  // 匹配 n8n workflow 名称
+  workflowKeywords: string[]; // 匹配 n8n workflow 名称
 }
 
 // 员工
 export interface AiEmployee {
   id: string;
   name: string;
-  icon: IconName;  // lucide 图标名称
+  icon: IconName; // lucide 图标名称
   role: string;
   description?: string;
   abilities: AiAbility[];
@@ -31,7 +36,7 @@ export interface AiEmployee {
 export interface Department {
   id: string;
   name: string;
-  icon: IconName;  // lucide 图标名称
+  icon: IconName; // lucide 图标名称
   description?: string;
   employees: AiEmployee[];
 }
@@ -56,15 +61,15 @@ export const AI_DEPARTMENTS: Department[] = [
             id: 'login',
             name: '账号登录',
             description: '管理平台账号登录状态',
-            workflowKeywords: ['登录', 'login', 'Login', 'VNC', 'vnc']
+            workflowKeywords: ['登录', 'login', 'Login', 'VNC', 'vnc'],
           },
           {
             id: 'publish',
             name: '内容发布',
             description: '执行内容发布任务',
-            workflowKeywords: ['发布', 'publish', 'Publish', 'post', 'Post']
-          }
-        ]
+            workflowKeywords: ['发布', 'publish', 'Publish', 'post', 'Post'],
+          },
+        ],
       },
       {
         id: 'xiaoxi',
@@ -77,17 +82,17 @@ export const AI_DEPARTMENTS: Department[] = [
             id: 'scrape',
             name: '数据采集',
             description: '从各平台采集数据',
-            workflowKeywords: ['爬取', 'scrape', 'Scrape', 'scraping', 'Scraping', '采集']
+            workflowKeywords: ['爬取', 'scrape', 'Scrape', 'scraping', 'Scraping', '采集'],
           },
           {
             id: 'analytics',
             name: '数据分析',
             description: '分析数据并生成报告',
-            workflowKeywords: ['分析', 'analytics', 'Analytics', '统计', 'stats', 'Stats']
-          }
-        ]
-      }
-    ]
+            workflowKeywords: ['分析', 'analytics', 'Analytics', '统计', 'stats', 'Stats'],
+          },
+        ],
+      },
+    ],
   },
   {
     id: 'tech',
@@ -106,25 +111,34 @@ export const AI_DEPARTMENTS: Department[] = [
             id: 'claude',
             name: 'AI 任务',
             description: '执行 Claude AI 相关任务',
-            workflowKeywords: ['claude', 'Claude', 'AI', 'ai', 'GPT', 'gpt']
+            workflowKeywords: ['claude', 'Claude', 'AI', 'ai', 'GPT', 'gpt'],
           },
           {
             id: 'maintenance',
             name: '系统维护',
             description: '定时维护和清理任务',
-            workflowKeywords: ['maintenance', 'Maintenance', 'nightly', 'Nightly', '维护', '清理', 'cleanup', 'Cleanup']
-          }
-        ]
-      }
-    ]
+            workflowKeywords: [
+              'maintenance',
+              'Maintenance',
+              'nightly',
+              'Nightly',
+              '维护',
+              '清理',
+              'cleanup',
+              'Cleanup',
+            ],
+          },
+        ],
+      },
+    ],
   },
   {
     id: 'finance',
     name: '财务部',
     icon: 'Wallet',
     description: '预留部门',
-    employees: []  // 预留
-  }
+    employees: [], // 预留
+  },
 ];
 
 // ============ 辅助函数 ============
@@ -136,9 +150,11 @@ export function matchEmployeeByWorkflow(workflowName: string): AiEmployee | null
   for (const dept of AI_DEPARTMENTS) {
     for (const employee of dept.employees) {
       for (const ability of employee.abilities) {
-        if (ability.workflowKeywords.some(keyword =>
-          workflowName.toLowerCase().includes(keyword.toLowerCase())
-        )) {
+        if (
+          ability.workflowKeywords.some(keyword =>
+            workflowName.toLowerCase().includes(keyword.toLowerCase())
+          )
+        ) {
           return employee;
         }
       }
@@ -150,13 +166,17 @@ export function matchEmployeeByWorkflow(workflowName: string): AiEmployee | null
 /**
  * 根据工作流名称匹配职能
  */
-export function matchAbilityByWorkflow(workflowName: string): { employee: AiEmployee; ability: AiAbility } | null {
+export function matchAbilityByWorkflow(
+  workflowName: string
+): { employee: AiEmployee; ability: AiAbility } | null {
   for (const dept of AI_DEPARTMENTS) {
     for (const employee of dept.employees) {
       for (const ability of employee.abilities) {
-        if (ability.workflowKeywords.some(keyword =>
-          workflowName.toLowerCase().includes(keyword.toLowerCase())
-        )) {
+        if (
+          ability.workflowKeywords.some(keyword =>
+            workflowName.toLowerCase().includes(keyword.toLowerCase())
+          )
+        ) {
           return { employee, ability };
         }
       }

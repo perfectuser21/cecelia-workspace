@@ -161,7 +161,8 @@ export default function FeishuLogin() {
 
     // 动态加载飞书 SDK
     const script = document.createElement('script');
-    script.src = 'https://lf-package-cn.feishucdn.com/obj/feishu-static/lark/passport/qrcode/LarkSSOSDKWebQRCode-1.0.3.js';
+    script.src =
+      'https://lf-package-cn.feishucdn.com/obj/feishu-static/lark/passport/qrcode/LarkSSOSDKWebQRCode-1.0.3.js';
     script.async = true;
     script.onload = () => {
       initQRCode();
@@ -221,11 +222,14 @@ export default function FeishuLogin() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{
-        background: isCore
-          ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)'
-          : 'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)'
-      }}>
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{
+          background: isCore
+            ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)'
+            : 'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)',
+        }}
+      >
         <div className="text-center">
           <img src="/logo-white.png" alt="Logo" className="h-14 mx-auto mb-8" />
           <p className="text-white/80 text-lg mb-6">正在为你准备一切...</p>
@@ -254,14 +258,27 @@ export default function FeishuLogin() {
   }
 
   return (
-    <div className="min-h-screen flex" style={{ background: isCore ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)' }}>
+    <div
+      className="min-h-screen flex"
+      style={{
+        background: isCore
+          ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)'
+          : 'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)',
+      }}
+    >
       {/* 左侧 - 品牌展示区 */}
       <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 flex-col justify-between p-12 relative overflow-hidden">
         {/* 背景装饰 */}
         <div className="absolute inset-0 overflow-hidden">
-          <div className={`absolute -top-40 -left-40 w-80 h-80 rounded-full opacity-10 ${isCore ? 'bg-slate-400' : 'bg-blue-500'}`} />
-          <div className={`absolute top-1/3 -right-20 w-60 h-60 rounded-full opacity-10 ${isCore ? 'bg-slate-300' : 'bg-sky-400'}`} />
-          <div className={`absolute -bottom-20 left-1/4 w-40 h-40 rounded-full opacity-5 ${isCore ? 'bg-slate-200' : 'bg-cyan-400'}`} />
+          <div
+            className={`absolute -top-40 -left-40 w-80 h-80 rounded-full opacity-10 ${isCore ? 'bg-slate-400' : 'bg-blue-500'}`}
+          />
+          <div
+            className={`absolute top-1/3 -right-20 w-60 h-60 rounded-full opacity-10 ${isCore ? 'bg-slate-300' : 'bg-sky-400'}`}
+          />
+          <div
+            className={`absolute -bottom-20 left-1/4 w-40 h-40 rounded-full opacity-5 ${isCore ? 'bg-slate-200' : 'bg-cyan-400'}`}
+          />
         </div>
 
         {/* Logo */}
@@ -321,7 +338,9 @@ export default function FeishuLogin() {
             {/* 飞书扫码二维码容器 */}
             <div className="flex flex-col items-center mb-6">
               {/* 二维码外框 - 210px 显示区域 */}
-              <div className={`rounded-2xl border-2 ${isCore ? 'border-slate-400/50' : 'border-sky-400/50'} bg-white p-2`}>
+              <div
+                className={`rounded-2xl border-2 ${isCore ? 'border-slate-400/50' : 'border-sky-400/50'} bg-white p-2`}
+              >
                 {/* 裁剪容器 */}
                 <div style={{ width: 210, height: 210, overflow: 'hidden', borderRadius: 8 }}>
                   {/* SDK 生成 300x300，缩放到 70% = 210px */}
@@ -329,12 +348,21 @@ export default function FeishuLogin() {
                     key={qrKey}
                     id="feishu-qr-container"
                     className="[&_iframe]:!border-0 [&_iframe]:!outline-none [&_iframe]:block"
-                    style={{ width: 300, height: 300, transform: 'scale(0.7)', transformOrigin: 'top left' }}
+                    style={{
+                      width: 300,
+                      height: 300,
+                      transform: 'scale(0.7)',
+                      transformOrigin: 'top left',
+                    }}
                   >
                     {(!qrReady || refreshing) && !error && (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 rounded-lg">
-                        <div className={`animate-spin rounded-full h-8 w-8 border-2 border-t-transparent mb-3 ${isCore ? 'border-slate-500' : 'border-blue-600'}`}></div>
-                        <p className="text-gray-400 text-sm">{refreshing ? '刷新中...' : '加载中...'}</p>
+                        <div
+                          className={`animate-spin rounded-full h-8 w-8 border-2 border-t-transparent mb-3 ${isCore ? 'border-slate-500' : 'border-blue-600'}`}
+                        ></div>
+                        <p className="text-gray-400 text-sm">
+                          {refreshing ? '刷新中...' : '加载中...'}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -387,9 +415,7 @@ export default function FeishuLogin() {
           </div>
 
           {/* 底部版权 */}
-          <p className="text-center text-white/30 text-xs mt-8">
-            © 2025 悦升云端科技 ZenithJoy
-          </p>
+          <p className="text-center text-white/30 text-xs mt-8">© 2025 悦升云端科技 ZenithJoy</p>
         </div>
       </div>
     </div>

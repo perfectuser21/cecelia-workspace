@@ -96,7 +96,11 @@ export const publishApi = {
   },
 
   // Get all publish tasks
-  getTasks: async (options?: { status?: string; limit?: number; offset?: number }): Promise<PublishTask[]> => {
+  getTasks: async (options?: {
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<PublishTask[]> => {
     const response = await apiClient.get<PublishTask[]>('/v1/publish/tasks', {
       params: options,
     });
@@ -126,13 +130,16 @@ export const publishApi = {
   },
 
   // Update task
-  updateTask: async (id: string, data: Partial<{
-    title: string;
-    content: string;
-    originalFiles: string[];
-    targetPlatforms: string[];
-    scheduleAt: string | null;
-  }>): Promise<PublishTask> => {
+  updateTask: async (
+    id: string,
+    data: Partial<{
+      title: string;
+      content: string;
+      originalFiles: string[];
+      targetPlatforms: string[];
+      scheduleAt: string | null;
+    }>
+  ): Promise<PublishTask> => {
     const response = await apiClient.patch<PublishTask>(`/v1/publish/tasks/${id}`, data);
     return response.data;
   },
@@ -156,7 +163,9 @@ export const publishApi = {
 
   // Retry failed platform
   retryPlatform: async (taskId: string, platform: string): Promise<PublishTask> => {
-    const response = await apiClient.post<PublishTask>(`/v1/publish/tasks/${taskId}/retry/${platform}`);
+    const response = await apiClient.post<PublishTask>(
+      `/v1/publish/tasks/${taskId}/retry/${platform}`
+    );
     return response.data;
   },
 

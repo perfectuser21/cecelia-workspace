@@ -1,8 +1,8 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
-import App from './App'
-import './index.css'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App';
+import './index.css';
 
 // 强制刷新 Service Worker 缓存
 const APP_VERSION = '2026-01-18-v1';
@@ -47,6 +47,6 @@ clearStaleCache().then(() => {
       <BrowserRouter>
         <App />
       </BrowserRouter>
-    </React.StrictMode>,
+    </React.StrictMode>
   );
 });

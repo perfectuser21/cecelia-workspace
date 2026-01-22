@@ -145,7 +145,7 @@ export default function SettingsPage() {
               type="checkbox"
               id="feishuEnabled"
               checked={settings.notifications.feishu.enabled}
-              onChange={(e) => handleChange('notifications.feishu.enabled', e.target.checked)}
+              onChange={e => handleChange('notifications.feishu.enabled', e.target.checked)}
               className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
             />
             <label htmlFor="feishuEnabled" className="ml-2 text-sm font-medium text-gray-700">
@@ -154,14 +154,12 @@ export default function SettingsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Webhook URL
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Webhook URL</label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={settings.notifications.feishu.webhookUrl}
-                onChange={(e) => handleChange('notifications.feishu.webhookUrl', e.target.value)}
+                onChange={e => handleChange('notifications.feishu.webhookUrl', e.target.value)}
                 placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..."
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -184,7 +182,9 @@ export default function SettingsPage() {
                   type="checkbox"
                   id="notifySuccess"
                   checked={settings.notifications.feishu.notifyOnSuccess}
-                  onChange={(e) => handleChange('notifications.feishu.notifyOnSuccess', e.target.checked)}
+                  onChange={e =>
+                    handleChange('notifications.feishu.notifyOnSuccess', e.target.checked)
+                  }
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <label htmlFor="notifySuccess" className="ml-2 text-sm text-gray-700">
@@ -196,7 +196,9 @@ export default function SettingsPage() {
                   type="checkbox"
                   id="notifyFailure"
                   checked={settings.notifications.feishu.notifyOnFailure}
-                  onChange={(e) => handleChange('notifications.feishu.notifyOnFailure', e.target.checked)}
+                  onChange={e =>
+                    handleChange('notifications.feishu.notifyOnFailure', e.target.checked)
+                  }
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <label htmlFor="notifyFailure" className="ml-2 text-sm text-gray-700">
@@ -208,7 +210,9 @@ export default function SettingsPage() {
                   type="checkbox"
                   id="notifyLogin"
                   checked={settings.notifications.feishu.notifyOnLogin}
-                  onChange={(e) => handleChange('notifications.feishu.notifyOnLogin', e.target.checked)}
+                  onChange={e =>
+                    handleChange('notifications.feishu.notifyOnLogin', e.target.checked)
+                  }
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <label htmlFor="notifyLogin" className="ml-2 text-sm text-gray-700">
@@ -220,7 +224,9 @@ export default function SettingsPage() {
                   type="checkbox"
                   id="notifyMetrics"
                   checked={settings.notifications.feishu.notifyOnMetrics}
-                  onChange={(e) => handleChange('notifications.feishu.notifyOnMetrics', e.target.checked)}
+                  onChange={e =>
+                    handleChange('notifications.feishu.notifyOnMetrics', e.target.checked)
+                  }
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <label htmlFor="notifyMetrics" className="ml-2 text-sm text-gray-700">
@@ -241,7 +247,7 @@ export default function SettingsPage() {
               type="checkbox"
               id="notionEnabled"
               checked={settings.notion.enabled}
-              onChange={(e) => handleChange('notion.enabled', e.target.checked)}
+              onChange={e => handleChange('notion.enabled', e.target.checked)}
               className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
             />
             <label htmlFor="notionEnabled" className="ml-2 text-sm font-medium text-gray-700">
@@ -250,27 +256,23 @@ export default function SettingsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              API Key
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">API Key</label>
             <input
               type="password"
               value={settings.notion.apiKey}
-              onChange={(e) => handleChange('notion.apiKey', e.target.value)}
+              onChange={e => handleChange('notion.apiKey', e.target.value)}
               placeholder="secret_..."
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Database ID
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Database ID</label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={settings.notion.databaseId}
-                onChange={(e) => handleChange('notion.databaseId', e.target.value)}
+                onChange={e => handleChange('notion.databaseId', e.target.value)}
                 placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -292,37 +294,31 @@ export default function SettingsPage() {
         <h2 className="text-lg font-semibold text-gray-900 mb-4">数据采集配置</h2>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              超时时间（秒）
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">超时时间（秒）</label>
             <input
               type="number"
               value={settings.collection.timeout}
-              onChange={(e) => handleChange('collection.timeout', parseInt(e.target.value))}
+              onChange={e => handleChange('collection.timeout', parseInt(e.target.value))}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              重试次数
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">重试次数</label>
             <input
               type="number"
               value={settings.collection.retries}
-              onChange={(e) => handleChange('collection.retries', parseInt(e.target.value))}
+              onChange={e => handleChange('collection.retries', parseInt(e.target.value))}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              并发数
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">并发数</label>
             <input
               type="number"
               value={settings.collection.concurrency}
-              onChange={(e) => handleChange('collection.concurrency', parseInt(e.target.value))}
+              onChange={e => handleChange('collection.concurrency', parseInt(e.target.value))}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -339,17 +335,22 @@ export default function SettingsPage() {
                 type="checkbox"
                 id="loginExpiryEnabled"
                 checked={settings.alerts.loginExpiry.enabled}
-                onChange={(e) => handleChange('alerts.loginExpiry.enabled', e.target.checked)}
+                onChange={e => handleChange('alerts.loginExpiry.enabled', e.target.checked)}
                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
               />
-              <label htmlFor="loginExpiryEnabled" className="ml-2 text-sm font-medium text-gray-700">
+              <label
+                htmlFor="loginExpiryEnabled"
+                className="ml-2 text-sm font-medium text-gray-700"
+              >
                 登录过期告警
               </label>
             </div>
             <input
               type="number"
               value={settings.alerts.loginExpiry.daysBeforeExpiry}
-              onChange={(e) => handleChange('alerts.loginExpiry.daysBeforeExpiry', parseInt(e.target.value))}
+              onChange={e =>
+                handleChange('alerts.loginExpiry.daysBeforeExpiry', parseInt(e.target.value))
+              }
               placeholder="提前天数"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={!settings.alerts.loginExpiry.enabled}
@@ -362,17 +363,22 @@ export default function SettingsPage() {
                 type="checkbox"
                 id="followerDropEnabled"
                 checked={settings.alerts.followerDrop.enabled}
-                onChange={(e) => handleChange('alerts.followerDrop.enabled', e.target.checked)}
+                onChange={e => handleChange('alerts.followerDrop.enabled', e.target.checked)}
                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
               />
-              <label htmlFor="followerDropEnabled" className="ml-2 text-sm font-medium text-gray-700">
+              <label
+                htmlFor="followerDropEnabled"
+                className="ml-2 text-sm font-medium text-gray-700"
+              >
                 粉丝下降告警
               </label>
             </div>
             <input
               type="number"
               value={settings.alerts.followerDrop.threshold}
-              onChange={(e) => handleChange('alerts.followerDrop.threshold', parseInt(e.target.value))}
+              onChange={e =>
+                handleChange('alerts.followerDrop.threshold', parseInt(e.target.value))
+              }
               placeholder="下降百分比阈值"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={!settings.alerts.followerDrop.enabled}
@@ -385,17 +391,22 @@ export default function SettingsPage() {
                 type="checkbox"
                 id="engagementDropEnabled"
                 checked={settings.alerts.engagementDrop.enabled}
-                onChange={(e) => handleChange('alerts.engagementDrop.enabled', e.target.checked)}
+                onChange={e => handleChange('alerts.engagementDrop.enabled', e.target.checked)}
                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
               />
-              <label htmlFor="engagementDropEnabled" className="ml-2 text-sm font-medium text-gray-700">
+              <label
+                htmlFor="engagementDropEnabled"
+                className="ml-2 text-sm font-medium text-gray-700"
+              >
                 互动下降告警
               </label>
             </div>
             <input
               type="number"
               value={settings.alerts.engagementDrop.threshold}
-              onChange={(e) => handleChange('alerts.engagementDrop.threshold', parseInt(e.target.value))}
+              onChange={e =>
+                handleChange('alerts.engagementDrop.threshold', parseInt(e.target.value))
+              }
               placeholder="下降阈值"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={!settings.alerts.engagementDrop.enabled}

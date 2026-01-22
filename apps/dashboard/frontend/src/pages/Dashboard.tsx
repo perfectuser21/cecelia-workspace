@@ -23,7 +23,7 @@ import {
   CloudSnow,
   Quote,
   Timer,
-  PartyPopper
+  PartyPopper,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -157,7 +157,7 @@ const MAIN_FEATURES = [
     icon: BarChart3,
     color: 'from-blue-500 to-blue-600',
     badge: '实时',
-    link: '/data-center'
+    link: '/data-center',
   },
   {
     id: 'accounts',
@@ -166,7 +166,7 @@ const MAIN_FEATURES = [
     icon: Users,
     color: 'from-indigo-500 to-indigo-600',
     badge: '',
-    link: '/accounts'
+    link: '/accounts',
   },
   {
     id: 'content',
@@ -175,7 +175,7 @@ const MAIN_FEATURES = [
     icon: FileText,
     color: 'from-sky-500 to-cyan-600',
     badge: '即将上线',
-    link: '#'
+    link: '#',
   },
   {
     id: 'tools',
@@ -184,8 +184,8 @@ const MAIN_FEATURES = [
     icon: Sparkles,
     color: 'from-violet-500 to-purple-600',
     badge: '',
-    link: '/tools'
-  }
+    link: '/tools',
+  },
 ];
 
 // 数据采集平台
@@ -195,44 +195,68 @@ const SCRAPING_PLATFORMS = [
     name: '抖音',
     icon: Video,
     color: 'bg-pink-500',
-    endpoint: '/webhook/douyin-scraper'
+    endpoint: '/webhook/douyin-scraper',
   },
   {
     id: 'xiaohongshu',
     name: '小红书',
     icon: ImageIcon,
     color: 'bg-red-500',
-    endpoint: '/webhook/xhs-scraper'
+    endpoint: '/webhook/xhs-scraper',
   },
   {
     id: 'weibo',
     name: '微博',
     icon: MessageCircle,
     color: 'bg-orange-500',
-    endpoint: '/webhook/weibo-scraper'
+    endpoint: '/webhook/weibo-scraper',
   },
   {
     id: 'toutiao',
     name: '今日头条',
     icon: Newspaper,
     color: 'bg-blue-500',
-    endpoint: '/webhook/toutiao-scraper'
+    endpoint: '/webhook/toutiao-scraper',
   },
   {
     id: 'shipin',
     name: '视频号',
     icon: Tv,
     color: 'bg-green-500',
-    endpoint: '/webhook/shipin-scraper'
-  }
+    endpoint: '/webhook/shipin-scraper',
+  },
 ];
 
 // 快捷操作 - 立体卡片风格
 const QUICK_ACTIONS = [
-  { id: 'scrape', title: '数据采集', icon: Database, color: 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600' },
-  { id: 'report', title: '生成报表', icon: FileText, color: 'text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600' },
-  { id: 'hot', title: '热点监控', icon: Target, color: 'text-sky-600 dark:text-sky-400 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600' },
-  { id: 'analysis', title: '数据分析', icon: Activity, color: 'text-violet-600 dark:text-violet-400 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600' }
+  {
+    id: 'scrape',
+    title: '数据采集',
+    icon: Database,
+    color:
+      'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600',
+  },
+  {
+    id: 'report',
+    title: '生成报表',
+    icon: FileText,
+    color:
+      'text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600',
+  },
+  {
+    id: 'hot',
+    title: '热点监控',
+    icon: Target,
+    color:
+      'text-sky-600 dark:text-sky-400 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600',
+  },
+  {
+    id: 'analysis',
+    title: '数据分析',
+    icon: Activity,
+    color:
+      'text-violet-600 dark:text-violet-400 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600',
+  },
 ];
 
 interface Task {
@@ -252,11 +276,11 @@ export default function Dashboard() {
     today: {
       tasks: 12,
       success: 11,
-      rate: 92
+      rate: 92,
     },
     platforms: 5,
     accounts: 23,
-    dataPoints: 1247
+    dataPoints: 1247,
   };
 
   // 节日检测
@@ -288,7 +312,7 @@ export default function Dashboard() {
               temp: current.temp_C,
               desc: current.lang_zh?.[0]?.value || current.weatherDesc?.[0]?.value || '未知',
               icon: getWeatherIcon(current.weatherCode),
-              city: '西安'
+              city: '西安',
             });
           }
         }
@@ -314,7 +338,7 @@ export default function Dashboard() {
       return {
         greeting: `${holiday.emoji} ${holiday.name}快乐`,
         subtitle: holiday.greeting,
-        isHoliday: true
+        isHoliday: true,
       };
     }
 
@@ -405,36 +429,31 @@ export default function Dashboard() {
     }
   };
 
-  const handleStartScraping = async (platform: typeof SCRAPING_PLATFORMS[0]) => {
+  const handleStartScraping = async (platform: (typeof SCRAPING_PLATFORMS)[0]) => {
     const newTask: Task = {
       id: `${platform.id}-${Date.now()}`,
       platform: platform.name,
       status: 'running',
-      startTime: new Date()
+      startTime: new Date(),
     };
 
     setTasks(prev => [newTask, ...prev]);
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_N8N_WEBHOOK_BASE}${platform.endpoint}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: user?.id,
-            platform: platform.id,
-            timestamp: new Date().toISOString()
-          })
-        }
-      );
+      const response = await fetch(`${import.meta.env.VITE_N8N_WEBHOOK_BASE}${platform.endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          platform: platform.id,
+          timestamp: new Date().toISOString(),
+        }),
+      });
 
       if (response.ok) {
         setTasks(prev =>
           prev.map(task =>
-            task.id === newTask.id
-              ? { ...task, status: 'success', message: '采集完成' }
-              : task
+            task.id === newTask.id ? { ...task, status: 'success', message: '采集完成' } : task
           )
         );
       } else {
@@ -443,9 +462,7 @@ export default function Dashboard() {
     } catch {
       setTasks(prev =>
         prev.map(task =>
-          task.id === newTask.id
-            ? { ...task, status: 'failed', message: '采集失败' }
-            : task
+          task.id === newTask.id ? { ...task, status: 'failed', message: '采集失败' } : task
         )
       );
     }
@@ -460,9 +477,7 @@ export default function Dashboard() {
             <h1 className="text-3xl font-semibold text-slate-800 dark:text-white mb-2">
               {greeting.greeting}，{user?.name}
             </h1>
-            <p className="text-slate-500 dark:text-slate-400">
-              {greeting.subtitle}
-            </p>
+            <p className="text-slate-500 dark:text-slate-400">{greeting.subtitle}</p>
           </div>
           <div className="hidden md:flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-[0_4px_16px_-2px_rgba(0,0,0,0.12)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
             <Clock className="w-5 h-5 text-blue-500" />
@@ -471,7 +486,7 @@ export default function Dashboard() {
                 {new Date().toLocaleDateString('zh-CN', {
                   month: 'long',
                   day: 'numeric',
-                  weekday: 'long'
+                  weekday: 'long',
                 })}
               </div>
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -491,7 +506,9 @@ export default function Dashboard() {
               {weather.icon === 'rain' && <CloudRain className="w-4 h-4 text-blue-500" />}
               {weather.icon === 'snow' && <CloudSnow className="w-4 h-4 text-cyan-400" />}
               <span className="text-sm text-slate-600 dark:text-slate-300">
-                {weather.city} <span className="font-medium text-slate-800 dark:text-white">{weather.temp}°C</span> {weather.desc}
+                {weather.city}{' '}
+                <span className="font-medium text-slate-800 dark:text-white">{weather.temp}°C</span>{' '}
+                {weather.desc}
               </span>
             </div>
           )}
@@ -501,7 +518,10 @@ export default function Dashboard() {
             <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 shadow-[0_2px_12px_-2px_rgba(0,0,0,0.1)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
               <Timer className="w-4 h-4 text-blue-500" />
               <span className="text-sm text-slate-600 dark:text-slate-300">
-                距离下班还有 <span className="font-medium text-slate-800 dark:text-white">{offWorkCountdown.hours}小时{offWorkCountdown.minutes}分钟</span>
+                距离下班还有{' '}
+                <span className="font-medium text-slate-800 dark:text-white">
+                  {offWorkCountdown.hours}小时{offWorkCountdown.minutes}分钟
+                </span>
               </span>
             </div>
           )}
@@ -511,7 +531,10 @@ export default function Dashboard() {
             <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 shadow-[0_2px_12px_-2px_rgba(0,0,0,0.1)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
               <PartyPopper className="w-4 h-4 text-blue-500" />
               <span className="text-sm text-slate-600 dark:text-slate-300">
-                距离周末还有 <span className="font-medium text-slate-800 dark:text-white">{weekendCountdown}天</span>
+                距离周末还有{' '}
+                <span className="font-medium text-slate-800 dark:text-white">
+                  {weekendCountdown}天
+                </span>
               </span>
             </div>
           )}
@@ -521,7 +544,9 @@ export default function Dashboard() {
             <Quote className="w-4 h-4 text-blue-500" />
             <span className="text-sm text-slate-600 dark:text-slate-300">
               {dailyQuote.text}
-              <span className="text-slate-400 dark:text-slate-500 ml-1">—— {dailyQuote.author}</span>
+              <span className="text-slate-400 dark:text-slate-500 ml-1">
+                —— {dailyQuote.author}
+              </span>
             </span>
           </div>
         </div>
@@ -585,7 +610,9 @@ export default function Dashboard() {
                 <div className="relative">
                   <Icon className="w-6 h-6 mb-2 transition-all duration-500 group-hover:scale-125 group-hover:rotate-12 group-hover:text-blue-500 dark:group-hover:text-blue-400" />
                 </div>
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-200 relative">{action.title}</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200 relative">
+                  {action.title}
+                </span>
               </button>
             );
           })}
@@ -600,7 +627,7 @@ export default function Dashboard() {
             数据采集
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {SCRAPING_PLATFORMS.map((platform) => {
+            {SCRAPING_PLATFORMS.map(platform => {
               const Icon = platform.icon;
               const isRunning = tasks.some(
                 t => t.platform === platform.name && t.status === 'running'
@@ -616,9 +643,7 @@ export default function Dashboard() {
                 >
                   <Icon className="w-8 h-8 mb-2" />
                   <span className="text-sm font-medium">{platform.name}</span>
-                  {isRunning && (
-                    <div className="mt-2 text-xs opacity-90">采集中...</div>
-                  )}
+                  {isRunning && <div className="mt-2 text-xs opacity-90">采集中...</div>}
                 </button>
               );
             })}
@@ -630,7 +655,7 @@ export default function Dashboard() {
       <div className="mb-8">
         <h2 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">功能模块</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {MAIN_FEATURES.map((feature) => {
+          {MAIN_FEATURES.map(feature => {
             const Icon = feature.icon;
             return (
               <a
@@ -639,7 +664,9 @@ export default function Dashboard() {
                 className="group relative bg-white dark:bg-slate-800 rounded-2xl shadow-[0_4px_24px_-2px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.08)] hover:shadow-[0_15px_40px_-10px_rgba(52,103,214,0.25)] transition-all duration-300 overflow-hidden border border-slate-200 dark:border-slate-700 shimmer-card spring-hover"
               >
                 {/* 渐变背景 - 浅色模式更明显 */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-[0.08] dark:group-hover:opacity-[0.15] transition-opacity duration-300`}></div>
+                <div
+                  className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-[0.08] dark:group-hover:opacity-[0.15] transition-opacity duration-300`}
+                ></div>
 
                 <div className="relative p-7">
                   <div className="flex items-start justify-between mb-4">
@@ -661,7 +688,10 @@ export default function Dashboard() {
                     {feature.description}
                   </p>
                   <div className="mt-5 flex items-center text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all duration-300">
-                    进入 <span className="ml-1 group-hover:translate-x-2 transition-transform duration-300">→</span>
+                    进入{' '}
+                    <span className="ml-1 group-hover:translate-x-2 transition-transform duration-300">
+                      →
+                    </span>
                   </div>
                 </div>
               </a>
@@ -678,12 +708,17 @@ export default function Dashboard() {
             <h2 className="text-lg font-semibold text-slate-800 dark:text-white">最近活动</h2>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-700">
-            {tasks.slice(0, 5).map((task) => (
-              <div key={task.id} className="px-6 py-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all duration-300">
+            {tasks.slice(0, 5).map(task => (
+              <div
+                key={task.id}
+                className="px-6 py-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all duration-300"
+              >
                 <div className="flex items-center space-x-4">
                   <TaskStatusIcon status={task.status} />
                   <div>
-                    <p className="font-medium text-slate-800 dark:text-white">{task.platform} 数据采集</p>
+                    <p className="font-medium text-slate-800 dark:text-white">
+                      {task.platform} 数据采集
+                    </p>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
                       {task.startTime.toLocaleTimeString('zh-CN')}
                       {task.message && ` - ${task.message}`}
@@ -747,7 +782,7 @@ function StatCard({
   icon: Icon,
   color,
   subtitle,
-  index = 0
+  index = 0,
 }: {
   title: string;
   value: number | string;
@@ -757,24 +792,24 @@ function StatCard({
   index?: number;
 }) {
   // 解析数字值用于计数动画
-  const numericValue = typeof value === 'number' ? value : parseInt(String(value).replace(/[^0-9]/g, '')) || 0;
+  const numericValue =
+    typeof value === 'number' ? value : parseInt(String(value).replace(/[^0-9]/g, '')) || 0;
   const animatedValue = useCountUp(numericValue, 1000 + index * 150);
-  const displayValue = typeof value === 'string' && value.includes('+')
-    ? `${animatedValue}+`
-    : animatedValue;
+  const displayValue =
+    typeof value === 'string' && value.includes('+') ? `${animatedValue}+` : animatedValue;
 
   const colorClasses = {
     blue: 'bg-gradient-to-br from-blue-500 to-blue-600',
     purple: 'bg-gradient-to-br from-indigo-500 to-indigo-600',
     green: 'bg-gradient-to-br from-sky-500 to-cyan-600',
-    orange: 'bg-gradient-to-br from-violet-500 to-purple-600'
+    orange: 'bg-gradient-to-br from-violet-500 to-purple-600',
   };
 
   const glowColors = {
     blue: 'shadow-blue-500/30',
     purple: 'shadow-indigo-500/30',
     green: 'shadow-cyan-500/30',
-    orange: 'shadow-purple-500/30'
+    orange: 'shadow-purple-500/30',
   };
 
   return (
@@ -787,7 +822,9 @@ function StatCard({
 
       <div className="relative tilt-card-content">
         <div className="flex items-center justify-between mb-3">
-          <div className={`${colorClasses[color as keyof typeof colorClasses]} ${glowColors[color as keyof typeof glowColors]} rounded-xl p-2.5 shadow-lg group-hover:scale-110 group-hover:shadow-xl transition-all duration-300`}>
+          <div
+            className={`${colorClasses[color as keyof typeof colorClasses]} ${glowColors[color as keyof typeof glowColors]} rounded-xl p-2.5 shadow-lg group-hover:scale-110 group-hover:shadow-xl transition-all duration-300`}
+          >
             <Icon className="w-5 h-5 text-white" />
           </div>
           {/* 趋势指示器 */}
@@ -819,7 +856,11 @@ function TaskStatusIcon({ status }: { status: Task['status'] }) {
     case 'success':
       return <CheckCircle className="h-5 w-5 text-green-600" />;
     case 'failed':
-      return <div className="h-5 w-5 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xs font-bold">!</div>;
+      return (
+        <div className="h-5 w-5 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xs font-bold">
+          !
+        </div>
+      );
   }
 }
 
@@ -828,16 +869,18 @@ function TaskStatusBadge({ status }: { status: Task['status'] }) {
   const badges = {
     running: 'bg-blue-100 text-blue-800',
     success: 'bg-green-100 text-green-800',
-    failed: 'bg-red-100 text-red-800'
+    failed: 'bg-red-100 text-red-800',
   };
   const labels = {
     running: '进行中',
     success: '成功',
-    failed: '失败'
+    failed: '失败',
   };
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badges[status]}`}>
+    <span
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badges[status]}`}
+    >
       {labels[status]}
     </span>
   );

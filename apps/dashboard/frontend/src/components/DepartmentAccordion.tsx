@@ -9,7 +9,10 @@ interface DepartmentAccordionProps {
   defaultExpanded?: boolean;
 }
 
-export function DepartmentAccordion({ department, defaultExpanded = false }: DepartmentAccordionProps) {
+export function DepartmentAccordion({
+  department,
+  defaultExpanded = false,
+}: DepartmentAccordionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const navigate = useNavigate();
   const employeeCount = department.employees.length;
@@ -22,12 +25,17 @@ export function DepartmentAccordion({ department, defaultExpanded = false }: Dep
         onClick={() => hasEmployees && setIsExpanded(!isExpanded)}
         disabled={!hasEmployees}
         className={`w-full flex items-center justify-between p-4 text-left transition-colors ${
-          hasEmployees ? 'hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer' : 'cursor-default opacity-60'
+          hasEmployees
+            ? 'hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer'
+            : 'cursor-default opacity-60'
         }`}
       >
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
-            <DynamicIcon name={department.icon} className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <DynamicIcon
+              name={department.icon}
+              className="w-5 h-5 text-blue-600 dark:text-blue-400"
+            />
           </div>
           <div>
             <h3 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2">
@@ -37,9 +45,7 @@ export function DepartmentAccordion({ department, defaultExpanded = false }: Dep
               </span>
             </h3>
             {department.description && (
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                {department.description}
-              </p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">{department.description}</p>
             )}
           </div>
         </div>
@@ -50,13 +56,12 @@ export function DepartmentAccordion({ department, defaultExpanded = false }: Dep
               今日 {department.todayTotal} 次任务
             </span>
           )}
-          {hasEmployees && (
-            isExpanded ? (
+          {hasEmployees &&
+            (isExpanded ? (
               <ChevronDown className="w-5 h-5 text-slate-400" />
             ) : (
               <ChevronRight className="w-5 h-5 text-slate-400" />
-            )
-          )}
+            ))}
         </div>
       </button>
 
@@ -73,15 +78,14 @@ export function DepartmentAccordion({ department, defaultExpanded = false }: Dep
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-                  <DynamicIcon name={employee.icon} className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+                  <DynamicIcon
+                    name={employee.icon}
+                    className="w-4 h-4 text-slate-600 dark:text-slate-300"
+                  />
                 </div>
                 <div>
-                  <h4 className="font-medium text-slate-800 dark:text-white">
-                    {employee.name}
-                  </h4>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {employee.role}
-                  </p>
+                  <h4 className="font-medium text-slate-800 dark:text-white">{employee.name}</h4>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{employee.role}</p>
                 </div>
               </div>
 

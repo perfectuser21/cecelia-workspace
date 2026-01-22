@@ -9,12 +9,15 @@ interface PlatformPreviewProps {
 }
 
 // 平台配置
-const platformStyles: Record<string, {
-  name: string;
-  bg: string;
-  accent: string;
-  icon: string;
-}> = {
+const platformStyles: Record<
+  string,
+  {
+    name: string;
+    bg: string;
+    accent: string;
+    icon: string;
+  }
+> = {
   website: { name: '网站', bg: 'bg-slate-50', accent: 'text-blue-600', icon: '🌐' },
   xhs: { name: '小红书', bg: 'bg-red-50', accent: 'text-red-500', icon: '📕' },
   weibo: { name: '微博', bg: 'bg-orange-50', accent: 'text-orange-500', icon: '🔥' },
@@ -88,7 +91,9 @@ export default function PlatformPreview({
         <p className="text-gray-600 text-sm line-clamp-3">{content || '正文内容...'}</p>
         {/* Author */}
         <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
-          <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-xs">Z</div>
+          <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-xs">
+            Z
+          </div>
           <span className="text-xs text-gray-500">ZenithJoyAI</span>
           <div className="ml-auto flex items-center gap-3 text-gray-400 text-xs">
             <span>❤️ 收藏</span>
@@ -104,7 +109,9 @@ export default function PlatformPreview({
     <div className="bg-white rounded-lg border border-gray-200 max-w-lg mx-auto">
       {/* Header */}
       <div className="p-4 flex items-start gap-3">
-        <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold">ZJ</div>
+        <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold">
+          ZJ
+        </div>
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <span className="font-bold text-gray-900">ZenithJoyAI</span>
@@ -115,7 +122,10 @@ export default function PlatformPreview({
       </div>
       {/* Content */}
       <div className="px-4 pb-3">
-        <p className="text-gray-900 whitespace-pre-line">{title}{content ? '\n\n' + content : ''}</p>
+        <p className="text-gray-900 whitespace-pre-line">
+          {title}
+          {content ? '\n\n' + content : ''}
+        </p>
       </div>
       {/* Image */}
       {imageUrl && (
@@ -138,7 +148,9 @@ export default function PlatformPreview({
       <div className="p-4">
         {/* Header */}
         <div className="flex items-start gap-3">
-          <div className="w-12 h-12 rounded-full bg-black flex items-center justify-center text-white font-bold">ZJ</div>
+          <div className="w-12 h-12 rounded-full bg-black flex items-center justify-center text-white font-bold">
+            ZJ
+          </div>
           <div className="flex-1">
             <div className="flex items-center gap-1">
               <span className="font-bold text-gray-900">ZenithJoyAI</span>
@@ -146,10 +158,17 @@ export default function PlatformPreview({
               <span className="text-gray-400">· 刚刚</span>
             </div>
             {/* Content */}
-            <p className="mt-2 text-gray-900 whitespace-pre-line">{title}{content ? '\n\n' + content : ''}</p>
+            <p className="mt-2 text-gray-900 whitespace-pre-line">
+              {title}
+              {content ? '\n\n' + content : ''}
+            </p>
             {/* Image */}
             {imageUrl && (
-              <img src={imageUrl} alt="" className="mt-3 w-full h-auto rounded-2xl border border-gray-200" />
+              <img
+                src={imageUrl}
+                alt=""
+                className="mt-3 w-full h-auto rounded-2xl border border-gray-200"
+              />
             )}
           </div>
         </div>
@@ -189,22 +208,36 @@ export default function PlatformPreview({
       </div>
       {/* Side actions */}
       <div className="absolute right-2 bottom-20 flex flex-col items-center gap-4 text-white">
-        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">❤️</div>
-        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">💬</div>
-        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">⭐</div>
-        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">↗️</div>
+        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+          ❤️
+        </div>
+        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+          💬
+        </div>
+        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+          ⭐
+        </div>
+        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+          ↗️
+        </div>
       </div>
     </div>
   );
 
   const renderPreview = () => {
     switch (activePreview) {
-      case 'website': return <WebsitePreview />;
-      case 'xhs': return <XhsPreview />;
-      case 'weibo': return <WeiboPreview />;
-      case 'x': return <XPreview />;
-      case 'douyin': return <DouyinPreview />;
-      default: return <WebsitePreview />;
+      case 'website':
+        return <WebsitePreview />;
+      case 'xhs':
+        return <XhsPreview />;
+      case 'weibo':
+        return <WeiboPreview />;
+      case 'x':
+        return <XPreview />;
+      case 'douyin':
+        return <DouyinPreview />;
+      default:
+        return <WebsitePreview />;
     }
   };
 
@@ -220,9 +253,10 @@ export default function PlatformPreview({
               onClick={() => setActivePreview(platform)}
               className={`
                 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
-                ${activePreview === platform
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ${
+                  activePreview === platform
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }
               `}
             >

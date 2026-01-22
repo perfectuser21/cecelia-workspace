@@ -3,10 +3,10 @@
    ============================================ */
 :root {
   /* 主色调 - 由 InstanceContext 动态设置 */
-  --primary-color: #3467D6;
-  --primary-color-light: #3467D620;
-  --primary-color-medium: #3467D640;
-  --primary-color-dark: #2856B8;
+  --primary-color: #3467d6;
+  --primary-color-light: #3467d620;
+  --primary-color-medium: #3467d640;
+  --primary-color-dark: #2856b8;
 
   /* 侧边栏渐变 */
   --sidebar-gradient: linear-gradient(180deg, #1e3a8a 0%, #1e2a5e 100%);
@@ -25,19 +25,19 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #3467D6 0%, #3C8CFD 50%, #01C7D2 100%);
+  background: linear-gradient(180deg, #3467d6 0%, #3c8cfd 50%, #01c7d2 100%);
   border-radius: 4px;
   transition: background 0.3s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #2856B8 0%, #2A6FE0 50%, #00A8B3 100%);
+  background: linear-gradient(180deg, #2856b8 0%, #2a6fe0 50%, #00a8b3 100%);
 }
 
 /* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #3C8CFD transparent;
+  scrollbar-color: #3c8cfd transparent;
 }
 
 /* Core 冷灰滚动条 */
@@ -64,7 +64,11 @@
     radial-gradient(ellipse at 0% 0%, rgba(100, 116, 139, 0.06) 0%, transparent 50%),
     radial-gradient(ellipse at 100% 100%, rgba(148, 163, 184, 0.04) 0%, transparent 50%),
     linear-gradient(145deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%);
-  background-size: 20px 20px, 100% 100%, 100% 100%, 100% 100%;
+  background-size:
+    20px 20px,
+    100% 100%,
+    100% 100%,
+    100% 100%;
 }
 
 .instance-cecilia.dark .premium-bg,
@@ -74,7 +78,11 @@
     radial-gradient(ellipse at 0% 0%, rgba(100, 116, 139, 0.04) 0%, transparent 50%),
     radial-gradient(ellipse at 100% 100%, rgba(148, 163, 184, 0.03) 0%, transparent 50%),
     linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-  background-size: 24px 24px, 100% 100%, 100% 100%, 100% 100%;
+  background-size:
+    24px 24px,
+    100% 100%,
+    100% 100%,
+    100% 100%;
 }
 
 /* Core shimmer 效果 - 冷灰色 */
@@ -179,14 +187,7 @@
 
 /* Core gradient border - 冷灰色 */
 .instance-cecilia .gradient-border::before {
-  background: conic-gradient(
-    from var(--angle),
-    #475569,
-    #64748b,
-    #94a3b8,
-    #64748b,
-    #475569
-  );
+  background: conic-gradient(from var(--angle), #475569, #64748b, #94a3b8, #64748b, #475569);
 }
 
 /* Core particle - 冷灰色 */
@@ -269,13 +270,15 @@
   background:
     /* 微妙的点阵纹理 */
     radial-gradient(circle at 1px 1px, rgba(52, 103, 214, 0.025) 1px, transparent 1px),
-    /* 左上角光晕 */
-    radial-gradient(ellipse at 0% 0%, rgba(52, 103, 214, 0.08) 0%, transparent 50%),
+    /* 左上角光晕 */ radial-gradient(ellipse at 0% 0%, rgba(52, 103, 214, 0.08) 0%, transparent 50%),
     /* 右下角光晕 */
     radial-gradient(ellipse at 100% 100%, rgba(1, 199, 210, 0.06) 0%, transparent 50%),
-    /* 基础渐变 - 柔和的蓝灰色 */
-    linear-gradient(145deg, #f1f5f9 0%, #e5e9ef 50%, #f1f5f9 100%);
-  background-size: 20px 20px, 100% 100%, 100% 100%, 100% 100%;
+    /* 基础渐变 - 柔和的蓝灰色 */ linear-gradient(145deg, #f1f5f9 0%, #e5e9ef 50%, #f1f5f9 100%);
+  background-size:
+    20px 20px,
+    100% 100%,
+    100% 100%,
+    100% 100%;
   background-attachment: fixed;
 }
 
@@ -286,7 +289,11 @@
     radial-gradient(ellipse at 0% 0%, rgba(56, 189, 248, 0.05) 0%, transparent 50%),
     radial-gradient(ellipse at 100% 100%, rgba(1, 199, 210, 0.04) 0%, transparent 50%),
     linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-  background-size: 24px 24px, 100% 100%, 100% 100%, 100% 100%;
+  background-size:
+    24px 24px,
+    100% 100%,
+    100% 100%,
+    100% 100%;
 }
 
 /* 兼容旧类名 */
@@ -296,8 +303,10 @@
 
 /* 白色卡片柔和阴影 */
 .premium-bg .bg-white,
-.premium-bg [class*="bg-white"] {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.03);
+.premium-bg [class*='bg-white'] {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 2px 8px rgba(0, 0, 0, 0.03);
 }
 
 /* ============================================
@@ -416,7 +425,8 @@
    4. 发光脉冲效果 (Glow Pulse) - 性能优化版
    ============================================ */
 @keyframes glowPulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.6;
     transform: scaleY(1);
   }
@@ -443,7 +453,8 @@
 
 /* 活跃导航项的发光边框 */
 @keyframes borderGlow {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.7;
   }
   50% {
@@ -463,7 +474,7 @@
   transform: translateY(-50%);
   width: 3px;
   height: 60%;
-  background: linear-gradient(180deg, #3467D6, #3C8CFD, #3467D6);
+  background: linear-gradient(180deg, #3467d6, #3c8cfd, #3467d6);
   border-radius: 0 4px 4px 0;
   animation: borderGlow 2s ease-in-out infinite;
   will-change: opacity;
@@ -567,7 +578,8 @@
    9. 图标浮动动画
    ============================================ */
 @keyframes iconFloat {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
   50% {
@@ -612,14 +624,7 @@
   content: '';
   position: absolute;
   inset: -2px;
-  background: conic-gradient(
-    from var(--angle),
-    #3467D6,
-    #3C8CFD,
-    #01C7D2,
-    #3C8CFD,
-    #3467D6
-  );
+  background: conic-gradient(from var(--angle), #3467d6, #3c8cfd, #01c7d2, #3c8cfd, #3467d6);
   border-radius: inherit;
   z-index: -1;
   opacity: 0;
@@ -635,7 +640,8 @@
    11. 粒子背景点缀
    ============================================ */
 @keyframes particleFloat {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0) translateX(0);
     opacity: 0.3;
   }
@@ -657,7 +663,7 @@
   position: absolute;
   width: 4px;
   height: 4px;
-  background: linear-gradient(135deg, #3467D6, #01C7D2);
+  background: linear-gradient(135deg, #3467d6, #01c7d2);
   border-radius: 50%;
   animation: particleFloat 4s ease-in-out infinite;
   pointer-events: none;
@@ -682,10 +688,18 @@
   opacity: 0;
 }
 
-.card-reveal:nth-child(1) { animation-delay: 0.1s; }
-.card-reveal:nth-child(2) { animation-delay: 0.2s; }
-.card-reveal:nth-child(3) { animation-delay: 0.3s; }
-.card-reveal:nth-child(4) { animation-delay: 0.4s; }
+.card-reveal:nth-child(1) {
+  animation-delay: 0.1s;
+}
+.card-reveal:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.card-reveal:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.card-reveal:nth-child(4) {
+  animation-delay: 0.4s;
+}
 
 /* ============================================
    13. 悬停时的内发光效果
@@ -712,9 +726,9 @@
   background: linear-gradient(
     90deg,
     #1e3a8a 0%,
-    #3467D6 25%,
-    #01C7D2 50%,
-    #3467D6 75%,
+    #3467d6 25%,
+    #01c7d2 50%,
+    #3467d6 75%,
     #1e3a8a 100%
   );
   background-size: 200% auto;
@@ -728,7 +742,8 @@
    15. 呼吸灯效果
    ============================================ */
 @keyframes breathe {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.4;
     transform: scale(1);
   }
@@ -746,7 +761,8 @@
    16. 页面加载器脉冲效果
    ============================================ */
 @keyframes loaderPulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.3;
     transform: scale(0.95);
   }

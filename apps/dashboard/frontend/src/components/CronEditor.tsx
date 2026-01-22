@@ -95,7 +95,7 @@ export const CronEditor: React.FC<CronEditorProps> = ({ value, onChange }) => {
 
       {mode === 'preset' ? (
         <div className="grid grid-cols-2 gap-3">
-          {presets.map((preset) => (
+          {presets.map(preset => (
             <button
               key={preset.value}
               type="button"
@@ -118,9 +118,7 @@ export const CronEditor: React.FC<CronEditorProps> = ({ value, onChange }) => {
       ) : (
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Cron 表达式
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Cron 表达式</label>
             <input
               type="text"
               value={customValue}
@@ -138,7 +136,8 @@ export const CronEditor: React.FC<CronEditorProps> = ({ value, onChange }) => {
                   <code className="bg-blue-100 px-1 py-0.5 rounded">分 时 日 月 周</code>
                 </p>
                 <p className="text-blue-600 text-xs">
-                  示例: <code className="bg-blue-100 px-1 py-0.5 rounded">0 9 * * 1</code> = 每周一早上9点
+                  示例: <code className="bg-blue-100 px-1 py-0.5 rounded">0 9 * * 1</code> =
+                  每周一早上9点
                 </p>
               </div>
             </div>

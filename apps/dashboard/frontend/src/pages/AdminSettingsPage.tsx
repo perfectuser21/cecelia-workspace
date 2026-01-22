@@ -12,7 +12,9 @@ const AdminSettingsPage: React.FC = () => {
         >
           <MonitorDot className="w-10 h-10 text-purple-500 mb-3" />
           <h3 className="font-medium text-gray-900 dark:text-white mb-1">Claude Monitor</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">监控 Claude 会话运行状态和 Token 使用</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            监控 Claude 会话运行状态和 Token 使用
+          </p>
         </Link>
         <Link
           to="/settings/vps-monitor"

@@ -44,9 +44,9 @@ export interface ProcessOptions {
 // Whisper 转录片段
 export interface TranscriptSegment {
   id: number;
-  start: number;       // 开始时间（秒）
-  end: number;         // 结束时间（秒）
-  text: string;        // 转录文字
+  start: number; // 开始时间（秒）
+  end: number; // 结束时间（秒）
+  text: string; // 转录文字
   confidence?: number; // 置信度 0-1
   isSilence?: boolean; // 是否是静音段
 }
@@ -63,8 +63,8 @@ export interface AiEditOperation {
 
 // AI 分析结果
 export interface AiAnalysisResult {
-  summary: string;       // AI 对需求的理解说明
-  transcript?: string;   // Whisper 转录的文字（完整）
+  summary: string; // AI 对需求的理解说明
+  transcript?: string; // Whisper 转录的文字（完整）
   transcriptSegments?: TranscriptSegment[]; // Whisper 转录片段（含时间戳）
   params: ProcessOptions; // AI 生成的处理参数
   operations?: AiEditOperation[]; // AI 建议的剪辑操作列表
@@ -112,7 +112,10 @@ export interface VideoJob {
 }
 
 // 预设尺寸信息
-export const PRESET_INFO: Record<AspectRatioPreset, { name: string; width: number; height: number; platforms: string[] }> = {
+export const PRESET_INFO: Record<
+  AspectRatioPreset,
+  { name: string; width: number; height: number; platforms: string[] }
+> = {
   '9:16': { name: '竖屏', width: 1080, height: 1920, platforms: ['抖音', 'TikTok', '快手'] },
   '16:9': { name: '横屏', width: 1920, height: 1080, platforms: ['YouTube', 'B站'] },
   '1:1': { name: '方形', width: 1080, height: 1080, platforms: ['Instagram', '微博'] },
@@ -138,7 +141,7 @@ export const videoEditorApi = {
           'Content-Type': 'multipart/form-data',
         },
         timeout: 600000, // 10分钟超时，大文件需要
-        onUploadProgress: (progressEvent) => {
+        onUploadProgress: progressEvent => {
           if (onProgress && progressEvent.total) {
             const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
             onProgress(percent);
@@ -214,11 +217,14 @@ export const videoEditorApi = {
   },
 
   // AI 智能处理（触发 Headless Claude）
-  aiProcess: async (videoId: string, userPrompt: string): Promise<{ id: string; status: string; message: string }> => {
-    const response = await apiClient.post<{ success: boolean; job: { id: string; status: string; message: string } }>(
-      '/v1/video-editor/ai-process',
-      { videoId, userPrompt }
-    );
+  aiProcess: async (
+    videoId: string,
+    userPrompt: string
+  ): Promise<{ id: string; status: string; message: string }> => {
+    const response = await apiClient.post<{
+      success: boolean;
+      job: { id: string; status: string; message: string };
+    }>('/v1/video-editor/ai-process', { videoId, userPrompt });
     return response.data.job;
   },
 };

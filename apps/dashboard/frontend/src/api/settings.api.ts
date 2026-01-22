@@ -88,7 +88,7 @@ export const settingsApi = {
   // Get notifications
   getNotifications: async (unreadOnly = false, limit = 50) => {
     const response = await apiClient.get<Notification[]>('/v1/notifications', {
-      params: { unreadOnly, limit }
+      params: { unreadOnly, limit },
     });
     return response.data;
   },

@@ -123,7 +123,9 @@ export default function PlatformLogin() {
         </button>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">扫码登录</h1>
-          <p className="text-gray-500 mt-1">{session.platform} - {session.accountId}</p>
+          <p className="text-gray-500 mt-1">
+            {session.platform} - {session.accountId}
+          </p>
         </div>
       </div>
 
@@ -194,7 +196,8 @@ export default function PlatformLogin() {
           {/* Countdown */}
           {countdown > 0 && session.status === 'pending' && (
             <div className="mb-4 text-sm text-gray-500">
-              二维码将在 <span className="font-medium text-gray-900">{formatTime(countdown)}</span> 后过期
+              二维码将在 <span className="font-medium text-gray-900">{formatTime(countdown)}</span>{' '}
+              后过期
             </div>
           )}
 
@@ -215,19 +218,27 @@ export default function PlatformLogin() {
           <h3 className="font-medium text-gray-900 mb-3">登录步骤</h3>
           <ol className="space-y-2 text-sm text-gray-600">
             <li className="flex items-start">
-              <span className="inline-flex items-center justify-center w-5 h-5 mr-2 text-xs font-medium text-white bg-blue-600 rounded-full flex-shrink-0">1</span>
+              <span className="inline-flex items-center justify-center w-5 h-5 mr-2 text-xs font-medium text-white bg-blue-600 rounded-full flex-shrink-0">
+                1
+              </span>
               打开 {session.platform} App
             </li>
             <li className="flex items-start">
-              <span className="inline-flex items-center justify-center w-5 h-5 mr-2 text-xs font-medium text-white bg-blue-600 rounded-full flex-shrink-0">2</span>
+              <span className="inline-flex items-center justify-center w-5 h-5 mr-2 text-xs font-medium text-white bg-blue-600 rounded-full flex-shrink-0">
+                2
+              </span>
               找到扫码功能
             </li>
             <li className="flex items-start">
-              <span className="inline-flex items-center justify-center w-5 h-5 mr-2 text-xs font-medium text-white bg-blue-600 rounded-full flex-shrink-0">3</span>
+              <span className="inline-flex items-center justify-center w-5 h-5 mr-2 text-xs font-medium text-white bg-blue-600 rounded-full flex-shrink-0">
+                3
+              </span>
               扫描上方二维码
             </li>
             <li className="flex items-start">
-              <span className="inline-flex items-center justify-center w-5 h-5 mr-2 text-xs font-medium text-white bg-blue-600 rounded-full flex-shrink-0">4</span>
+              <span className="inline-flex items-center justify-center w-5 h-5 mr-2 text-xs font-medium text-white bg-blue-600 rounded-full flex-shrink-0">
+                4
+              </span>
               在手机上确认登录
             </li>
           </ol>

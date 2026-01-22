@@ -10,15 +10,21 @@ import { LogOut, PanelLeftClose, PanelLeft, Circle } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useInstance } from '../contexts/InstanceContext';
-import {
-  getAutopilotNavGroups,
-  filterNavGroups,
-  type NavGroup,
-} from '../config/navigation.config';
+import { getAutopilotNavGroups, filterNavGroups, type NavGroup } from '../config/navigation.config';
 
 // 将 Core 的 NavGroup 格式转换为带 LucideIcon 的格式
 function convertCoreNavGroups(
-  coreNavGroups: Array<{ title: string; items: Array<{ path: string; icon: string; label: string; featureKey: string; component?: string; requireSuperAdmin?: boolean }> }>
+  coreNavGroups: Array<{
+    title: string;
+    items: Array<{
+      path: string;
+      icon: string;
+      label: string;
+      featureKey: string;
+      component?: string;
+      requireSuperAdmin?: boolean;
+    }>;
+  }>
 ): NavGroup[] {
   return coreNavGroups.map(group => ({
     title: group.title,
@@ -97,11 +103,7 @@ export default function DynamicSidebar({
         className="absolute -right-3 top-20 w-6 h-6 rounded-full flex items-center justify-center text-sky-200 hover:text-white transition-all shadow-lg border border-sky-400/30 bg-blue-900 hover:bg-blue-800"
         title={collapsed ? '展开侧边栏' : '收起侧边栏'}
       >
-        {collapsed ? (
-          <PanelLeft className="w-3 h-3" />
-        ) : (
-          <PanelLeftClose className="w-3 h-3" />
-        )}
+        {collapsed ? <PanelLeft className="w-3 h-3" /> : <PanelLeftClose className="w-3 h-3" />}
       </button>
 
       {/* 导航菜单 */}
@@ -113,11 +115,9 @@ export default function DynamicSidebar({
                 {group.title}
               </p>
             )}
-            {collapsed && groupIndex > 0 && (
-              <div className="mx-2 mb-2 border-t border-white/5" />
-            )}
+            {collapsed && groupIndex > 0 && <div className="mx-2 mb-2 border-t border-white/5" />}
             <div className="space-y-1">
-              {group.items.map((item) => {
+              {group.items.map(item => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
                 return (
@@ -210,9 +210,7 @@ export default function DynamicSidebar({
                     </span>
                   )}
                 </p>
-                <p className="text-xs text-slate-500 truncate">
-                  {user?.department || '在线'}
-                </p>
+                <p className="text-xs text-slate-500 truncate">{user?.department || '在线'}</p>
               </div>
               <button
                 onClick={onLogout}

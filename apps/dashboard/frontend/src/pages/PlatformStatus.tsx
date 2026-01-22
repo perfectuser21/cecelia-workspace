@@ -13,14 +13,17 @@ import {
 import { publishApi } from '../api/publish.api';
 
 // Platform metadata
-const platformMeta: Record<string, {
-  displayName: string;
-  icon: string;
-  color: string;
-  bgColor: string;
-  n8nConnected: boolean;
-  dashboardUrl?: string;
-}> = {
+const platformMeta: Record<
+  string,
+  {
+    displayName: string;
+    icon: string;
+    color: string;
+    bgColor: string;
+    n8nConnected: boolean;
+    dashboardUrl?: string;
+  }
+> = {
   xhs: {
     displayName: '小红书',
     icon: '📕',
@@ -175,7 +178,9 @@ export default function PlatformStatus() {
               <p className="text-sm text-gray-500 dark:text-gray-400">已连接平台</p>
               <p className="text-2xl font-bold text-green-500 mt-1">
                 {allPlatforms.filter(p => platformMeta[p].n8nConnected).length}
-                <span className="text-sm text-gray-400 font-normal ml-1">/ {allPlatforms.length}</span>
+                <span className="text-sm text-gray-400 font-normal ml-1">
+                  / {allPlatforms.length}
+                </span>
               </p>
             </div>
             <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
@@ -270,8 +275,8 @@ export default function PlatformStatus() {
                         successRate >= 80
                           ? 'bg-green-500'
                           : successRate >= 50
-                          ? 'bg-yellow-500'
-                          : 'bg-red-500'
+                            ? 'bg-yellow-500'
+                            : 'bg-red-500'
                       }`}
                       style={{ width: `${successRate}%` }}
                     />
@@ -293,9 +298,7 @@ export default function PlatformStatus() {
                     <p className="text-xs text-gray-500 dark:text-gray-400">成功</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-xl font-bold text-red-500">
-                      {platformStats?.failed || 0}
-                    </p>
+                    <p className="text-xl font-bold text-red-500">{platformStats?.failed || 0}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">失败</p>
                   </div>
                 </div>

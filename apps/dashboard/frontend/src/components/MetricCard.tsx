@@ -18,7 +18,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   changeLabel,
   icon: Icon,
   iconColor = 'text-blue-600',
-  iconBgColor = 'bg-blue-100'
+  iconBgColor = 'bg-blue-100',
 }) => {
   const getTrendIcon = () => {
     if (change === undefined || change === null) return null;
@@ -42,11 +42,12 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           <div className="flex items-baseline gap-2 mb-2">
             <p className="text-3xl font-bold text-gray-900">{value}</p>
           </div>
-          {(change !== undefined && change !== null) && (
+          {change !== undefined && change !== null && (
             <div className={`flex items-center gap-1 text-sm font-medium ${getTrendColor()}`}>
               {getTrendIcon()}
               <span>
-                {change > 0 ? '+' : ''}{change}
+                {change > 0 ? '+' : ''}
+                {change}
                 {changeLabel && <span className="ml-1 text-gray-500">{changeLabel}</span>}
               </span>
             </div>

@@ -26,11 +26,41 @@ interface ApiResponse {
 }
 
 const FEATURES = [
-  { id: 'data-collection', name: '数据采集', color: '#3b82f6', bg: 'bg-blue-50 dark:bg-blue-900/20', keywords: ['采集', 'scrape', 'collect', 'fetch-data'] },
-  { id: 'content-publish', name: '内容发布', color: '#8b5cf6', bg: 'bg-purple-50 dark:bg-purple-900/20', keywords: ['发布', 'publish', 'post'] },
-  { id: 'ai-factory', name: 'AI 自动化', color: '#f59e0b', bg: 'bg-amber-50 dark:bg-amber-900/20', keywords: ['dispatcher', 'claude', 'executor', 'ai'] },
-  { id: 'monitoring', name: '监控巡检', color: '#10b981', bg: 'bg-emerald-50 dark:bg-emerald-900/20', keywords: ['监控', 'monitor', 'patrol'] },
-  { id: 'maintenance', name: '系统维护', color: '#6b7280', bg: 'bg-gray-50 dark:bg-gray-800/50', keywords: ['nightly', 'backup', 'cleanup', 'scheduler'] },
+  {
+    id: 'data-collection',
+    name: '数据采集',
+    color: '#3b82f6',
+    bg: 'bg-blue-50 dark:bg-blue-900/20',
+    keywords: ['采集', 'scrape', 'collect', 'fetch-data'],
+  },
+  {
+    id: 'content-publish',
+    name: '内容发布',
+    color: '#8b5cf6',
+    bg: 'bg-purple-50 dark:bg-purple-900/20',
+    keywords: ['发布', 'publish', 'post'],
+  },
+  {
+    id: 'ai-factory',
+    name: 'AI 自动化',
+    color: '#f59e0b',
+    bg: 'bg-amber-50 dark:bg-amber-900/20',
+    keywords: ['dispatcher', 'claude', 'executor', 'ai'],
+  },
+  {
+    id: 'monitoring',
+    name: '监控巡检',
+    color: '#10b981',
+    bg: 'bg-emerald-50 dark:bg-emerald-900/20',
+    keywords: ['监控', 'monitor', 'patrol'],
+  },
+  {
+    id: 'maintenance',
+    name: '系统维护',
+    color: '#6b7280',
+    bg: 'bg-gray-50 dark:bg-gray-800/50',
+    keywords: ['nightly', 'backup', 'cleanup', 'scheduler'],
+  },
 ];
 
 function matchFeature(name: string) {
@@ -89,9 +119,10 @@ export default function ExecutionStatus() {
     const success = matched.filter(e => e.status === 'success').length;
     const failed = matched.filter(e => e.status === 'error' || e.status === 'crashed').length;
     const running = matched.filter(e => e.status === 'running').length;
-    const avgDuration = matched.length > 0
-      ? Math.round(matched.reduce((acc, e) => acc + (e.duration || 0), 0) / matched.length)
-      : 0;
+    const avgDuration =
+      matched.length > 0
+        ? Math.round(matched.reduce((acc, e) => acc + (e.duration || 0), 0) / matched.length)
+        : 0;
 
     return {
       ...f,
@@ -104,7 +135,13 @@ export default function ExecutionStatus() {
     };
   }).filter(s => s.total > 0);
 
-  const todayStats = data?.todayStats || { total: 0, success: 0, error: 0, running: 0, successRate: 0 };
+  const todayStats = data?.todayStats || {
+    total: 0,
+    success: 0,
+    error: 0,
+    running: 0,
+    successRate: 0,
+  };
 
   if (loading && !data) {
     return (
@@ -117,7 +154,8 @@ export default function ExecutionStatus() {
   if (error && !data) {
     return (
       <div className="flex items-center justify-center h-64 text-red-500">
-        <XCircle className="w-5 h-5 mr-2" />{error}
+        <XCircle className="w-5 h-5 mr-2" />
+        {error}
       </div>
     );
   }
@@ -170,7 +208,9 @@ export default function ExecutionStatus() {
             <TrendingUp className="w-3.5 h-3.5" />
             <span>成功率</span>
           </div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">{todayStats.successRate}%</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            {todayStats.successRate}%
+          </div>
         </div>
       </div>
 
@@ -231,13 +271,18 @@ export default function ExecutionStatus() {
                         />
                       </div>
                     </div>
-                    <div className="w-12 text-right text-sm font-medium" style={{ color: feat.color }}>
+                    <div
+                      className="w-12 text-right text-sm font-medium"
+                      style={{ color: feat.color }}
+                    >
                       {rate}%
                     </div>
                     <div className="flex items-center gap-1.5 text-xs w-20 justify-end">
                       <span className="text-green-600 font-medium">{feat.success}</span>
                       <span className="text-gray-300">/</span>
-                      <span className={feat.failed > 0 ? 'text-red-500 font-medium' : 'text-gray-400'}>
+                      <span
+                        className={feat.failed > 0 ? 'text-red-500 font-medium' : 'text-gray-400'}
+                      >
                         {feat.failed}
                       </span>
                     </div>
@@ -255,15 +300,21 @@ export default function ExecutionStatus() {
                             exec.status === 'success'
                               ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                               : exec.status === 'running'
-                              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                              : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                                : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
                           }`}
                         >
                           {exec.status === 'success' && <CheckCircle2 className="w-3 h-3" />}
-                          {exec.status === 'running' && <Loader2 className="w-3 h-3 animate-spin" />}
-                          {(exec.status === 'error' || exec.status === 'crashed') && <XCircle className="w-3 h-3" />}
+                          {exec.status === 'running' && (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          )}
+                          {(exec.status === 'error' || exec.status === 'crashed') && (
+                            <XCircle className="w-3 h-3" />
+                          )}
                           <span>{formatTime(exec.startedAt)}</span>
-                          {exec.duration && <span className="text-gray-500">· {formatDuration(exec.duration)}</span>}
+                          {exec.duration && (
+                            <span className="text-gray-500">· {formatDuration(exec.duration)}</span>
+                          )}
                         </div>
                       ))}
                     </div>

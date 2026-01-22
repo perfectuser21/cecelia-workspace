@@ -16,14 +16,14 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   onLogin,
   onViewMetrics,
   onDelete,
-  onHealthCheck
+  onHealthCheck,
 }) => {
   const getPlatformLabel = (platform: string) => {
     const labels: Record<string, string> = {
       xiaohongshu: '小红书',
       douyin: '抖音',
       bilibili: 'B站',
-      weibo: '微博'
+      weibo: '微博',
     };
     return labels[platform] || platform;
   };
@@ -33,7 +33,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
       xiaohongshu: { bg: 'bg-red-100', text: 'text-red-700' },
       douyin: { bg: 'bg-black', text: 'text-white' },
       bilibili: { bg: 'bg-pink-100', text: 'text-pink-700' },
-      weibo: { bg: 'bg-orange-100', text: 'text-orange-700' }
+      weibo: { bg: 'bg-orange-100', text: 'text-orange-700' },
     };
     return colors[platform] || { bg: 'bg-gray-100', text: 'text-gray-700' };
   };
@@ -46,7 +46,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
@@ -61,7 +61,9 @@ export const AccountCard: React.FC<AccountCardProps> = ({
               className="w-12 h-12 rounded-full object-cover"
             />
           ) : (
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${platformColor.bg} ${platformColor.text} font-semibold`}>
+            <div
+              className={`w-12 h-12 rounded-full flex items-center justify-center ${platformColor.bg} ${platformColor.text} font-semibold`}
+            >
               {account.displayName.charAt(0)}
             </div>
           )}
@@ -70,7 +72,9 @@ export const AccountCard: React.FC<AccountCardProps> = ({
               {account.displayName}
             </h3>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${platformColor.bg} ${platformColor.text}`}>
+              <span
+                className={`px-2 py-0.5 rounded-md text-xs font-medium ${platformColor.bg} ${platformColor.text}`}
+              >
                 {getPlatformLabel(account.platform)}
               </span>
               <StatusBadge

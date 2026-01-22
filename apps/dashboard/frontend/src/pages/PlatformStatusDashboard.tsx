@@ -7,7 +7,7 @@ import {
   RefreshCw,
   ExternalLink,
   Clock,
-  Shield
+  Shield,
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -72,20 +72,22 @@ export default function PlatformLogin() {
     setValidating(platformId);
     try {
       const response = await axios.get(`${API_BASE}/api/douyin/validate`, {
-        timeout: 90000
+        timeout: 90000,
       });
 
       if (response.data.success) {
         // 更新平台状态
-        setPlatforms(prev => prev.map(p => {
-          if (p.id === platformId) {
-            return {
-              ...p,
-              status: response.data.valid ? 'logged_in' : 'expired'
-            };
-          }
-          return p;
-        }));
+        setPlatforms(prev =>
+          prev.map(p => {
+            if (p.id === platformId) {
+              return {
+                ...p,
+                status: response.data.valid ? 'logged_in' : 'expired',
+              };
+            }
+            return p;
+          })
+        );
 
         if (response.data.valid) {
           alert(`Cookie 有效${response.data.nickname ? `，用户: ${response.data.nickname}` : ''}`);
@@ -166,7 +168,7 @@ export default function PlatformLogin() {
 
       {/* 平台卡片网格 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {platforms.map((platform) => (
+        {platforms.map(platform => (
           <div
             key={platform.id}
             className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow"
@@ -192,17 +194,13 @@ export default function PlatformLogin() {
                   <Clock className="w-4 h-4" />
                   <span>上次登录</span>
                 </div>
-                <div className="text-gray-900 font-medium">
-                  {formatDate(platform.lastLogin)}
-                </div>
+                <div className="text-gray-900 font-medium">{formatDate(platform.lastLogin)}</div>
 
                 <div className="flex items-center gap-2 text-gray-500">
                   <Shield className="w-4 h-4" />
                   <span>过期时间</span>
                 </div>
-                <div className="text-gray-900 font-medium">
-                  {formatDate(platform.expiresAt)}
-                </div>
+                <div className="text-gray-900 font-medium">{formatDate(platform.expiresAt)}</div>
               </div>
 
               {/* 操作按钮 */}

@@ -7,8 +7,8 @@ export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${API_KEY}`
-  }
+    Authorization: `Bearer ${API_KEY}`,
+  },
 });
 
 // Account types
@@ -54,8 +54,7 @@ export interface DailyReport {
 // API functions
 export const api = {
   // Accounts
-  getAccounts: () =>
-    apiClient.get<Account[]>('/v1/accounts'),
+  getAccounts: () => apiClient.get<Account[]>('/v1/accounts'),
 
   addAccount: (account: Omit<Account, 'isActive' | 'lastHealthCheck'>) =>
     apiClient.post('/v1/accounts', account),
@@ -70,20 +69,19 @@ export const api = {
 
   // Metrics
   getMetrics: (platform?: string, accountId?: string, startDate?: string, endDate?: string) =>
-    apiClient.get<MetricsData[]>('/v1/metrics', { params: { platform, accountId, startDate, endDate } }),
+    apiClient.get<MetricsData[]>('/v1/metrics', {
+      params: { platform, accountId, startDate, endDate },
+    }),
 
   // Reports
-  getDailyReport: (date: string) =>
-    apiClient.get<DailyReport>(`/v1/reports/daily/${date}`),
+  getDailyReport: (date: string) => apiClient.get<DailyReport>(`/v1/reports/daily/${date}`),
 
   // Login
   initiateLogin: (platform: string, accountId: string) =>
     apiClient.post('/v1/login/initiate', { platform, accountId }),
 
-  getLoginStatus: (sessionId: string) =>
-    apiClient.get(`/v1/login/status/${sessionId}`),
+  getLoginStatus: (sessionId: string) => apiClient.get(`/v1/login/status/${sessionId}`),
 
   // Manual trigger
-  triggerWorkflow: () =>
-    apiClient.post('/v1/trigger/workflow'),
+  triggerWorkflow: () => apiClient.post('/v1/trigger/workflow'),
 };

@@ -9,7 +9,9 @@ export default function LoginPage() {
   const { platform, accountId } = useParams<{ platform: string; accountId: string }>();
   const navigate = useNavigate();
 
-  const [status, setStatus] = useState<'idle' | 'loading' | 'showing_qr' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'showing_qr' | 'success' | 'error'>(
+    'idle'
+  );
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -23,7 +25,7 @@ export default function LoginPage() {
       setQrCodeUrl(null);
 
       const response = await axios.post(`${N8N_WEBHOOK_BASE}/douyin-login`, {
-        action: 'get-qrcode'
+        action: 'get-qrcode',
       });
 
       const data = response.data;
@@ -64,7 +66,7 @@ export default function LoginPage() {
       setCheckingStatus(true);
 
       const response = await axios.post(`${N8N_WEBHOOK_BASE}/douyin-login`, {
-        action: 'check-status'
+        action: 'check-status',
       });
 
       const data = response.data;
@@ -143,7 +145,7 @@ export default function LoginPage() {
       xhs: '小红书',
       weibo: '微博',
       toutiao: '今日头条',
-      shipin: '视频号'
+      shipin: '视频号',
     };
     return names[p] || p;
   };
@@ -165,20 +167,14 @@ export default function LoginPage() {
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
             {getPlatformName(platform || '')} 账号登录
           </h2>
-          {accountId && (
-            <p className="text-gray-600 text-sm">
-              账号: {accountId}
-            </p>
-          )}
+          {accountId && <p className="text-gray-600 text-sm">账号: {accountId}</p>}
         </div>
 
         {/* 状态显示 */}
         <div className="mb-6">
           {status === 'idle' && (
             <div className="text-center">
-              <p className="text-gray-700 mb-6">
-                点击下方按钮获取登录二维码
-              </p>
+              <p className="text-gray-700 mb-6">点击下方按钮获取登录二维码</p>
               <button
                 onClick={fetchQrCode}
                 className="w-full inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
@@ -199,17 +195,11 @@ export default function LoginPage() {
             <div className="text-center">
               {/* 二维码图片 */}
               <div className="bg-white border-2 border-gray-200 rounded-lg p-4 mb-4 inline-block">
-                <img
-                  src={qrCodeUrl}
-                  alt="登录二维码"
-                  className="w-64 h-64 mx-auto"
-                />
+                <img src={qrCodeUrl} alt="登录二维码" className="w-64 h-64 mx-auto" />
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
-                <p className="text-blue-800 font-medium mb-1">
-                  {message}
-                </p>
+                <p className="text-blue-800 font-medium mb-1">{message}</p>
                 <p className="text-blue-600 text-sm flex items-center justify-center">
                   {checkingStatus ? (
                     <>
@@ -237,16 +227,10 @@ export default function LoginPage() {
             <div className="text-center py-8">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
               <div className="bg-green-50 border border-green-200 rounded-md p-4 mb-4">
-                <p className="text-green-800 font-medium mb-2">
-                  登录成功！
-                </p>
-                <p className="text-green-700 text-sm">
-                  {message}
-                </p>
+                <p className="text-green-800 font-medium mb-2">登录成功！</p>
+                <p className="text-green-700 text-sm">{message}</p>
               </div>
-              <p className="text-gray-600 text-sm">
-                3 秒后自动跳转回账号管理页面...
-              </p>
+              <p className="text-gray-600 text-sm">3 秒后自动跳转回账号管理页面...</p>
             </div>
           )}
 
@@ -254,12 +238,8 @@ export default function LoginPage() {
             <div className="text-center py-8">
               <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
               <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
-                <p className="text-red-800 font-medium mb-2">
-                  获取二维码失败
-                </p>
-                <p className="text-red-700 text-sm">
-                  {error}
-                </p>
+                <p className="text-red-800 font-medium mb-2">获取二维码失败</p>
+                <p className="text-red-700 text-sm">{error}</p>
               </div>
               <button
                 onClick={fetchQrCode}

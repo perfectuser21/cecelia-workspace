@@ -21,29 +21,32 @@ export default function MediaUploader({
   const [dragOver, setDragOver] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  const handleUpload = useCallback(async (files: File[]) => {
-    if (files.length === 0) return;
+  const handleUpload = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) return;
 
-    // Check file count limit
-    if (uploadedFiles.length + files.length > maxFiles) {
-      setError(`最多只能上传 ${maxFiles} 个文件`);
-      return;
-    }
+      // Check file count limit
+      if (uploadedFiles.length + files.length > maxFiles) {
+        setError(`最多只能上传 ${maxFiles} 个文件`);
+        return;
+      }
 
-    setUploading(true);
-    setError(null);
+      setUploading(true);
+      setError(null);
 
-    try {
-      const uploaded = await publishApi.uploadFiles(files);
-      const newFiles = [...uploadedFiles, ...uploaded];
-      setUploadedFiles(newFiles);
-      onFilesUploaded(newFiles);
-    } catch (err: any) {
-      setError(err.response?.data?.message || '上传失败，请重试');
-    } finally {
-      setUploading(false);
-    }
-  }, [uploadedFiles, maxFiles, onFilesUploaded]);
+      try {
+        const uploaded = await publishApi.uploadFiles(files);
+        const newFiles = [...uploadedFiles, ...uploaded];
+        setUploadedFiles(newFiles);
+        onFilesUploaded(newFiles);
+      } catch (err: any) {
+        setError(err.response?.data?.message || '上传失败，请重试');
+      } finally {
+        setUploading(false);
+      }
+    },
+    [uploadedFiles, maxFiles, onFilesUploaded]
+  );
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -51,13 +54,16 @@ export default function MediaUploader({
     }
   };
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
 
-    const files = Array.from(e.dataTransfer.files);
-    handleUpload(files);
-  }, [handleUpload]);
+      const files = Array.from(e.dataTransfer.files);
+      handleUpload(files);
+    },
+    [handleUpload]
+  );
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -83,7 +89,7 @@ export default function MediaUploader({
   // 计算图片比例
   const getAspectRatio = (width?: number, height?: number): string => {
     if (!width || !height) return '';
-    const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+    const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
     const divisor = gcd(width, height);
     const w = width / divisor;
     const h = height / divisor;
@@ -91,16 +97,16 @@ export default function MediaUploader({
     // 常见比例映射
     const ratio = width / height;
     if (Math.abs(ratio - 1) < 0.05) return '1:1';
-    if (Math.abs(ratio - 16/9) < 0.05) return '16:9';
-    if (Math.abs(ratio - 9/16) < 0.05) return '9:16';
-    if (Math.abs(ratio - 4/3) < 0.05) return '4:3';
-    if (Math.abs(ratio - 3/4) < 0.05) return '3:4';
-    if (Math.abs(ratio - 4/5) < 0.05) return '4:5';
-    if (Math.abs(ratio - 5/4) < 0.05) return '5:4';
+    if (Math.abs(ratio - 16 / 9) < 0.05) return '16:9';
+    if (Math.abs(ratio - 9 / 16) < 0.05) return '9:16';
+    if (Math.abs(ratio - 4 / 3) < 0.05) return '4:3';
+    if (Math.abs(ratio - 3 / 4) < 0.05) return '3:4';
+    if (Math.abs(ratio - 4 / 5) < 0.05) return '4:5';
+    if (Math.abs(ratio - 5 / 4) < 0.05) return '5:4';
 
     // 如果不是常见比例，显示简化的比例
     if (w <= 20 && h <= 20) return `${w}:${h}`;
-    return `${(ratio).toFixed(2)}:1`;
+    return `${ratio.toFixed(2)}:1`;
   };
 
   // 根据比例判断适合的平台
@@ -110,15 +116,27 @@ export default function MediaUploader({
     const fits: string[] = [];
 
     // 小红书: 3:4, 1:1, 4:3
-    if (Math.abs(ratio - 3/4) < 0.1 || Math.abs(ratio - 1) < 0.1 || Math.abs(ratio - 4/3) < 0.1) {
+    if (
+      Math.abs(ratio - 3 / 4) < 0.1 ||
+      Math.abs(ratio - 1) < 0.1 ||
+      Math.abs(ratio - 4 / 3) < 0.1
+    ) {
       fits.push('小红书');
     }
     // 抖音: 9:16, 3:4, 1:1
-    if (Math.abs(ratio - 9/16) < 0.1 || Math.abs(ratio - 3/4) < 0.1 || Math.abs(ratio - 1) < 0.1) {
+    if (
+      Math.abs(ratio - 9 / 16) < 0.1 ||
+      Math.abs(ratio - 3 / 4) < 0.1 ||
+      Math.abs(ratio - 1) < 0.1
+    ) {
       fits.push('抖音');
     }
     // X: 16:9, 1:1, 4:5
-    if (Math.abs(ratio - 16/9) < 0.1 || Math.abs(ratio - 1) < 0.1 || Math.abs(ratio - 4/5) < 0.1) {
+    if (
+      Math.abs(ratio - 16 / 9) < 0.1 ||
+      Math.abs(ratio - 1) < 0.1 ||
+      Math.abs(ratio - 4 / 5) < 0.1
+    ) {
       fits.push('X');
     }
     // 微博/网站: 任意比例
@@ -136,9 +154,10 @@ export default function MediaUploader({
         onDragLeave={handleDragLeave}
         className={`
           border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer
-          ${dragOver
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+          ${
+            dragOver
+              ? 'border-blue-500 bg-blue-50'
+              : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
           }
         `}
       >
@@ -163,9 +182,7 @@ export default function MediaUploader({
               <p className="text-gray-600 mb-2">
                 拖拽文件到这里，或<span className="text-blue-600 font-medium">点击上传</span>
               </p>
-              <p className="text-gray-400 text-sm">
-                支持图片和视频，单个文件最大 1GB
-              </p>
+              <p className="text-gray-400 text-sm">支持图片和视频，单个文件最大 1GB</p>
             </div>
           )}
         </label>
@@ -196,7 +213,10 @@ export default function MediaUploader({
                 {/* Thumbnail */}
                 <div
                   className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-200 cursor-pointer relative group"
-                  onClick={() => file.mimeType.startsWith('image/') && setPreviewImage(publishApi.getFileUrl(file.filePath))}
+                  onClick={() =>
+                    file.mimeType.startsWith('image/') &&
+                    setPreviewImage(publishApi.getFileUrl(file.filePath))
+                  }
                 >
                   {file.mimeType.startsWith('image/') ? (
                     <>
@@ -248,7 +268,10 @@ export default function MediaUploader({
                     <div className="mt-2 flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-500">适合:</span>
                       {platformFit.map(p => (
-                        <span key={p} className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">
+                        <span
+                          key={p}
+                          className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded"
+                        >
                           {p}
                         </span>
                       ))}
@@ -278,7 +301,7 @@ export default function MediaUploader({
               src={previewImage}
               alt="Preview"
               className="max-w-full max-h-[85vh] object-contain rounded-lg"
-              onClick={(e) => e.stopPropagation()}
+              onClick={e => e.stopPropagation()}
             />
           </div>
         </div>

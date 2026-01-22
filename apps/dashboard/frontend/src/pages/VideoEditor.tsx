@@ -1,9 +1,35 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  Upload, Film, Scissors, Square, Type, Download, Trash2, RefreshCw,
-  Play, Pause, ArrowLeft, CheckCircle2, XCircle, Loader2, Clock, Sparkles, Wand2,
-  Volume2, VolumeX, SkipBack, SkipForward, ChevronRight, ChevronDown,
-  Zap, Timer, Layers, FileVideo, Eye, Edit3, RotateCcw
+  Upload,
+  Film,
+  Scissors,
+  Square,
+  Type,
+  Download,
+  Trash2,
+  RefreshCw,
+  Play,
+  Pause,
+  ArrowLeft,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Clock,
+  Sparkles,
+  Wand2,
+  Volume2,
+  VolumeX,
+  SkipBack,
+  SkipForward,
+  ChevronRight,
+  ChevronDown,
+  Zap,
+  Timer,
+  Layers,
+  FileVideo,
+  Eye,
+  Edit3,
+  RotateCcw,
 } from 'lucide-react';
 import {
   videoEditorApi,
@@ -103,7 +129,7 @@ export default function VideoEditor() {
 
     const interval = setInterval(async () => {
       const updatedJobs = await Promise.all(
-        jobs.map(async (job) => {
+        jobs.map(async job => {
           if (job.status === 'processing' || job.status === 'pending') {
             try {
               const updated = await videoEditorApi.getJobStatus(job.id);
@@ -140,7 +166,7 @@ export default function VideoEditor() {
     setError(null);
 
     try {
-      const video = await videoEditorApi.uploadVideo(videoFile, (progress) => {
+      const video = await videoEditorApi.uploadVideo(videoFile, progress => {
         setUploadProgress(progress);
       });
       setVideos(prev => [video, ...prev]);
@@ -169,11 +195,14 @@ export default function VideoEditor() {
   };
 
   // 拖拽处理
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    handleUpload(e.dataTransfer.files);
-  }, [handleUpload]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
+      handleUpload(e.dataTransfer.files);
+    },
+    [handleUpload]
+  );
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -523,13 +552,15 @@ export default function VideoEditor() {
     const isFailed = currentJob.status === 'failed';
 
     return (
-      <div className={`mt-6 rounded-2xl border overflow-hidden ${
-        isComplete
-          ? 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800'
-          : isFailed
-          ? 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border-red-200 dark:border-red-800'
-          : 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800'
-      }`}>
+      <div
+        className={`mt-6 rounded-2xl border overflow-hidden ${
+          isComplete
+            ? 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800'
+            : isFailed
+              ? 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border-red-200 dark:border-red-800'
+              : 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800'
+        }`}
+      >
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700/50">
           <div className="flex items-center justify-between">
@@ -537,7 +568,11 @@ export default function VideoEditor() {
               {getStatusIcon(currentJob.status)}
               <div>
                 <h3 className="font-semibold text-gray-900 dark:text-white">
-                  {isComplete ? 'Processing Complete' : isFailed ? 'Processing Failed' : 'Processing Video'}
+                  {isComplete
+                    ? 'Processing Complete'
+                    : isFailed
+                      ? 'Processing Failed'
+                      : 'Processing Video'}
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {currentJob.userPrompt || 'Manual processing'}
@@ -566,28 +601,36 @@ export default function VideoEditor() {
         {currentJob.steps && currentJob.steps.length > 0 && (
           <div className="px-6 py-4">
             <div className="space-y-3">
-              {currentJob.steps.map((step) => {
+              {currentJob.steps.map(step => {
                 const stepMeta = PROCESSING_STEPS.find(s => s.step === step.step);
                 return (
                   <div key={step.step} className="flex items-center gap-4">
                     <div className="flex items-center gap-3 w-36 shrink-0">
                       {getStepStatusIcon(step)}
-                      <span className={`text-sm ${
-                        step.status === 'in_progress' ? 'text-blue-600 dark:text-blue-400 font-medium' :
-                        step.status === 'completed' ? 'text-green-600 dark:text-green-400' :
-                        step.status === 'failed' ? 'text-red-600 dark:text-red-400' :
-                        'text-gray-400 dark:text-gray-500'
-                      }`}>
+                      <span
+                        className={`text-sm ${
+                          step.status === 'in_progress'
+                            ? 'text-blue-600 dark:text-blue-400 font-medium'
+                            : step.status === 'completed'
+                              ? 'text-green-600 dark:text-green-400'
+                              : step.status === 'failed'
+                                ? 'text-red-600 dark:text-red-400'
+                                : 'text-gray-400 dark:text-gray-500'
+                        }`}
+                      >
                         {stepMeta?.name || step.step}
                       </span>
                     </div>
                     <div className="flex-1 h-2 bg-gray-200 dark:bg-slate-600 rounded-full overflow-hidden">
                       <div
                         className={`h-full transition-all duration-300 rounded-full ${
-                          step.status === 'completed' ? 'bg-green-500' :
-                          step.status === 'failed' ? 'bg-red-500' :
-                          step.status === 'in_progress' ? 'bg-blue-500' :
-                          'bg-gray-300 dark:bg-slate-500'
+                          step.status === 'completed'
+                            ? 'bg-green-500'
+                            : step.status === 'failed'
+                              ? 'bg-red-500'
+                              : step.status === 'in_progress'
+                                ? 'bg-blue-500'
+                                : 'bg-gray-300 dark:bg-slate-500'
                         }`}
                         style={{ width: `${step.progress}%` }}
                       />
@@ -662,7 +705,7 @@ export default function VideoEditor() {
           <span>{formatTimeShort(0)}</span>
           <span>{formatTimeShort(duration / 4)}</span>
           <span>{formatTimeShort(duration / 2)}</span>
-          <span>{formatTimeShort(duration * 3 / 4)}</span>
+          <span>{formatTimeShort((duration * 3) / 4)}</span>
           <span>{formatTimeShort(duration)}</span>
         </div>
 
@@ -670,7 +713,7 @@ export default function VideoEditor() {
         <div
           ref={timelineRef}
           className="relative h-12 bg-slate-800 rounded-lg overflow-hidden cursor-pointer"
-          onClick={(e) => {
+          onClick={e => {
             if (timelineRef.current) {
               const rect = timelineRef.current.getBoundingClientRect();
               const x = e.clientX - rect.left;
@@ -742,14 +785,18 @@ export default function VideoEditor() {
               {segments.length} segments
             </span>
           </div>
-          {showTranscript ? <ChevronDown className="w-5 h-5 text-gray-400" /> : <ChevronRight className="w-5 h-5 text-gray-400" />}
+          {showTranscript ? (
+            <ChevronDown className="w-5 h-5 text-gray-400" />
+          ) : (
+            <ChevronRight className="w-5 h-5 text-gray-400" />
+          )}
         </button>
 
         {showTranscript && (
           <div className="border-t border-gray-200 dark:border-slate-700 max-h-64 overflow-y-auto">
             {segments.length > 0 ? (
               <div className="divide-y divide-gray-100 dark:divide-slate-700/50">
-                {segments.map((seg) => {
+                {segments.map(seg => {
                   const isEditing = editingSegment === seg.id;
                   const displayText = editedTranscripts[seg.id] ?? seg.text;
                   const isCurrentSegment = currentTime >= seg.start && currentTime < seg.end;
@@ -772,25 +819,29 @@ export default function VideoEditor() {
                           <input
                             type="text"
                             value={displayText}
-                            onChange={(e) => setEditedTranscripts(prev => ({
-                              ...prev,
-                              [seg.id]: e.target.value
-                            }))}
+                            onChange={e =>
+                              setEditedTranscripts(prev => ({
+                                ...prev,
+                                [seg.id]: e.target.value,
+                              }))
+                            }
                             onBlur={() => setEditingSegment(null)}
-                            onKeyDown={(e) => e.key === 'Enter' && setEditingSegment(null)}
+                            onKeyDown={e => e.key === 'Enter' && setEditingSegment(null)}
                             className="w-full px-2 py-1 text-sm bg-white dark:bg-slate-700 border border-blue-500 rounded focus:outline-none"
                             autoFocus
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={e => e.stopPropagation()}
                           />
                         ) : (
-                          <p className={`text-sm ${seg.isSilence ? 'text-gray-400 italic' : 'text-gray-700 dark:text-gray-300'}`}>
+                          <p
+                            className={`text-sm ${seg.isSilence ? 'text-gray-400 italic' : 'text-gray-700 dark:text-gray-300'}`}
+                          >
                             {seg.isSilence ? '[Silence]' : displayText}
                           </p>
                         )}
                       </div>
                       {!seg.isSilence && (
                         <button
-                          onClick={(e) => {
+                          onClick={e => {
                             e.stopPropagation();
                             setEditingSegment(isEditing ? null : seg.id);
                           }}
@@ -820,7 +871,10 @@ export default function VideoEditor() {
   const renderOperationsPanel = () => {
     if (!aiAnalysis?.operations?.length) return null;
 
-    const totalSaving = aiAnalysis.operations.reduce((sum, op) => sum + (op.estimatedSaving || 0), 0);
+    const totalSaving = aiAnalysis.operations.reduce(
+      (sum, op) => sum + (op.estimatedSaving || 0),
+      0
+    );
 
     return (
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
@@ -838,7 +892,8 @@ export default function VideoEditor() {
           </div>
           {aiAnalysis.estimatedDuration && (
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Estimated output: {formatTimeShort(aiAnalysis.estimatedDuration)} (from {formatTimeShort(duration)})
+              Estimated output: {formatTimeShort(aiAnalysis.estimatedDuration)} (from{' '}
+              {formatTimeShort(duration)})
             </p>
           )}
         </div>
@@ -853,12 +908,17 @@ export default function VideoEditor() {
                   onClick={() => toggleOperation(op.id)}
                   className="w-full flex items-start gap-3 text-left"
                 >
-                  <div className={`p-2 rounded-lg ${
-                    op.type === 'remove_silence' ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' :
-                    op.type === 'resize' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' :
-                    op.type === 'add_subtitle' ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' :
-                    'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                  }`}>
+                  <div
+                    className={`p-2 rounded-lg ${
+                      op.type === 'remove_silence'
+                        ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                        : op.type === 'resize'
+                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'
+                          : op.type === 'add_subtitle'
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                            : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    }`}
+                  >
                     {getOperationIcon(op.type)}
                   </div>
                   <div className="flex-1">
@@ -875,7 +935,11 @@ export default function VideoEditor() {
                       </p>
                     )}
                   </div>
-                  {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
+                  {isExpanded ? (
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  )}
                 </button>
 
                 {isExpanded && (
@@ -903,7 +967,9 @@ export default function VideoEditor() {
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               Video Editor
             </h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">AI-powered video editing with FFmpeg</p>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">
+              AI-powered video editing with FFmpeg
+            </p>
           </div>
           <button
             onClick={loadData}
@@ -939,18 +1005,18 @@ export default function VideoEditor() {
             type="file"
             accept="video/*"
             className="hidden"
-            onChange={(e) => e.target.files && handleUpload(e.target.files)}
+            onChange={e => e.target.files && handleUpload(e.target.files)}
           />
 
           {uploading ? (
             <div className="flex flex-col items-center gap-4">
               <div className="relative">
                 <div className="w-20 h-20 rounded-full border-4 border-blue-100 dark:border-blue-900" />
-                <div
-                  className="absolute inset-0 w-20 h-20 rounded-full border-4 border-transparent border-t-blue-500 animate-spin"
-                />
+                <div className="absolute inset-0 w-20 h-20 rounded-full border-4 border-transparent border-t-blue-500 animate-spin" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{uploadProgress}%</span>
+                  <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                    {uploadProgress}%
+                  </span>
                 </div>
               </div>
               <p className="text-gray-600 dark:text-gray-300">Uploading video...</p>
@@ -986,7 +1052,7 @@ export default function VideoEditor() {
               Uploaded Videos
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {videos.map((video) => (
+              {videos.map(video => (
                 <div
                   key={video.id}
                   className="group bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden hover:shadow-xl hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer"
@@ -1018,7 +1084,9 @@ export default function VideoEditor() {
                         </span>
                       )}
                       {video.width && video.height && (
-                        <span>{video.width}x{video.height}</span>
+                        <span>
+                          {video.width}x{video.height}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -1037,8 +1105,11 @@ export default function VideoEditor() {
             </h2>
             <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
               <div className="divide-y divide-gray-200 dark:divide-slate-700">
-                {jobs.map((job) => (
-                  <div key={job.id} className="p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                {jobs.map(job => (
+                  <div
+                    key={job.id}
+                    className="p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
+                  >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         {getStatusIcon(job.status)}
@@ -1067,7 +1138,7 @@ export default function VideoEditor() {
                             download
                             target="_blank"
                             rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={e => e.stopPropagation()}
                             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg text-sm font-medium shadow-md shadow-green-500/20 hover:from-green-700 hover:to-emerald-700 transition-all"
                           >
                             <Download className="w-4 h-4" />
@@ -1094,13 +1165,15 @@ export default function VideoEditor() {
                         </div>
                         {job.steps && job.steps.length > 0 && (
                           <div className="flex items-center gap-4 mt-2">
-                            {job.steps.map((step) => (
+                            {job.steps.map(step => (
                               <span
                                 key={step.step}
                                 className={`text-xs flex items-center gap-1 ${
-                                  step.status === 'in_progress' ? 'text-blue-600 dark:text-blue-400' :
-                                  step.status === 'completed' ? 'text-green-600 dark:text-green-400' :
-                                  'text-gray-400'
+                                  step.status === 'in_progress'
+                                    ? 'text-blue-600 dark:text-blue-400'
+                                    : step.status === 'completed'
+                                      ? 'text-green-600 dark:text-green-400'
+                                      : 'text-gray-400'
                                 }`}
                               >
                                 {getStepStatusIcon(step)}
@@ -1152,7 +1225,9 @@ export default function VideoEditor() {
                 </span>
               )}
               {selectedVideo.width && selectedVideo.height && (
-                <span>{selectedVideo.width}x{selectedVideo.height}</span>
+                <span>
+                  {selectedVideo.width}x{selectedVideo.height}
+                </span>
               )}
             </div>
           </div>
@@ -1172,7 +1247,10 @@ export default function VideoEditor() {
         <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-400 flex items-center gap-3">
           <XCircle className="w-5 h-5 shrink-0" />
           {error}
-          <button onClick={() => setError(null)} className="ml-auto text-red-500 hover:text-red-700">
+          <button
+            onClick={() => setError(null)}
+            className="ml-auto text-red-500 hover:text-red-700"
+          >
             <XCircle className="w-4 h-4" />
           </button>
         </div>
@@ -1239,7 +1317,11 @@ export default function VideoEditor() {
                     onClick={togglePlay}
                     className="p-3 bg-white rounded-full text-slate-900 hover:bg-gray-200 transition-all shadow-lg"
                   >
-                    {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+                    {isPlaying ? (
+                      <Pause className="w-5 h-5" />
+                    ) : (
+                      <Play className="w-5 h-5 ml-0.5" />
+                    )}
                   </button>
                   <button
                     onClick={skipForward}
@@ -1262,7 +1344,7 @@ export default function VideoEditor() {
                     max={duration || 0}
                     step={0.1}
                     value={currentTime}
-                    onChange={(e) => seekTo(parseFloat(e.target.value))}
+                    onChange={e => seekTo(parseFloat(e.target.value))}
                     className="w-full h-1 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg"
                   />
                 </div>
@@ -1273,7 +1355,11 @@ export default function VideoEditor() {
                     onClick={toggleMute}
                     className="p-2 text-gray-400 hover:text-white transition-colors"
                   >
-                    {isMuted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                    {isMuted || volume === 0 ? (
+                      <VolumeX className="w-5 h-5" />
+                    ) : (
+                      <Volume2 className="w-5 h-5" />
+                    )}
                   </button>
                   <input
                     type="range"
@@ -1281,7 +1367,7 @@ export default function VideoEditor() {
                     max={1}
                     step={0.1}
                     value={isMuted ? 0 : volume}
-                    onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                    onChange={e => handleVolumeChange(parseFloat(e.target.value))}
                     className="w-20 h-1 bg-slate-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full"
                   />
                 </div>
@@ -1344,7 +1430,7 @@ export default function VideoEditor() {
               </p>
               <textarea
                 value={aiPrompt}
-                onChange={(e) => {
+                onChange={e => {
                   setAiPrompt(e.target.value);
                   setAiAnalysis(null);
                 }}
@@ -1359,8 +1445,12 @@ export default function VideoEditor() {
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 shrink-0" />
                     <div>
-                      <h4 className="font-medium text-gray-900 dark:text-white text-sm">AI Understanding</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{aiAnalysis.summary}</p>
+                      <h4 className="font-medium text-gray-900 dark:text-white text-sm">
+                        AI Understanding
+                      </h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {aiAnalysis.summary}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1435,7 +1525,7 @@ export default function VideoEditor() {
                   <h3 className="font-semibold text-gray-900 dark:text-white">Aspect Ratio</h3>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  {(Object.keys(PRESET_INFO) as AspectRatioPreset[]).map((key) => {
+                  {(Object.keys(PRESET_INFO) as AspectRatioPreset[]).map(key => {
                     const info = PRESET_INFO[key];
                     const isSelected = preset === key;
                     return (
@@ -1448,7 +1538,9 @@ export default function VideoEditor() {
                             : 'border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500'
                         }`}
                       >
-                        <p className={`font-medium text-sm ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
+                        <p
+                          className={`font-medium text-sm ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}
+                        >
                           {key}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -1468,12 +1560,14 @@ export default function VideoEditor() {
                 </div>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">Start Time</label>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                      Start Time
+                    </label>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         value={trimStart}
-                        onChange={(e) => setTrimStart(e.target.value)}
+                        onChange={e => setTrimStart(e.target.value)}
                         placeholder="00:00:00"
                         className="flex-1 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white font-mono text-sm"
                       />
@@ -1486,12 +1580,14 @@ export default function VideoEditor() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">End Time</label>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                      End Time
+                    </label>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         value={trimEnd}
-                        onChange={(e) => setTrimEnd(e.target.value)}
+                        onChange={e => setTrimEnd(e.target.value)}
                         placeholder="00:00:00"
                         className="flex-1 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white font-mono text-sm"
                       />
@@ -1515,15 +1611,17 @@ export default function VideoEditor() {
                 <div className="space-y-3">
                   <textarea
                     value={subtitleText}
-                    onChange={(e) => setSubtitleText(e.target.value)}
+                    onChange={e => setSubtitleText(e.target.value)}
                     placeholder="Enter subtitle text..."
                     rows={2}
                     className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white resize-none text-sm"
                   />
                   <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">Position</label>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                      Position
+                    </label>
                     <div className="flex gap-2">
-                      {(['bottom', 'center', 'top'] as const).map((style) => (
+                      {(['bottom', 'center', 'top'] as const).map(style => (
                         <button
                           key={style}
                           onClick={() => setSubtitleStyle(style)}

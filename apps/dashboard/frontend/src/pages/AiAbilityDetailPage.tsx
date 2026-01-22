@@ -90,32 +90,22 @@ export default function AiAbilityDetailPage() {
           {ability.name}
         </h1>
         {ability.description && (
-          <p className="text-slate-500 dark:text-slate-400">
-            {ability.description}
-          </p>
+          <p className="text-slate-500 dark:text-slate-400">{ability.description}</p>
         )}
-        <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-          所属员工: {employeeName}
-        </p>
+        <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">所属员工: {employeeName}</p>
       </div>
 
       {/* 控制面板 */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm mb-6 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-lg font-semibold text-slate-800 dark:text-white mb-1">
-              自动运行
-            </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              定时自动执行此职能的任务
-            </p>
+            <h2 className="text-lg font-semibold text-slate-800 dark:text-white mb-1">自动运行</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">定时自动执行此职能的任务</p>
           </div>
           {/* Toggle 开关 - 静态展示 */}
           <button
             className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-              autoRunEnabled
-                ? 'bg-blue-600'
-                : 'bg-slate-300 dark:bg-slate-600'
+              autoRunEnabled ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'
             }`}
             disabled
           >
@@ -139,18 +129,14 @@ export default function AiAbilityDetailPage() {
 
       {/* 最近执行记录 */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">
-          最近执行记录
-        </h2>
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">最近执行记录</h2>
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
           </div>
         ) : tasks.length === 0 ? (
-          <div className="text-center py-12 text-slate-400 dark:text-slate-500">
-            暂无执行记录
-          </div>
+          <div className="text-center py-12 text-slate-400 dark:text-slate-500">暂无执行记录</div>
         ) : (
           <div className="space-y-3">
             {tasks.map(task => (
