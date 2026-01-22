@@ -147,19 +147,9 @@ export const additionalRoutes: RouteConfig[] = [
   // 登录相关
   { path: '/login/:platform/:accountId', component: 'LoginPage', requireAuth: true },
 
-  // 管理员子页面
-  { path: '/settings/claude-monitor', component: 'ClaudeMonitor', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/vps-monitor', component: 'VpsMonitor', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/claude-stats', component: 'ClaudeStats', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/n8n-workflows', component: 'N8nWorkflows', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/n8n-workflows/:instance/:id', component: 'N8nWorkflowDetail', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/n8n-status', component: 'N8nLiveStatus', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/n8n-status/:executionId', component: 'N8nLiveStatusDetail', requireAuth: true, requireSuperAdmin: true },
-  { path: '/settings/canvas', component: 'Canvas', requireAuth: true, requireSuperAdmin: true },
-
-  // 旧重定向（已废弃，现在由 Core features 处理）
-  // { path: '/panorama', redirect: '/settings/canvas' },  // 现在是 dev-panorama 功能
-  // { path: '/whiteboard', redirect: '/settings/canvas' }, // 现在由 canvas feature 处理
+  // 管理员子页面已迁移到 Core
+  // ClaudeMonitor, VpsMonitor, ClaudeStats, N8n*, Canvas 等
+  // 通过 Core 实例访问: core.zenjoymedia.media
 ];
 
 // ============ 辅助函数 ============
