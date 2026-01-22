@@ -18,14 +18,14 @@ export default defineConfig({
     // Dedupe to ensure single instances of dependencies
     dedupe: [
       'react', 'react-dom', 'react-router-dom',
-      'lucide-react', 'axios', 'recharts',
+      'lucide-react', 'axios', 'recharts', '@hello-pangea/dnd',
     ],
   },
   // Optimize deps to pre-bundle external feature dependencies
   optimizeDeps: {
     include: [
       'react', 'react-dom', 'react-router-dom',
-      'lucide-react', 'axios', 'recharts',
+      'lucide-react', 'axios', 'recharts', '@hello-pangea/dnd',
     ],
   },
   plugins: [
