@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/Tasks-D0jMhdPc.js","assets/index-xvZdZyzc.js","assets/index-DmdrB02_.css","assets/tiny-invariant-BaFNuDhB.js","assets/index-B9ygI19o.js"])))=>i.map(i=>d[i]);
+import{ai as e}from"./index-xvZdZyzc.js";const s={id:"tasks",name:"Notion Tasks",version:"1.0.0",source:"core",instances:["core"],routes:[{path:"/tasks",component:"Tasks",navItem:{label:"任务",icon:"CheckSquare",order:5}}],components:{Tasks:()=>e(()=>import("./Tasks-D0jMhdPc.js"),__vite__mapDeps([0,1,2,3,4]))}};export{s as default};
