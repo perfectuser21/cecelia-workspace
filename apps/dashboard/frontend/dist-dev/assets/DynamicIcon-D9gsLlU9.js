@@ -1,1 +1,0 @@
-import{j as r,z as a,am as t,B as c,V as e,an as i,ao as m,ap as p}from"./index-CScgfzHC.js";const x={Monitor:p,Code:m,Wallet:i,Video:e,BarChart3:c,Wrench:t,User:a};function u({name:o,...s}){const n=x[o]||a;return r.jsx(n,{...s})}export{u as D};
