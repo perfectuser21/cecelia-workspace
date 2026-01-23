@@ -1,1 +1,0 @@
-const t="";async function e(r){const o=await fetch(`${t}${r}`);if(!o.ok)throw new Error(`API error: ${o.status}`);return o.json()}const s={getAll:()=>e("/api/workers"),getWorker:r=>e(`/api/workers/${r}`),getWorkerWorkflows:r=>e(`/api/workers/${r}/workflows`)};export{s as w};
