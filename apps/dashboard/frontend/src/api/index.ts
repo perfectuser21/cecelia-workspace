@@ -5,6 +5,6 @@ export * from './accounts.api';
 export * from './metrics.api';
 export * from './settings.api';
 export * from './publish.api';
-export * from './tasks.api';
+// tasks.api moved to zenithjoy-core
 export * from './video-editor.api';
 export * from './instance.api';

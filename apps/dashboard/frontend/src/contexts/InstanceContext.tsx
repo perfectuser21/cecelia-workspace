@@ -42,7 +42,8 @@ const autopilotConfig: InstanceConfig = {
     'workbench': true,
     'media-scenario': true,  // 新媒体运营场景
     'ai-employees': true,    // AI 员工
-    'settings': true,
+    'accounts': true,        // 账号管理
+    // 'settings' 已迁移到 Core
     // 旧 features（保留用于兼容，实际已合并到 media-scenario）
     'execution-status': true,
     'tasks': true,
@@ -60,12 +61,18 @@ const autopilotConfig: InstanceConfig = {
 let cachedCoreConfig: CoreDynamicConfig | null = null;
 
 // 异步加载 Core 配置
-export async function loadCoreConfig(): Promise<CoreDynamicConfig> {
+// 注意: 在 CI 或没有 zenithjoy-core 的环境会失败，这是预期的
+export async function loadCoreConfig(): Promise<CoreDynamicConfig | null> {
   if (cachedCoreConfig) return cachedCoreConfig;
 
-  const { buildCoreConfig } = await import('@features/core');
-  cachedCoreConfig = await buildCoreConfig();
-  return cachedCoreConfig;
+  try {
+    const { buildCoreConfig } = await import('@features/core');
+    cachedCoreConfig = await buildCoreConfig();
+    return cachedCoreConfig;
+  } catch (error) {
+    console.warn('Core features not available:', error);
+    return null;
+  }
 }
 
 // 检测是否为 Core 实例

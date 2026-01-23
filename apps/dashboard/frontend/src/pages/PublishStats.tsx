@@ -8,6 +8,9 @@ import {
   RefreshCw,
   Loader2,
   Target,
+  Wifi,
+  WifiOff,
+  ExternalLink,
 } from 'lucide-react';
 import { publishApi } from '../api/publish.api';
 import {
@@ -52,18 +55,90 @@ const STATUS_LABELS: Record<string, string> = {
   partial: '部分成功',
 };
 
-// 平台名称映射
-const PLATFORM_NAMES: Record<string, string> = {
-  douyin: '抖音',
-  kuaishou: '快手',
-  xiaohongshu: '小红书',
-  toutiao: '头条',
-  weibo: '微博',
-  videoNumber: '视频号',
-  wechat: '公众号',
-  zhihu: '知乎',
-  website: '官网',
+// 平台配置（名称、图标、连接状态）
+const PLATFORM_META: Record<string, {
+  displayName: string;
+  icon: string;
+  color: string;
+  connected: boolean;
+  dashboardUrl?: string;
+}> = {
+  xhs: {
+    displayName: '小红书',
+    icon: '📕',
+    color: 'text-red-500',
+    connected: true,
+    dashboardUrl: 'https://creator.xiaohongshu.com',
+  },
+  xiaohongshu: {
+    displayName: '小红书',
+    icon: '📕',
+    color: 'text-red-500',
+    connected: true,
+    dashboardUrl: 'https://creator.xiaohongshu.com',
+  },
+  weibo: {
+    displayName: '微博',
+    icon: '🟠',
+    color: 'text-orange-500',
+    connected: true,
+    dashboardUrl: 'https://weibo.com',
+  },
+  douyin: {
+    displayName: '抖音',
+    icon: '🎵',
+    color: 'text-slate-900 dark:text-white',
+    connected: true,
+    dashboardUrl: 'https://creator.douyin.com',
+  },
+  website: {
+    displayName: 'ZenithJoyAI',
+    icon: '🌐',
+    color: 'text-blue-500',
+    connected: true,
+    dashboardUrl: 'https://zenithjoyai.com',
+  },
+  x: {
+    displayName: 'X (Twitter)',
+    icon: '𝕏',
+    color: 'text-slate-900 dark:text-white',
+    connected: false,
+    dashboardUrl: 'https://x.com',
+  },
+  kuaishou: {
+    displayName: '快手',
+    icon: '📹',
+    color: 'text-orange-600',
+    connected: false,
+  },
+  toutiao: {
+    displayName: '头条',
+    icon: '📰',
+    color: 'text-red-600',
+    connected: false,
+  },
+  videoNumber: {
+    displayName: '视频号',
+    icon: '📺',
+    color: 'text-green-600',
+    connected: false,
+  },
+  wechat: {
+    displayName: '公众号',
+    icon: '💬',
+    color: 'text-green-500',
+    connected: false,
+  },
+  zhihu: {
+    displayName: '知乎',
+    icon: '❓',
+    color: 'text-blue-600',
+    connected: false,
+  },
 };
+
+// 获取平台显示名称
+const getPlatformName = (key: string) => PLATFORM_META[key]?.displayName || key;
 
 export default function PublishStats() {
   const [stats, setStats] = useState<StatsData | null>(null);
@@ -130,7 +205,7 @@ export default function PublishStats() {
   // 准备平台统计柱状图数据
   const platformChartData = Object.entries(stats.byPlatform)
     .map(([platform, data]) => ({
-      platform: PLATFORM_NAMES[platform] || platform,
+      platform: getPlatformName(platform),
       total: data.total,
       success: data.success,
       failed: data.failed,
@@ -438,6 +513,53 @@ export default function PublishStats() {
             </LineChart>
           </ResponsiveContainer>
         )}
+      </div>
+
+      {/* Platform Connection Status */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">平台连接状态</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {Object.entries(PLATFORM_META)
+            .filter(([key]) => !['xhs'].includes(key)) // 去重 xhs/xiaohongshu
+            .map(([key, meta]) => (
+              <div
+                key={key}
+                className={`p-4 rounded-xl border ${
+                  meta.connected
+                    ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20'
+                    : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xl">{meta.icon}</span>
+                  <span className={`font-medium ${meta.color}`}>{meta.displayName}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  {meta.connected ? (
+                    <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                      <Wifi className="w-3 h-3" />
+                      已连接
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs text-gray-400">
+                      <WifiOff className="w-3 h-3" />
+                      待对接
+                    </span>
+                  )}
+                  {meta.dashboardUrl && (
+                    <a
+                      href={meta.dashboardUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-gray-400 hover:text-blue-500 transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+        </div>
       </div>
     </div>
   );

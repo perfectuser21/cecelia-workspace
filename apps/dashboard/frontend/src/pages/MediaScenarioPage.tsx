@@ -9,15 +9,15 @@
 
 import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
-import { FileText, Send, BarChart3, Database, ListTodo, Activity, Radio, TrendingUp, PieChart } from 'lucide-react';
+import { FileText, Send, BarChart3, Database, Activity, Radio, TrendingUp, PieChart } from 'lucide-react';
 import ScenarioTabs, { type TabItem } from '../components/ScenarioTabs';
 
 // 懒加载页面组件
 const ContentPublish = lazy(() => import('./ContentPublish'));
 const ScrapingPage = lazy(() => import('./ScrapingPage'));
-const Tasks = lazy(() => import('./Tasks'));
+// Tasks 已移到 zenithjoy-core
 const ExecutionStatus = lazy(() => import('./ExecutionStatus'));
-const PlatformStatus = lazy(() => import('./PlatformStatus'));
+// PlatformStatus 已合并到 PublishStats
 const PublishStats = lazy(() => import('./PublishStats'));
 const ContentData = lazy(() => import('./ContentData'));
 
@@ -45,8 +45,7 @@ const CONTENT_SUB_TABS: TabItem[] = [
 
 // 发布子 Tab 配置
 const PUBLISH_SUB_TABS: TabItem[] = [
-  { path: '/media/publish', label: '发布任务', icon: ListTodo },
-  { path: '/media/publish/history', label: '执行记录', icon: Activity },
+  { path: '/media/publish', label: '执行记录', icon: Activity },
   { path: '/media/publish/platforms', label: '平台状态', icon: Radio },
 ];
 
@@ -111,14 +110,13 @@ function ContentTab() {
 // 发布 Tab 页面
 function PublishTab() {
   const location = useLocation();
-  const isHistoryPage = location.pathname === '/media/publish/history';
   const isPlatformsPage = location.pathname === '/media/publish/platforms';
 
   return (
     <>
       <SubTabs tabs={PUBLISH_SUB_TABS} />
       <Suspense fallback={<LoadingFallback />}>
-        {isHistoryPage ? <ExecutionStatus /> : isPlatformsPage ? <PlatformStatus /> : <Tasks />}
+        {isPlatformsPage ? <PublishStats /> : <ExecutionStatus />}
       </Suspense>
     </>
   );
@@ -162,8 +160,9 @@ export default function MediaScenarioPage() {
 
         {/* 发布 Tab */}
         <Route path="publish" element={<PublishTab />} />
-        <Route path="publish/history" element={<PublishTab />} />
         <Route path="publish/platforms" element={<PublishTab />} />
+        {/* /publish/history 重定向到 /publish（向后兼容） */}
+        <Route path="publish/history" element={<Navigate to="/media/publish" replace />} />
 
         {/* 数据 Tab */}
         <Route path="data" element={<DataTab />} />

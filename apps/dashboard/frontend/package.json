@@ -27,9 +27,6 @@
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
-    "@zenithjoy/eslint-config": "file:../../../../zenithjoy-core/packages/shared-config/eslint-config",
-    "@zenithjoy/prettier-config": "file:../../../../zenithjoy-core/packages/shared-config/prettier-config",
-    "@zenithjoy/tsconfig": "file:../../../../zenithjoy-core/packages/shared-config/tsconfig",
     "autoprefixer": "^10.4.16",
     "eslint": "^9.0.0",
     "postcss": "^8.4.32",
@@ -39,5 +36,11 @@
     "vite": "^5.0.8",
     "vite-plugin-pwa": "^1.2.0"
   },
-  "prettier": "@zenithjoy/prettier-config"
+  "prettier": {
+    "semi": true,
+    "singleQuote": true,
+    "trailingComma": "es5",
+    "printWidth": 100,
+    "tabWidth": 2
+  }
 }
