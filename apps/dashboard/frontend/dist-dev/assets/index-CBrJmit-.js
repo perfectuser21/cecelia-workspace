@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/VpsMonitor-cVQO6C-v.js","assets/index-sd6rvxIJ.js","assets/index-3UAe3Ji9.css","assets/generateCategoricalChart-Co0yWREY.js","assets/tiny-invariant-BaFNuDhB.js"])))=>i.map(i=>d[i]);
+import{ah as o}from"./index-sd6rvxIJ.js";const r={id:"vps-monitor",name:"VPS Monitor",version:"1.0.0",source:"core",instances:["core"],routes:[{path:"/vps-monitor",component:"VpsMonitor"}],components:{VpsMonitor:()=>o(()=>import("./VpsMonitor-cVQO6C-v.js"),__vite__mapDeps([0,1,2,3,4]))}};export{r as default};

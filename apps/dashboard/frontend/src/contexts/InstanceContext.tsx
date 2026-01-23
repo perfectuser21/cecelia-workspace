@@ -78,7 +78,32 @@ export async function loadCoreConfig(): Promise<CoreDynamicConfig | null> {
 // 检测是否为 Core 实例
 function isCoreInstance(): boolean {
   const hostname = window.location.hostname;
-  return hostname.startsWith('core.') || hostname.includes('core');
+  const port = window.location.port;
+  const pathname = window.location.pathname;
+
+  // Check hostname patterns
+  if (hostname.startsWith('core.') || hostname.includes('core')) {
+    return true;
+  }
+
+  // localhost:5212 is dev-core environment
+  if (hostname === 'localhost' && port === '5212') {
+    return true;
+  }
+
+  // Allow ?instance=core query param for testing
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('instance') === 'core') {
+    return true;
+  }
+
+  // Check if accessing Core-only routes (e.g., /cecelia, /ops, /panorama)
+  const coreOnlyPaths = ['/cecelia', '/ops', '/panorama', '/dev-panorama', '/engine', '/devgate', '/workers'];
+  if (coreOnlyPaths.some(p => pathname.startsWith(p))) {
+    return true;
+  }
+
+  return false;
 }
 
 interface InstanceContextType {

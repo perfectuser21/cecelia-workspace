@@ -38,7 +38,7 @@ function convertCoreNavGroups(
 
 function AppContent() {
   const location = useLocation();
-  const { user, logout, isAuthenticated, isSuperAdmin } = useAuth();
+  const { user, logout, isAuthenticated, isSuperAdmin, isInitializing } = useAuth();
   const { theme, setTheme } = useTheme();
   const { config, loading: instanceLoading, isFeatureEnabled, isCore, coreConfig } = useInstance();
   const [collapsed, setCollapsed] = useState(false);
@@ -73,6 +73,18 @@ function AppContent() {
 
   // 兼容旧代码
   const navItems = navGroups.flatMap(g => g.items);
+
+  // 认证初始化中时显示加载状态（防止在检查 cookie 前显示登录页）
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50/30 dark:from-slate-900 dark:to-slate-800">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-500 dark:text-gray-400">正在检查登录状态...</p>
+        </div>
+      </div>
+    );
+  }
 
   // 如果未登录且不在登录页，显示登录页
   if (!isAuthenticated && !location.pathname.startsWith('/login')) {
