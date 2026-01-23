@@ -1,5 +1,4 @@
 import { useContainer } from '@tldraw/editor'
-import classNames from 'classnames'
 import { Popover as _Popover } from 'radix-ui'
 import React from 'react'
 import { useMenuIsOpen } from '../../hooks/useMenuIsOpen'
@@ -10,16 +9,15 @@ export interface TLUiPopoverProps {
 	open?: boolean
 	children: React.ReactNode
 	onOpenChange?(isOpen: boolean): void
-	className?: string
 }
 
 /** @public @react */
-export function TldrawUiPopover({ id, children, onOpenChange, open, className }: TLUiPopoverProps) {
+export function TldrawUiPopover({ id, children, onOpenChange, open }: TLUiPopoverProps) {
 	const [isOpen, handleOpenChange] = useMenuIsOpen(id, onOpenChange)
 
 	return (
 		<_Popover.Root onOpenChange={handleOpenChange} open={open || isOpen /* allow debugging */}>
-			<div className={classNames('tlui-popover', className)}>{children}</div>
+			<div className="tlui-popover">{children}</div>
 		</_Popover.Root>
 	)
 }

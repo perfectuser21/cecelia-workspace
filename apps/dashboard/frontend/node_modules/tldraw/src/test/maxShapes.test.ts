@@ -1,5 +1,4 @@
 import { createShapeId } from '@tldraw/editor'
-import { vi } from 'vitest'
 import { TestEditor } from './TestEditor'
 
 let editor: TestEditor
@@ -83,7 +82,7 @@ describe('Maximum shapes behavior', () => {
 			})
 
 			it('should emit max-shapes event when limit is reached', () => {
-				const maxShapesHandler = vi.fn()
+				const maxShapesHandler = jest.fn()
 				editor.addListener('max-shapes', maxShapesHandler)
 
 				// Set up the note tool
@@ -283,7 +282,7 @@ describe('Maximum shapes behavior', () => {
 			expect(editor.getCurrentPageShapeIds().size).toBe(5)
 
 			// Try to create one more shape
-			const maxShapesHandler = vi.fn()
+			const maxShapesHandler = jest.fn()
 			editor.addListener('max-shapes', maxShapesHandler)
 
 			const extraShapeId = createShapeId('extra-shape')

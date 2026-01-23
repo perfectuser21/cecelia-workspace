@@ -1,9 +1,8 @@
 import { PageRecordType, Vec, createShapeId } from '@tldraw/editor'
-import { vi } from 'vitest'
 import { TestEditor } from './TestEditor'
 import { TL } from './test-jsx'
 
-vi.useFakeTimers()
+jest.useFakeTimers()
 
 let editor: TestEditor
 
@@ -21,20 +20,20 @@ beforeEach(() => {
 test('it creates a listener that updates the current url', async () => {
 	const unlisten = editor.registerDeepLinkListener()
 
-	vi.advanceTimersByTime(1000)
+	jest.advanceTimersByTime(1000)
 	expect(window.location.href).toMatchInlineSnapshot(`"http://localhost/test?d=v0.0.1080.720.page"`)
 
 	const pageId = PageRecordType.createId('foo')
 	editor.createPage({ id: pageId })
 	editor.setCurrentPage(pageId)
 
-	vi.advanceTimersByTime(1000)
+	jest.advanceTimersByTime(1000)
 
 	expect(window.location.href).toMatchInlineSnapshot(`"http://localhost/test?d=v0.0.1080.720.foo"`)
 
 	editor.pan({ x: 100, y: 100 })
 
-	vi.advanceTimersByTime(1000)
+	jest.advanceTimersByTime(1000)
 
 	expect(window.location.href).toMatchInlineSnapshot(
 		`"http://localhost/test?d=v-100.-100.1080.720.foo"`
@@ -44,7 +43,7 @@ test('it creates a listener that updates the current url', async () => {
 
 	editor.pan({ x: 500, y: 500 })
 
-	vi.advanceTimersByTime(1000)
+	jest.advanceTimersByTime(1000)
 
 	expect(window.location.href).toMatchInlineSnapshot(
 		`"http://localhost/test?d=v-100.-100.1080.720.foo"`
@@ -76,7 +75,7 @@ test('it allows specifying a page target', async () => {
 		param: 'foo',
 	})
 
-	vi.advanceTimersByTime(1000)
+	jest.advanceTimersByTime(1000)
 
 	// no shapes yet
 	expect(window.location.href).toMatchInlineSnapshot(`"http://localhost/test?foo=ppage"`)
@@ -88,19 +87,19 @@ test('it allows specifying a page target', async () => {
 		<TL.geo id={boxB} x={1000} y={1000} w={100} h={100} />,
 	])
 
-	vi.advanceTimersByTime(1000)
+	jest.advanceTimersByTime(1000)
 	expect(window.location.href).toMatchInlineSnapshot(`"http://localhost/test?foo=sa"`)
 
 	editor.pan({ x: -1000, y: -1000 })
 
-	vi.advanceTimersByTime(1000)
+	jest.advanceTimersByTime(1000)
 	expect(window.location.href).toMatchInlineSnapshot(`"http://localhost/test?foo=sb"`)
 
 	unlisten()
 
 	editor.pan({ x: 1000, y: 1000 })
 
-	vi.advanceTimersByTime(1000)
+	jest.advanceTimersByTime(1000)
 	expect(window.location.href).toMatchInlineSnapshot(`"http://localhost/test?foo=sb"`)
 	expect(getNearestShape().id).toBe(boxA)
 })

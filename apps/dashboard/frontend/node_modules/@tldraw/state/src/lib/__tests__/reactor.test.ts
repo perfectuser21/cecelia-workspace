@@ -1,4 +1,3 @@
-import { vi } from 'vitest'
 import { atom } from '../Atom'
 import { react, reactor } from '../EffectScheduler'
 import { advanceGlobalEpoch, transact } from '../transactions'
@@ -26,7 +25,7 @@ describe('reactors', () => {
 			}
 		})
 		expect(() => r.start()).toThrowErrorMatchingInlineSnapshot(
-			`[Error: Reaction update depth limit exceeded]`
+			`"Reaction update depth limit exceeded"`
 		)
 	})
 
@@ -34,7 +33,7 @@ describe('reactors', () => {
 		const atomA = atom('', 1)
 		const atomB = atom('', 1)
 
-		const react = vi.fn(() => {
+		const react = jest.fn(() => {
 			atomA.get()
 			atomB.get()
 		})
@@ -53,7 +52,7 @@ describe('reactors', () => {
 
 	it('will not react if stopped', () => {
 		const a = atom('', 1)
-		const react = vi.fn(() => {
+		const react = jest.fn(() => {
 			a.get()
 		})
 		const r = reactor('', react)
@@ -65,7 +64,7 @@ describe('reactors', () => {
 
 	it('will not react if the parents have not changed', () => {
 		const a = atom('', 1)
-		const react = vi
+		const react = jest
 			.fn(() => {
 				a.get()
 			})
@@ -85,7 +84,7 @@ describe('stopping', () => {
 	it('works', () => {
 		const a = atom('', 1)
 
-		const rfn = vi.fn(() => {
+		const rfn = jest.fn(() => {
 			a.get()
 		})
 		const r = reactor('', rfn)
@@ -120,7 +119,7 @@ describe('stopping', () => {
 test('.start() by default does not trigger a reaction if nothing has changed', () => {
 	const a = atom('', 1)
 
-	const rfn = vi.fn(() => {
+	const rfn = jest.fn(() => {
 		a.get()
 	})
 
@@ -139,7 +138,7 @@ test('.start() by default does not trigger a reaction if nothing has changed', (
 test('.start({force: true}) will trigger a reaction even if nothing has changed', () => {
 	const a = atom('', 1)
 
-	const rfn = vi.fn(() => {
+	const rfn = jest.fn(() => {
 		a.get()
 	})
 

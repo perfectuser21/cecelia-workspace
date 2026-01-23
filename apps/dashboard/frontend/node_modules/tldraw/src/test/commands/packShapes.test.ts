@@ -1,5 +1,4 @@
 import { createShapeId } from '@tldraw/editor'
-import { vi } from 'vitest'
 import { TestEditor } from '../TestEditor'
 
 let editor: TestEditor
@@ -11,7 +10,7 @@ const ids = {
 	boxD: createShapeId('boxD'),
 }
 
-vi.useFakeTimers()
+jest.useFakeTimers()
 
 beforeEach(() => {
 	editor = new TestEditor()
@@ -46,7 +45,7 @@ describe('editor.packShapes', () => {
 		editor.selectAll()
 		const centerBefore = editor.getSelectionRotatedPageBounds()!.center.clone()
 		editor.packShapes(editor.getSelectedShapeIds())
-		vi.advanceTimersByTime(1000)
+		jest.advanceTimersByTime(1000)
 		expect(
 			editor.getCurrentPageShapes().map((s) => ({ ...s, parentId: 'wahtever' }))
 		).toMatchSnapshot('packed shapes')
@@ -58,7 +57,7 @@ describe('editor.packShapes', () => {
 		editor.selectAll()
 		const centerBefore = editor.getSelectionRotatedPageBounds()!.center.clone()
 		editor.packShapes(editor.getSelectedShapeIds(), 16)
-		vi.advanceTimersByTime(1000)
+		jest.advanceTimersByTime(1000)
 		expect(
 			editor.getCurrentPageShapes().map((s) => ({ ...s, parentId: 'wahtever' }))
 		).toMatchSnapshot('packed shapes')
@@ -69,7 +68,7 @@ describe('editor.packShapes', () => {
 	it('packs rotated shapes', () => {
 		editor.updateShapes([{ id: ids.boxA, type: 'geo', rotation: Math.PI }])
 		editor.selectAll().packShapes(editor.getSelectedShapeIds(), 16)
-		vi.advanceTimersByTime(1000)
+		jest.advanceTimersByTime(1000)
 		expect(
 			editor.getCurrentPageShapes().map((s) => ({ ...s, parentId: 'wahtever' }))
 		).toMatchSnapshot('packed shapes')

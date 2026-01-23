@@ -98,7 +98,7 @@ function isCoreInstance(): boolean {
   }
 
   // Check if accessing Core-only routes (e.g., /cecelia, /ops, /panorama)
-  const coreOnlyPaths = ['/cecelia', '/ops', '/panorama', '/dev-panorama', '/engine', '/devgate', '/workers', '/voice-canvas', '/canvas', '/test-canvas'];
+  const coreOnlyPaths = ['/cecelia', '/ops', '/panorama', '/dev-panorama', '/engine', '/devgate', '/workers', '/voice-canvas', '/canvas', '/test-canvas', '/simple-test'];
   if (coreOnlyPaths.some(p => pathname.startsWith(p))) {
     return true;
   }

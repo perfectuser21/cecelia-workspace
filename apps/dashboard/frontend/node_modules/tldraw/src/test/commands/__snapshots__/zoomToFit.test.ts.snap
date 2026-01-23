@@ -1,6 +1,6 @@
-// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+// Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`converts correctly > Zoom to Fit Camera 1`] = `
+exports[`converts correctly: Zoom to Fit Camera 1`] = `
 {
   "id": "static",
   "meta": {},

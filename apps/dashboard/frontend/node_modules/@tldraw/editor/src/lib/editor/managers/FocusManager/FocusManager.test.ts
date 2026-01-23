@@ -1,59 +1,58 @@
-import { Mock, Mocked, vi } from 'vitest'
 import { Editor } from '../../Editor'
 import { FocusManager } from './FocusManager'
 
 // Mock the Editor class
-vi.mock('../../Editor')
+jest.mock('../../Editor')
 
 describe('FocusManager', () => {
-	let editor: Mocked<
+	let editor: jest.Mocked<
 		Editor & {
 			sideEffects: {
-				registerAfterChangeHandler: Mock
+				registerAfterChangeHandler: jest.Mock
 			}
-			getInstanceState: Mock
-			updateInstanceState: Mock
-			getContainer: Mock
-			isIn: Mock
-			getSelectedShapeIds: Mock
-			complete: Mock
+			getInstanceState: jest.Mock
+			updateInstanceState: jest.Mock
+			getContainer: jest.Mock
+			isIn: jest.Mock
+			getSelectedShapeIds: jest.Mock
+			complete: jest.Mock
 		}
 	>
 	let focusManager: FocusManager
 	let mockContainer: HTMLElement
-	let mockDispose: Mock
+	let mockDispose: jest.Mock
 	let originalAddEventListener: typeof document.body.addEventListener
 	let originalRemoveEventListener: typeof document.body.removeEventListener
 
 	beforeEach(() => {
 		// Create mock container element
 		mockContainer = document.createElement('div')
-		mockContainer.focus = vi.fn()
-		mockContainer.blur = vi.fn()
-		vi.spyOn(mockContainer.classList, 'add')
-		vi.spyOn(mockContainer.classList, 'remove')
+		mockContainer.focus = jest.fn()
+		mockContainer.blur = jest.fn()
+		jest.spyOn(mockContainer.classList, 'add')
+		jest.spyOn(mockContainer.classList, 'remove')
 
 		// Create mock dispose function
-		mockDispose = vi.fn()
+		mockDispose = jest.fn()
 
 		// Mock editor
 		editor = {
 			sideEffects: {
-				registerAfterChangeHandler: vi.fn(() => mockDispose),
+				registerAfterChangeHandler: jest.fn(() => mockDispose),
 			},
-			getInstanceState: vi.fn(() => ({ isFocused: false })),
-			updateInstanceState: vi.fn(),
-			getContainer: vi.fn(() => mockContainer),
-			isIn: vi.fn(() => false),
-			getSelectedShapeIds: vi.fn(() => []),
-			complete: vi.fn(),
+			getInstanceState: jest.fn(() => ({ isFocused: false })),
+			updateInstanceState: jest.fn(),
+			getContainer: jest.fn(() => mockContainer),
+			isIn: jest.fn(() => false),
+			getSelectedShapeIds: jest.fn(() => []),
+			complete: jest.fn(),
 		} as any
 
 		// Mock document.body event listeners
 		originalAddEventListener = document.body.addEventListener
 		originalRemoveEventListener = document.body.removeEventListener
-		document.body.addEventListener = vi.fn()
-		document.body.removeEventListener = vi.fn()
+		document.body.addEventListener = jest.fn()
+		document.body.removeEventListener = jest.fn()
 	})
 
 	afterEach(() => {
@@ -66,7 +65,7 @@ describe('FocusManager', () => {
 			focusManager.dispose()
 		}
 
-		vi.clearAllMocks()
+		jest.clearAllMocks()
 	})
 
 	describe('constructor', () => {
@@ -132,7 +131,7 @@ describe('FocusManager', () => {
 			const handler = handlerCall[1]
 
 			// Clear previous calls
-			vi.clearAllMocks()
+			jest.clearAllMocks()
 
 			// Simulate focus state change
 			const prev = { isFocused: false }
@@ -150,7 +149,7 @@ describe('FocusManager', () => {
 			const handlerCall = editor.sideEffects.registerAfterChangeHandler.mock.calls[0]
 			const handler = handlerCall[1]
 
-			vi.clearAllMocks()
+			jest.clearAllMocks()
 
 			// Simulate no focus state change
 			const prev = { isFocused: true }
@@ -171,7 +170,7 @@ describe('FocusManager', () => {
 			// Get the handler before clearing mocks
 			const handlerCall = editor.sideEffects.registerAfterChangeHandler.mock.calls[0]
 			handler = handlerCall[1]
-			vi.clearAllMocks()
+			jest.clearAllMocks()
 		})
 
 		it('should add focused class when editor is focused', () => {
@@ -206,11 +205,11 @@ describe('FocusManager', () => {
 			focusManager = new FocusManager(editor)
 
 			// Get the keydown handler that was registered
-			const addEventListenerCalls = (document.body.addEventListener as Mock).mock.calls
-			const keydownCall = addEventListenerCalls.find((call: any) => call[0] === 'keydown')
-			keydownHandler = keydownCall![1]
+			const addEventListenerCalls = (document.body.addEventListener as jest.Mock).mock.calls
+			const keydownCall = addEventListenerCalls.find((call) => call[0] === 'keydown')
+			keydownHandler = keydownCall[1]
 
-			vi.clearAllMocks()
+			jest.clearAllMocks()
 		})
 
 		it('should remove no-focus-ring class on Tab key', () => {
@@ -284,11 +283,11 @@ describe('FocusManager', () => {
 			focusManager = new FocusManager(editor)
 
 			// Get the mousedown handler that was registered
-			const addEventListenerCalls = (document.body.addEventListener as Mock).mock.calls
-			const mousedownCall = addEventListenerCalls.find((call: any) => call[0] === 'mousedown')
-			mousedownHandler = mousedownCall![1]
+			const addEventListenerCalls = (document.body.addEventListener as jest.Mock).mock.calls
+			const mousedownCall = addEventListenerCalls.find((call) => call[0] === 'mousedown')
+			mousedownHandler = mousedownCall[1]
 
-			vi.clearAllMocks()
+			jest.clearAllMocks()
 		})
 
 		it('should add no-focus-ring class on mouse down', () => {
@@ -327,7 +326,7 @@ describe('FocusManager', () => {
 		it('should complete before bluring', () => {
 			const callOrder: string[] = []
 			editor.complete.mockImplementation(() => callOrder.push('complete'))
-			mockContainer.blur = vi.fn(() => callOrder.push('blur'))
+			mockContainer.blur = jest.fn(() => callOrder.push('blur'))
 
 			focusManager.blur()
 
@@ -338,7 +337,7 @@ describe('FocusManager', () => {
 	describe('dispose', () => {
 		beforeEach(() => {
 			focusManager = new FocusManager(editor)
-			vi.clearAllMocks()
+			jest.clearAllMocks()
 		})
 
 		it('should remove keyboard event listener', () => {
@@ -377,7 +376,7 @@ describe('FocusManager', () => {
 			const handlerCall = editor.sideEffects.registerAfterChangeHandler.mock.calls[0]
 			const handler = handlerCall[1]
 
-			vi.clearAllMocks()
+			jest.clearAllMocks()
 
 			// Rapid focus changes
 			editor.getInstanceState.mockReturnValue({ isFocused: true })
@@ -395,9 +394,9 @@ describe('FocusManager', () => {
 
 		it('should handle keyboard navigation while editing', () => {
 			focusManager = new FocusManager(editor)
-			const addEventListenerCalls = (document.body.addEventListener as Mock).mock.calls
-			const keydownCall = addEventListenerCalls.find((call: any) => call[0] === 'keydown')
-			const keydownHandler = keydownCall![1]
+			const addEventListenerCalls = (document.body.addEventListener as jest.Mock).mock.calls
+			const keydownCall = addEventListenerCalls.find((call) => call[0] === 'keydown')
+			const keydownHandler = keydownCall[1]
 
 			editor.isIn.mockReturnValue(true) // Editing mode
 
@@ -410,15 +409,15 @@ describe('FocusManager', () => {
 
 		it('should handle mouse and keyboard interaction sequence', () => {
 			focusManager = new FocusManager(editor)
-			const addEventListenerCalls = (document.body.addEventListener as Mock).mock.calls
+			const addEventListenerCalls = (document.body.addEventListener as jest.Mock).mock.calls
 
-			const mousedownCall = addEventListenerCalls.find((call: any) => call[0] === 'mousedown')
-			const keydownCall = addEventListenerCalls.find((call: any) => call[0] === 'keydown')
+			const mousedownCall = addEventListenerCalls.find((call) => call[0] === 'mousedown')
+			const keydownCall = addEventListenerCalls.find((call) => call[0] === 'keydown')
 
-			const mousedownHandler = mousedownCall![1]
-			const keydownHandler = keydownCall![1]
+			const mousedownHandler = mousedownCall[1]
+			const keydownHandler = keydownCall[1]
 
-			vi.clearAllMocks()
+			jest.clearAllMocks()
 
 			// Mouse down adds no-focus-ring
 			mousedownHandler()

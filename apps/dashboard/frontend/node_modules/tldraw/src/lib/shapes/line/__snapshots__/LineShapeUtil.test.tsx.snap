@@ -1,6 +1,6 @@
-// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+// Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Misc > resizes > line shape after resize 1`] = `
+exports[`Misc resizes: line shape after resize 1`] = `
 {
   "id": "shape:line1",
   "index": "a1",

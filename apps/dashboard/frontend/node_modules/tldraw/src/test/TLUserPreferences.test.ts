@@ -1,5 +1,4 @@
 import { TLUserPreferences, atom, createTLUser } from '@tldraw/editor'
-import { vi } from 'vitest'
 import { TestEditor } from './TestEditor'
 
 let editor: TestEditor
@@ -60,7 +59,7 @@ describe('TLUserPreferences', () => {
 			locale: null,
 			name: null,
 		})
-		const setUserPreferences = vi.fn((preferences) => userPreferences.set(preferences))
+		const setUserPreferences = jest.fn((preferences) => userPreferences.set(preferences))
 
 		editor = new TestEditor({
 			user: createTLUser({
@@ -81,7 +80,7 @@ describe('TLUserPreferences', () => {
 			id: '123',
 			name: 'blah',
 		})
-		const setUserPreferences = vi.fn((preferences) => userPreferences.set(preferences))
+		const setUserPreferences = jest.fn((preferences) => userPreferences.set(preferences))
 
 		editor = new TestEditor({
 			user: createTLUser({
@@ -102,7 +101,7 @@ describe('TLUserPreferences', () => {
 			id: '123',
 			name: 'blah',
 		})
-		const setUserPreferences = vi.fn((preferences) => userPreferences.set(preferences))
+		const setUserPreferences = jest.fn((preferences) => userPreferences.set(preferences))
 
 		editor = new TestEditor({
 			user: createTLUser({

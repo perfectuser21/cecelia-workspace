@@ -1,11 +1,10 @@
 import { act, render, waitFor } from '@testing-library/react'
-import { vi } from 'vitest'
 import { TldrawEditor } from '../TldrawEditor'
 import { LicenseManager } from './LicenseManager'
 
 let mockLicenseState = 'unlicensed'
 
-vi.mock('./useLicenseManagerState', () => ({
+jest.mock('./useLicenseManagerState', () => ({
 	useLicenseManagerState: () => mockLicenseState,
 }))
 

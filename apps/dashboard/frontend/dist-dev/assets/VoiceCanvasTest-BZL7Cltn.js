@@ -1,1 +1,0 @@
-import{j as o}from"./index-X_gQAix8.js";import{T as t}from"./tldraw-CQ8QgGP9.js";import"./index-B2_eO_2O.js";function s(){return console.log("[VoiceCanvasTest] Render"),o.jsx("div",{style:{position:"fixed",top:64,left:256,right:0,bottom:0,backgroundColor:"white"},children:o.jsx(t,{})})}export{s as default};

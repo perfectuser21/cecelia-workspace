@@ -2,7 +2,6 @@ import { tlenv } from '@tldraw/editor'
 
 // N.B. We rework these Windows placeholders down below.
 const cmdKey = tlenv.isDarwin ? '⌘' : '__CTRL__'
-const ctrlKey = tlenv.isDarwin ? '⌃' : '__CTRL__'
 const altKey = tlenv.isDarwin ? '⌥' : '__ALT__'
 
 /** @public */
@@ -20,7 +19,7 @@ export function kbd(str: string) {
 					? s.replace(/[[\]]/g, '')
 					: s
 							.replace(/cmd\+/g, cmdKey)
-							.replace(/ctrl\+/g, ctrlKey)
+							.replace(/ctrl\+/g, cmdKey)
 							.replace(/alt\+/g, altKey)
 							.replace(/shift\+/g, '⇧')
 							// Backwards compatibility with the old system.
@@ -31,16 +30,9 @@ export function kbd(str: string) {
 			)
 			.flat()
 			.map((sub, index) => {
-				if (sub[0] === '+') return []
-
-				let modifiedKey
-				if (sub === '__CTRL__') {
-					modifiedKey = 'Ctrl'
-				} else if (sub === '__ALT__') {
-					modifiedKey = 'Alt'
-				} else {
-					modifiedKey = sub[0].toUpperCase() + sub.slice(1)
-				}
+				if (sub === '__CTRL__') return 'Ctrl'
+				if (sub === '__ALT__') return 'Alt'
+				const modifiedKey = sub[0].toUpperCase() + sub.slice(1)
 				return tlenv.isDarwin || !index ? modifiedKey : ['+', modifiedKey]
 			})
 			.flat()

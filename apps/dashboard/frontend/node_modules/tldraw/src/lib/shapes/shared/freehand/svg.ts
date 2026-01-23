@@ -6,8 +6,6 @@ import { StrokePoint } from './types'
  *
  * @param points - The stroke points returned from perfect-freehand
  * @param closed - Whether the shape is closed
- *
- * @public
  */
 export function getSvgPathFromStrokePoints(points: StrokePoint[], closed = false): string {
 	const len = points.length

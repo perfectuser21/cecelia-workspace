@@ -1,4 +1,4 @@
-import { ComponentType, ReactNode, RefAttributes, createContext, useContext, useMemo } from 'react'
+import { ComponentType, ReactNode, createContext, useContext, useMemo } from 'react'
 import { DefaultBackground } from '../components/default-components/DefaultBackground'
 import { DefaultBrush, TLBrushProps } from '../components/default-components/DefaultBrush'
 import {
@@ -38,10 +38,6 @@ import {
 } from '../components/default-components/DefaultShapeIndicatorErrorFallback'
 import { DefaultShapeIndicators } from '../components/default-components/DefaultShapeIndicators'
 import {
-	DefaultShapeWrapper,
-	TLShapeWrapperProps,
-} from '../components/default-components/DefaultShapeWrapper'
-import {
 	DefaultSnapIndicator,
 	TLSnapIndicatorProps,
 } from '../components/default-components/DefaultSnapIndictor'
@@ -72,7 +68,6 @@ export interface TLEditorComponents {
 	SelectionForeground?: ComponentType<TLSelectionForegroundProps> | null
 	ShapeIndicator?: ComponentType<TLShapeIndicatorProps> | null
 	ShapeIndicators?: ComponentType | null
-	ShapeWrapper?: ComponentType<TLShapeWrapperProps & RefAttributes<HTMLDivElement>> | null
 	SnapIndicator?: ComponentType<TLSnapIndicatorProps> | null
 	Spinner?: ComponentType<React.SVGProps<SVGSVGElement>> | null
 	SvgDefs?: ComponentType | null
@@ -119,7 +114,6 @@ export function EditorComponentsProvider({
 			SelectionForeground: DefaultSelectionForeground,
 			ShapeIndicator: DefaultShapeIndicator,
 			ShapeIndicators: DefaultShapeIndicators,
-			ShapeWrapper: DefaultShapeWrapper,
 			SnapIndicator: DefaultSnapIndicator,
 			Spinner: DefaultSpinner,
 			SvgDefs: DefaultSvgDefs,

@@ -342,7 +342,7 @@ function AppContent() {
       {/* 主内容区域 - 配置驱动路由 */}
       {/* Canvas 页面需要全屏，不要 padding */}
       <main className={isAuthenticated ? `${collapsed ? 'ml-16' : 'ml-64'} pt-16 transition-all duration-300` : ""}>
-        <div className={isAuthenticated && !['/canvas', '/voice-canvas', '/test-canvas'].includes(location.pathname) ? "p-8" : ""} style={['/canvas', '/voice-canvas', '/test-canvas'].includes(location.pathname) ? { position: 'absolute', top: 64, left: collapsed ? 64 : 256, right: 0, bottom: 0 } : {}}>
+        <div className={isAuthenticated && !['/canvas', '/voice-canvas', '/test-canvas', '/simple-test'].includes(location.pathname) ? "p-8" : ""} style={['/canvas', '/voice-canvas', '/test-canvas', '/simple-test'].includes(location.pathname) ? { position: 'absolute', top: 64, left: collapsed ? 64 : 256, right: 0, bottom: 0 } : {}}>
           <DynamicRouter>
             {/* 登录页面（静态路由） */}
             <Route path="/login" element={<FeishuLogin />} />

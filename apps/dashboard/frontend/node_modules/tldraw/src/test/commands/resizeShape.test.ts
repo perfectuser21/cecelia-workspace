@@ -1,10 +1,9 @@
 import { createShapeId } from '@tldraw/editor'
-import { vi } from 'vitest'
 import { TestEditor } from '../TestEditor'
 
 let editor: TestEditor
 
-vi.useFakeTimers()
+jest.useFakeTimers()
 
 const ids = {
 	boxA: createShapeId('boxA'),

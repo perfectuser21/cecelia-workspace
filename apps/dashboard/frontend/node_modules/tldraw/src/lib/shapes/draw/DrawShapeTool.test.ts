@@ -1,4 +1,5 @@
 import { TestEditor } from '../../../test/TestEditor'
+import { DrawShapeTool } from './DrawShapeTool'
 
 let editor: TestEditor
 
@@ -7,6 +8,10 @@ beforeEach(() => {
 })
 afterEach(() => {
 	editor?.dispose()
+})
+
+describe(DrawShapeTool, () => {
+	return
 })
 
 describe('When in the idle state', () => {

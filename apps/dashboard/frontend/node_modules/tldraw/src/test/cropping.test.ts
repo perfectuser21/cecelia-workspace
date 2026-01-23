@@ -1,9 +1,8 @@
 import { createShapeId, TLImageShape } from '@tldraw/editor'
-import { vi } from 'vitest'
 import { MIN_CROP_SIZE } from '../lib/shapes/shared/crop'
 import { TestEditor } from './TestEditor'
 
-vi.useFakeTimers()
+jest.useFakeTimers()
 
 let editor: TestEditor
 
@@ -496,7 +495,7 @@ describe('When in the select.crop.translating_crop state', () => {
 		})
 
 		editor.keyUp('Shift')
-		vi.advanceTimersByTime(500)
+		jest.advanceTimersByTime(500)
 
 		const afterShiftUp = editor.getShape<TLImageShape>(ids.imageB)!.props.crop!
 

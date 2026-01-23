@@ -1,21 +1,17 @@
-import { vi } from 'vitest'
 import { Editor } from '../../Editor'
 import { TextManager, TLMeasureTextSpanOpts } from './TextManager'
 
 // Create a simple mock DOM environment
 const mockElement = {
-	classList: { add: vi.fn() },
+	classList: { add: jest.fn() },
 	tabIndex: -1,
-	cloneNode: vi.fn(),
+	cloneNode: jest.fn(),
 	innerHTML: '',
 	textContent: '',
-	setAttribute: vi.fn(),
-	style: {
-		setProperty: vi.fn(),
-		getPropertyValue: vi.fn(() => ''),
-	},
+	setAttribute: jest.fn(),
+	style: { setProperty: jest.fn() },
 	scrollWidth: 100,
-	getBoundingClientRect: vi.fn(() => ({
+	getBoundingClientRect: jest.fn(() => ({
 		width: 100,
 		height: 20,
 		left: 0,
@@ -23,44 +19,22 @@ const mockElement = {
 		right: 100,
 		bottom: 20,
 	})),
-	remove: vi.fn(),
-	insertAdjacentElement: vi.fn(),
+	remove: jest.fn(),
+	insertAdjacentElement: jest.fn(),
 	childNodes: [],
 }
 
 // Mock document.createElement to return our mock element
-const mockCreateElement = vi.fn(() => {
+const mockCreateElement = jest.fn(() => {
 	const element = { ...mockElement }
-	element.cloneNode = vi.fn(() => ({ ...element }))
-
-	// Make textContent and innerHTML reactive like real DOM elements
-	let _textContent = ''
-	let _innerHTML = ''
-
-	Object.defineProperty(element, 'textContent', {
-		get: () => _textContent,
-		set: (value) => {
-			_textContent = value || ''
-			// When textContent is set, innerHTML should be the escaped version
-			_innerHTML = _textContent
-		},
-	})
-
-	Object.defineProperty(element, 'innerHTML', {
-		get: () => _innerHTML,
-		set: (value) => {
-			_innerHTML = value || ''
-			_textContent = _innerHTML // Simple approximation
-		},
-	})
-
+	element.cloneNode = jest.fn(() => ({ ...element }))
 	return element
 })
 
 // Mock editor
 const mockEditor = {
-	getContainer: vi.fn(() => ({
-		appendChild: vi.fn(),
+	getContainer: jest.fn(() => ({
+		appendChild: jest.fn(),
 	})),
 } as unknown as Editor
 
@@ -69,10 +43,10 @@ global.document = {
 	createElement: mockCreateElement,
 } as any
 
-global.Range = vi.fn(() => ({
-	setStart: vi.fn(),
-	setEnd: vi.fn(),
-	getClientRects: vi.fn(() => [
+global.Range = jest.fn(() => ({
+	setStart: jest.fn(),
+	setEnd: jest.fn(),
+	getClientRects: jest.fn(() => [
 		{
 			width: 10,
 			height: 16,
@@ -88,7 +62,7 @@ describe('TextManager', () => {
 	let textManager: TextManager
 
 	beforeEach(() => {
-		vi.clearAllMocks()
+		jest.clearAllMocks()
 		textManager = new TextManager(mockEditor)
 	})
 
@@ -112,13 +86,13 @@ describe('TextManager', () => {
 		}
 
 		it('should call measureHtml with normalized text', () => {
-			const spy = vi.spyOn(textManager, 'measureHtml')
+			const spy = jest.spyOn(textManager, 'measureHtml')
 			textManager.measureText('Hello World', defaultOpts)
 			expect(spy).toHaveBeenCalledWith('Hello World', defaultOpts)
 		})
 
 		it('should normalize line breaks', () => {
-			const spy = vi.spyOn(textManager, 'measureHtml')
+			const spy = jest.spyOn(textManager, 'measureHtml')
 			textManager.measureText('Hello\nWorld\r\nTest', defaultOpts)
 			// The text should be normalized to use consistent line breaks
 			expect(spy).toHaveBeenCalled()
@@ -273,7 +247,7 @@ describe('TextManager', () => {
 
 		it('should return array of text spans for non-empty text', () => {
 			// Mock measureElementTextNodeSpans to return some spans
-			vi.spyOn(textManager, 'measureElementTextNodeSpans').mockReturnValue({
+			jest.spyOn(textManager, 'measureElementTextNodeSpans').mockReturnValue({
 				spans: [
 					{
 						text: 'Hello World',
@@ -292,7 +266,7 @@ describe('TextManager', () => {
 		})
 
 		it('should handle wrap overflow', () => {
-			vi.spyOn(textManager, 'measureElementTextNodeSpans').mockReturnValue({
+			jest.spyOn(textManager, 'measureElementTextNodeSpans').mockReturnValue({
 				spans: [
 					{
 						text: 'Hello World',
@@ -310,7 +284,8 @@ describe('TextManager', () => {
 
 		it('should handle truncate-ellipsis overflow', () => {
 			// Mock the calls for ellipsis handling
-			vi.spyOn(textManager, 'measureElementTextNodeSpans')
+			jest
+				.spyOn(textManager, 'measureElementTextNodeSpans')
 				.mockReturnValueOnce({
 					spans: [
 						{
@@ -346,7 +321,7 @@ describe('TextManager', () => {
 		})
 
 		it('should handle truncate-clip overflow', () => {
-			vi.spyOn(textManager, 'measureElementTextNodeSpans').mockReturnValue({
+			jest.spyOn(textManager, 'measureElementTextNodeSpans').mockReturnValue({
 				spans: [
 					{
 						text: 'Hello Wo',
@@ -363,7 +338,7 @@ describe('TextManager', () => {
 		})
 
 		it('should handle different text alignments', () => {
-			vi.spyOn(textManager, 'measureElementTextNodeSpans').mockReturnValue({
+			jest.spyOn(textManager, 'measureElementTextNodeSpans').mockReturnValue({
 				spans: [
 					{
 						text: 'Test',
@@ -383,7 +358,7 @@ describe('TextManager', () => {
 		})
 
 		it('should handle custom font properties', () => {
-			vi.spyOn(textManager, 'measureElementTextNodeSpans').mockReturnValue({
+			jest.spyOn(textManager, 'measureElementTextNodeSpans').mockReturnValue({
 				spans: [
 					{
 						text: 'Test',
@@ -407,7 +382,7 @@ describe('TextManager', () => {
 		})
 
 		it('should handle other styles', () => {
-			vi.spyOn(textManager, 'measureElementTextNodeSpans').mockReturnValue({
+			jest.spyOn(textManager, 'measureElementTextNodeSpans').mockReturnValue({
 				spans: [
 					{
 						text: 'Test',

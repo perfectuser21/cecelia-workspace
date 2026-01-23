@@ -1,9 +1,8 @@
 import { PI, TLShapeId, createShapeId } from '@tldraw/editor'
-import { vi } from 'vitest'
 import { TestEditor } from '../TestEditor'
 import { TL } from '../test-jsx'
 
-vi.useFakeTimers()
+jest.useFakeTimers()
 
 let editor: TestEditor
 
@@ -47,10 +46,10 @@ describe('distributeShapes command', () => {
 	describe('when less than three shapes are selected', () => {
 		it('does nothing', () => {
 			editor.setSelectedShapes([ids.boxA, ids.boxB])
-			const fn = vi.fn()
+			const fn = jest.fn()
 			editor.store.listen(fn)
 			editor.distributeShapes(editor.getSelectedShapeIds(), 'horizontal')
-			vi.advanceTimersByTime(1000)
+			jest.advanceTimersByTime(1000)
 			expect(fn).not.toHaveBeenCalled()
 		})
 	})
@@ -59,7 +58,7 @@ describe('distributeShapes command', () => {
 		it('distributeShapes horizontally', () => {
 			editor.selectAll()
 			editor.distributeShapes(editor.getSelectedShapeIds(), 'horizontal')
-			vi.advanceTimersByTime(1000)
+			jest.advanceTimersByTime(1000)
 			editor.expectShapeToMatch(
 				{ id: ids.boxA, x: 0 },
 				{ id: ids.boxB, x: 200 },
@@ -71,7 +70,7 @@ describe('distributeShapes command', () => {
 			editor.updateShapes([{ id: ids.boxC, type: 'geo', x: 25 }])
 			editor.selectAll()
 			editor.distributeShapes(editor.getSelectedShapeIds(), 'horizontal')
-			vi.advanceTimersByTime(1000)
+			jest.advanceTimersByTime(1000)
 			editor.expectShapeToMatch(
 				{ id: ids.boxA, x: 0 },
 				{ id: ids.boxB, x: 100 },
@@ -82,7 +81,7 @@ describe('distributeShapes command', () => {
 		it('distributeShapes vertically', () => {
 			editor.selectAll()
 			editor.distributeShapes(editor.getSelectedShapeIds(), 'vertical')
-			vi.advanceTimersByTime(1000)
+			jest.advanceTimersByTime(1000)
 			editor.expectShapeToMatch(
 				{ id: ids.boxA, y: 0 },
 				{ id: ids.boxB, y: 200 },
@@ -94,7 +93,7 @@ describe('distributeShapes command', () => {
 			editor.updateShapes([{ id: ids.boxC, type: 'geo', y: 25 }])
 			editor.selectAll()
 			editor.distributeShapes(editor.getSelectedShapeIds(), 'vertical')
-			vi.advanceTimersByTime(1000)
+			jest.advanceTimersByTime(1000)
 			editor.expectShapeToMatch(
 				{ id: ids.boxA, y: 0 },
 				{ id: ids.boxB, y: 100 },
@@ -136,7 +135,7 @@ describe('distributeShapes command', () => {
 		editor.setSelectedShapes([ids.boxB, ids.boxC, ids.boxD])
 
 		editor.distributeShapes(editor.getSelectedShapeIds(), 'horizontal')
-		vi.advanceTimersByTime(1000)
+		jest.advanceTimersByTime(1000)
 
 		editor.expectShapeToMatch(
 			{ id: ids.boxB, x: 100 },
@@ -178,7 +177,7 @@ describe('distributeShapes command', () => {
 		editor.setSelectedShapes([ids.boxB, ids.boxC, ids.boxD])
 
 		editor.distributeShapes(editor.getSelectedShapeIds(), 'horizontal')
-		vi.advanceTimersByTime(1000)
+		jest.advanceTimersByTime(1000)
 
 		editor.expectShapeToMatch(
 			{ id: ids.boxB, x: 100 },
@@ -223,7 +222,7 @@ describe('distributeShapes command', () => {
 		editor.setSelectedShapes([ids.boxB, ids.boxC, ids.boxD])
 
 		editor.distributeShapes(editor.getSelectedShapeIds(), 'horizontal')
-		vi.advanceTimersByTime(1000)
+		jest.advanceTimersByTime(1000)
 
 		editor.expectShapeToMatch(
 			{ id: ids.boxB, x: 100 },

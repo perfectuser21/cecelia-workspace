@@ -1,6 +1,6 @@
 import { PageRecordType } from '@tldraw/tlschema'
 import { IndexKey, promiseWithResolve } from '@tldraw/utils'
-import { Mock, vi } from 'vitest'
+import { afterEach } from 'node:test'
 import { createTLStore } from '../../config/createTLStore'
 import { TLLocalSyncClient } from './TLLocalSyncClient'
 import { hardReset } from './hardReset'
@@ -10,20 +10,20 @@ class BroadcastChannelMock {
 	constructor(_name: string) {
 		// noop
 	}
-	postMessage = vi.fn((_msg: any) => {
+	postMessage = jest.fn((_msg: any) => {
 		// noop
 	})
-	close = vi.fn(() => {
+	close = jest.fn(() => {
 		// noop
 	})
 }
 
 function testClient(channel = new BroadcastChannelMock('test')) {
 	const store = createTLStore({ shapeUtils: [], bindingUtils: [] })
-	const onLoad = vi.fn(() => {
+	const onLoad = jest.fn(() => {
 		return
 	})
-	const onLoadError = vi.fn(() => {
+	const onLoadError = jest.fn(() => {
 		return
 	})
 	const client = new TLLocalSyncClient(
@@ -36,26 +36,26 @@ function testClient(channel = new BroadcastChannelMock('test')) {
 		channel
 	)
 
-	client.db.storeSnapshot = vi.fn(() => Promise.resolve())
-	client.db.storeChanges = vi.fn(() => Promise.resolve())
+	client.db.storeSnapshot = jest.fn(() => Promise.resolve())
+	client.db.storeChanges = jest.fn(() => Promise.resolve())
 
 	return {
-		client: client as { db: { storeSnapshot: Mock; storeChanges: Mock } } & typeof client,
+		client: client as { db: { storeSnapshot: jest.Mock; storeChanges: jest.Mock } } & typeof client,
 		store,
 		onLoad,
 		onLoadError,
 		channel,
 		tick: async () => {
-			vi.advanceTimersByTime(500)
+			jest.advanceTimersByTime(500)
 			await Promise.resolve()
 			await client.db.pending()
-			vi.advanceTimersByTime(500)
+			jest.advanceTimersByTime(500)
 			await Promise.resolve()
 		},
 	}
 }
 
-const reloadMock = vi.fn()
+const reloadMock = jest.fn()
 
 beforeAll(() => {
 	Object.defineProperty(window, 'location', {
@@ -65,14 +65,14 @@ beforeAll(() => {
 })
 
 beforeEach(() => {
-	vi.clearAllMocks()
+	jest.clearAllMocks()
 })
 
 afterEach(async () => {
 	await hardReset({ shouldReload: false })
 })
 
-vi.useFakeTimers()
+jest.useFakeTimers()
 
 test('the client connects on instantiation, announcing its schema', async () => {
 	const { channel, tick } = testClient()
@@ -86,7 +86,7 @@ test('the client connects on instantiation, announcing its schema', async () => 
 test('when a client receives an announce with a newer schema version it reloads itself', async () => {
 	const { client, channel, onLoadError, tick } = testClient()
 	await tick()
-	vi.advanceTimersByTime(10000)
+	jest.advanceTimersByTime(10000)
 	expect(reloadMock).not.toHaveBeenCalled()
 	channel.onmessage?.({
 		data: {
@@ -104,7 +104,7 @@ test('when a client receives an announce with a newer schema version it reloads 
 test('when a client receives an announce with a newer schema version shortly after loading it does not reload but instead reports a loadError', async () => {
 	const { client, channel, onLoadError, tick } = testClient()
 	await tick()
-	vi.advanceTimersByTime(1000)
+	jest.advanceTimersByTime(1000)
 	expect(reloadMock).not.toHaveBeenCalled()
 	channel.onmessage?.({
 		data: {

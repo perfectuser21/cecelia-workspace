@@ -1,5 +1,4 @@
 import { BaseRecord, RecordId, Store, StoreSchema, createRecordType } from '@tldraw/store'
-import { vi } from 'vitest'
 import { TLHistoryBatchOptions } from '../../types/history-types'
 import { HistoryManager } from './HistoryManager'
 
@@ -490,7 +489,7 @@ describe('HistoryManager constructor and lifecycle', () => {
 	})
 
 	it('should initialize with optional annotateError callback', () => {
-		const mockAnnotateError = vi.fn()
+		const mockAnnotateError = jest.fn()
 		const manager = new HistoryManager({ store, annotateError: mockAnnotateError })
 		expect(manager).toBeDefined()
 	})
@@ -504,7 +503,7 @@ describe('HistoryManager constructor and lifecycle', () => {
 	})
 
 	it('should handle errors in batch operations with annotateError', () => {
-		const mockAnnotateError = vi.fn()
+		const mockAnnotateError = jest.fn()
 		const manager = new HistoryManager({ store, annotateError: mockAnnotateError })
 
 		const errorFn = () => {
@@ -516,7 +515,7 @@ describe('HistoryManager constructor and lifecycle', () => {
 	})
 
 	it('should handle nested batch error scenarios', () => {
-		const mockAnnotateError = vi.fn()
+		const mockAnnotateError = jest.fn()
 		const manager = new HistoryManager({ store, annotateError: mockAnnotateError })
 
 		const nestedErrorFn = () => {
@@ -696,7 +695,7 @@ describe('HistoryManager error scenarios and edge cases', () => {
 	describe('squashToMark error handling', () => {
 		it('should handle non-existent mark gracefully', () => {
 			store.update(ids.a, (s) => ({ ...s, value: 1 }))
-			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+			const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
 
 			manager.squashToMark('non-existent-mark')
 
@@ -708,7 +707,7 @@ describe('HistoryManager error scenarios and edge cases', () => {
 		})
 
 		it('should handle empty stack when squashing', () => {
-			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+			const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
 
 			manager.squashToMark('non-existent')
 
@@ -781,7 +780,7 @@ describe('HistoryManager error scenarios and edge cases', () => {
 		})
 
 		it('should maintain batch state correctly during errors', () => {
-			const mockAnnotateError = vi.fn()
+			const mockAnnotateError = jest.fn()
 			const errorManager = new HistoryManager({ store, annotateError: mockAnnotateError })
 
 			try {

@@ -1,4 +1,3 @@
-import { vi } from 'vitest'
 import { HandTool } from '../lib/tools/HandTool/HandTool'
 import { TestEditor, createDefaultShapes } from './TestEditor'
 
@@ -15,7 +14,7 @@ afterEach(() => {
 	editor?.dispose()
 })
 
-vi.useFakeTimers()
+jest.useFakeTimers()
 
 describe(HandTool, () => {
 	it('Double taps to zoom in', () => {
@@ -23,9 +22,9 @@ describe(HandTool, () => {
 		expect(editor.getZoomLevel()).toBe(1)
 		editor.click()
 		editor.click() // double click!
-		vi.advanceTimersByTime(300)
+		jest.advanceTimersByTime(300)
 		expect(editor.getZoomLevel()).not.toBe(1) // animating
-		vi.advanceTimersByTime(300)
+		jest.advanceTimersByTime(300)
 		expect(editor.getZoomLevel()).toBe(2) // all done
 	})
 
@@ -35,9 +34,9 @@ describe(HandTool, () => {
 		editor.click()
 		editor.click()
 		editor.click() // triple click!
-		vi.advanceTimersByTime(300)
+		jest.advanceTimersByTime(300)
 		expect(editor.getZoomLevel()).not.toBe(1) // animating
-		vi.advanceTimersByTime(300)
+		jest.advanceTimersByTime(300)
 		expect(editor.getZoomLevel()).toBe(0.5) // all done
 	})
 
@@ -49,9 +48,9 @@ describe(HandTool, () => {
 		editor.click()
 		editor.click()
 		editor.click() // quad click!
-		vi.advanceTimersByTime(300)
+		jest.advanceTimersByTime(300)
 		expect(editor.getZoomLevel()).not.toBe(2) // animating
-		vi.advanceTimersByTime(300)
+		jest.advanceTimersByTime(300)
 		expect(editor.getZoomLevel()).toBe(1) // all done
 	})
 
@@ -63,9 +62,9 @@ describe(HandTool, () => {
 		editor.click()
 		editor.click()
 		editor.click() // quad click!
-		vi.advanceTimersByTime(300)
+		jest.advanceTimersByTime(300)
 		expect(editor.getZoomLevel()).not.toBe(1) // animating
-		vi.advanceTimersByTime(300)
+		jest.advanceTimersByTime(300)
 		const z = editor.getZoomLevel()
 		editor.zoomToFit() // call zoom to fit manually to compare
 		expect(editor.getZoomLevel()).toBe(z) // zoom should not have changed

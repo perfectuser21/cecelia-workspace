@@ -1,11 +1,10 @@
 import { TLShapePartial, Vec, createShapeId } from '@tldraw/editor'
-import { vi } from 'vitest'
 import { TestEditor } from '../TestEditor'
 import { PerformanceMeasurer } from './PerformanceMeasurer'
 
 let editor = new TestEditor()
 
-vi.useRealTimers()
+jest.useRealTimers()
 
 describe.skip('Example perf tests', () => {
 	it('measures Editor.createShape vs Editor.createShapes', () => {

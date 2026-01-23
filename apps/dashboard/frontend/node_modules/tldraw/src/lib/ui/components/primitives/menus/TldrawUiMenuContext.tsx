@@ -3,6 +3,7 @@ import { TLUiEventSource } from '../../../context/events'
 
 /** @public */
 export type TLUiMenuContextType =
+	| 'panel'
 	| 'menu'
 	| 'small-icons'
 	| 'context-menu'

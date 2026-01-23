@@ -1,4 +1,3 @@
-import { vi } from 'vitest'
 import { SelectTool } from '../lib/tools/SelectTool/SelectTool'
 import { TestEditor } from './TestEditor'
 import { TL } from './test-jsx'
@@ -29,12 +28,12 @@ describe(SelectTool, () => {
 			// clicking on the input will preserve selection, however you can
 			// click on the shape itself to select it as usual.
 			// clicking on the shape should not do anything
-			// vi.advanceTimersByTime(1000)
+			// jest.advanceTimersByTime(1000)
 			// editor.pointerDown(50, 50, shapeId)
 			// expect(editor.currentPageState.editingShapeId).toBe(shapeId)
 
 			// clicking outside the shape should end editing
-			vi.advanceTimersByTime(1000)
+			jest.advanceTimersByTime(1000)
 
 			editor.pointerDown(150, 150).pointerUp()
 			expect(editor.getCurrentPageState().editingShapeId).toBe(null)
@@ -52,7 +51,7 @@ describe(SelectTool, () => {
 		expect(editor.getCurrentPageState().editingShapeId).toBe(shapeId)
 
 		// clicking outside the shape should end editing
-		vi.advanceTimersByTime(1000)
+		jest.advanceTimersByTime(1000)
 
 		editor.pointerDown(150, 150).pointerUp()
 		expect(editor.getCurrentPageState().editingShapeId).toBe(null)
