@@ -18,11 +18,14 @@ export default defineConfig({
     alias: {
       '@features/core': coreFeaturesPath,
       '@': path.resolve(__dirname, './src'),
+      // Ensure tldraw resolves to our node_modules
+      '@tldraw/tldraw': path.resolve(__dirname, 'node_modules/@tldraw/tldraw'),
     },
     // Dedupe to ensure single instances of dependencies
     dedupe: [
       'react', 'react-dom', 'react-router-dom',
       'lucide-react', 'axios', 'recharts', '@hello-pangea/dnd',
+      '@tldraw/tldraw', '@tldraw/editor', '@tldraw/state',
     ],
   },
   // Optimize deps to pre-bundle external feature dependencies
@@ -30,6 +33,7 @@ export default defineConfig({
     include: [
       'react', 'react-dom', 'react-router-dom',
       'lucide-react', 'axios', 'recharts', '@hello-pangea/dnd',
+      '@tldraw/tldraw',
     ],
   },
   plugins: [
