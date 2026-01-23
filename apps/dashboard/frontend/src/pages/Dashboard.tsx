@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   LayoutGrid,
   TrendingUp,
+  TrendingDown,
   Users,
   BarChart3,
   Target,
@@ -22,11 +23,14 @@ import {
   CloudRain,
   CloudSnow,
   Quote,
-  Calendar,
   Timer,
-  PartyPopper
+  PartyPopper,
+  Send,
+  ClipboardList,
+  Bot
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { dashboardApi, type DashboardStats } from '../api';
 
 // 每日一言库
 const DAILY_QUOTES = [
@@ -260,17 +264,28 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [showScrapingPanel, setShowScrapingPanel] = useState(false);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
-  const stats = {
-    today: {
-      tasks: 12,
-      success: 11,
-      rate: 92
-    },
-    platforms: 5,
-    accounts: 23,
-    dataPoints: 1247
-  };
+  // 获取 Dashboard 实时统计数据
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setStatsLoading(true);
+        const stats = await dashboardApi.fetchDashboardStats();
+        setDashboardStats(stats);
+      } catch (error) {
+        console.error('Failed to fetch dashboard stats:', error);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    fetchStats();
+    // 每 30 秒刷新一次
+    const timer = setInterval(fetchStats, 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   // 节日检测
   const holiday = useMemo(() => getHoliday(), []);
@@ -542,35 +557,42 @@ export default function Dashboard() {
         {/* 数据概览卡片 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard
-            title="今日任务"
-            value={stats.today.tasks}
-            icon={CheckCircle}
+            title="今日发布"
+            value={dashboardStats?.todayPublished.value ?? 0}
+            delta={dashboardStats?.todayPublished.delta ?? 0}
+            icon={Send}
             color="blue"
-            subtitle={`成功 ${stats.today.success} 次`}
+            subtitle="较昨日"
+            loading={statsLoading}
             index={0}
           />
           <StatCard
-            title="接入平台"
-            value={stats.platforms}
-            icon={LayoutGrid}
+            title="待处理任务"
+            value={dashboardStats?.pendingTasks.value ?? 0}
+            icon={ClipboardList}
             color="purple"
-            subtitle="5 个社交平台"
+            subtitle="等待发布"
+            loading={statsLoading}
             index={1}
           />
           <StatCard
-            title="管理账号"
-            value={stats.accounts}
+            title="活跃账号"
+            value={dashboardStats?.activeAccounts.value ?? 0}
+            delta={dashboardStats?.activeAccounts.delta ?? 0}
             icon={Users}
             color="green"
-            subtitle="多平台账号"
+            subtitle="登录有效"
+            loading={statsLoading}
             index={2}
           />
           <StatCard
-            title="数据量"
-            value={`${stats.dataPoints}+`}
-            icon={TrendingUp}
+            title="AI 执行"
+            value={dashboardStats?.aiExecutions.value ?? 0}
+            delta={dashboardStats?.aiExecutions.delta ?? 0}
+            icon={Bot}
             color="orange"
-            subtitle="今日采集"
+            subtitle="今日任务"
+            loading={statsLoading}
             index={3}
           />
         </div>
@@ -753,25 +775,29 @@ function useCountUp(end: number, duration: number = 1500) {
   return count;
 }
 
-// 统计卡片组件 - 计数动画 + 简化悬停效果
+// 统计卡片组件 - 计数动画 + 玻璃拟态效果
 function StatCard({
   title,
   value,
+  delta,
   icon: Icon,
   color,
   subtitle,
+  loading = false,
   index = 0
 }: {
   title: string;
   value: number | string;
+  delta?: number;
   icon: any;
   color: string;
   subtitle?: string;
+  loading?: boolean;
   index?: number;
 }) {
   // 解析数字值用于计数动画
   const numericValue = typeof value === 'number' ? value : parseInt(String(value).replace(/[^0-9]/g, '')) || 0;
-  const animatedValue = useCountUp(numericValue, 1000 + index * 150);
+  const animatedValue = useCountUp(loading ? 0 : numericValue, 1000 + index * 150);
   const displayValue = typeof value === 'string' && value.includes('+')
     ? `${animatedValue}+`
     : animatedValue;
@@ -790,11 +816,33 @@ function StatCard({
     orange: 'shadow-purple-500/30'
   };
 
+  // 渲染变化指示器
+  const renderDelta = () => {
+    if (delta === undefined || delta === 0) return null;
+
+    const isPositive = delta > 0;
+    return (
+      <div className={`flex items-center gap-0.5 text-xs font-medium ${
+        isPositive ? 'text-green-500' : 'text-red-500'
+      }`}>
+        {isPositive ? (
+          <TrendingUp className="w-3 h-3" />
+        ) : (
+          <TrendingDown className="w-3 h-3" />
+        )}
+        <span>{isPositive ? '+' : ''}{delta}</span>
+      </div>
+    );
+  };
+
   return (
     <div
-      className="group relative bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 overflow-hidden card-reveal tilt-card cursor-default"
+      className="group relative bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-5 border border-slate-200/60 dark:border-slate-700/60 overflow-hidden card-reveal tilt-card cursor-default shadow-[0_4px_16px_-2px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.12)] transition-all duration-300"
       style={{ animationDelay: `${index * 0.1}s` }}
     >
+      {/* 玻璃拟态光效 */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-transparent dark:from-white/5 pointer-events-none" />
+
       {/* 悬停渐变背景 */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-cyan-500/5 dark:from-blue-500/10 dark:to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
@@ -803,22 +851,33 @@ function StatCard({
           <div className={`${colorClasses[color as keyof typeof colorClasses]} ${glowColors[color as keyof typeof glowColors]} rounded-xl p-2.5 shadow-lg group-hover:scale-110 group-hover:shadow-xl transition-all duration-300`}>
             <Icon className="w-5 h-5 text-white" />
           </div>
-          {/* 趋势指示器 */}
-          <div className="flex items-end gap-0.5 h-5 opacity-50 group-hover:opacity-80 transition-opacity">
-            {[40, 65, 45, 80, 100].map((height, i) => (
-              <div
-                key={i}
-                className="w-1 rounded-full bg-gradient-to-t from-blue-500/60 to-blue-300/30 dark:from-sky-400/60 dark:to-sky-300/30 group-hover:scale-y-110 transition-transform duration-300"
-                style={{ height: `${height}%`, transitionDelay: `${i * 30}ms` }}
-              />
-            ))}
-          </div>
+          {/* 变化指示器或加载动画 */}
+          {loading ? (
+            <div className="w-4 h-4 border-2 border-slate-300 dark:border-slate-600 border-t-blue-500 rounded-full animate-spin" />
+          ) : (
+            renderDelta() || (
+              <div className="flex items-end gap-0.5 h-5 opacity-50 group-hover:opacity-80 transition-opacity">
+                {[40, 65, 45, 80, 100].map((height, i) => (
+                  <div
+                    key={i}
+                    className="w-1 rounded-full bg-gradient-to-t from-blue-500/60 to-blue-300/30 dark:from-sky-400/60 dark:to-sky-300/30 group-hover:scale-y-110 transition-transform duration-300"
+                    style={{ height: `${height}%`, transitionDelay: `${i * 30}ms` }}
+                  />
+                ))}
+              </div>
+            )
+          )}
         </div>
         <div className="text-2xl font-bold text-slate-800 dark:text-white mb-0.5 counter-number">
-          {displayValue}
+          {loading ? '-' : displayValue}
         </div>
         <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{title}</div>
-        {subtitle && <div className="text-xs text-slate-400 dark:text-slate-500">{subtitle}</div>}
+        {subtitle && delta !== undefined && delta !== 0 && (
+          <div className="text-xs text-slate-400 dark:text-slate-500">{subtitle}</div>
+        )}
+        {subtitle && (delta === undefined || delta === 0) && (
+          <div className="text-xs text-slate-400 dark:text-slate-500">{subtitle}</div>
+        )}
       </div>
     </div>
   );

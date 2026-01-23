@@ -37,7 +37,7 @@ services:
       - EXECUTIONS_DATA_MAX_AGE=168
       - EXECUTIONS_DATA_PRUNE_MAX_COUNT=500
     volumes:
-      - n8n_data:/home/node/.n8n
+      - n8n-self-hosted_n8n_data:/home/node/.n8n
     networks:
       - n8n-network
       - npm-network
@@ -50,4 +50,5 @@ networks:
     name: n8n-social-media-scraper_n8n-network
 
 volumes:
-  n8n_data:
+  n8n-self-hosted_n8n_data:
+    external: true
