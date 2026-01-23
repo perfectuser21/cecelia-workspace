@@ -1,0 +1,1 @@
+import{j as t}from"./index-BfzjYRpn.js";import{T as i}from"./tldraw-CgSctpjD.js";import"./index-BtNwh5yq.js";function e(){return t.jsx("div",{style:{position:"fixed",inset:0},children:t.jsx(i,{})})}export{e as default};

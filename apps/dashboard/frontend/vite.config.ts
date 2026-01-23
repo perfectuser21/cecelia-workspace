@@ -18,14 +18,17 @@ export default defineConfig({
     alias: {
       '@features/core': coreFeaturesPath,
       '@': path.resolve(__dirname, './src'),
-      // Ensure tldraw resolves to our node_modules
+      // Ensure dependencies resolve to our node_modules
       '@tldraw/tldraw': path.resolve(__dirname, 'node_modules/@tldraw/tldraw'),
+      'react-konva': path.resolve(__dirname, 'node_modules/react-konva'),
+      'konva': path.resolve(__dirname, 'node_modules/konva'),
     },
     // Dedupe to ensure single instances of dependencies
     dedupe: [
       'react', 'react-dom', 'react-router-dom',
       'lucide-react', 'axios', 'recharts', '@hello-pangea/dnd',
       '@tldraw/tldraw', '@tldraw/editor', '@tldraw/state',
+      'react-konva', 'konva',
     ],
   },
   // Optimize deps to pre-bundle external feature dependencies
@@ -34,6 +37,7 @@ export default defineConfig({
       'react', 'react-dom', 'react-router-dom',
       'lucide-react', 'axios', 'recharts', '@hello-pangea/dnd',
       '@tldraw/tldraw',
+      'react-konva', 'konva',
     ],
   },
   plugins: [

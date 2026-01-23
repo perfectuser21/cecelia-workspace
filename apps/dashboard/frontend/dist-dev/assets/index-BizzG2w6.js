@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/DevGateMetrics-BkkHKy8A.js","assets/index-BfzjYRpn.js","assets/index-3UAe3Ji9.css"])))=>i.map(i=>d[i]);
+import{ah as e}from"./index-BfzjYRpn.js";const o={id:"devgate",name:"DevGate",version:"1.0.0",source:"core",instances:["core"],routes:[{path:"/devgate",component:"DevGateMetrics"}],components:{DevGateMetrics:()=>e(()=>import("./DevGateMetrics-BkkHKy8A.js"),__vite__mapDeps([0,1,2]))}};export{o as default};
