@@ -55,8 +55,8 @@ export default function FeatureDashboard() {
         }
       }
 
-      // 实例过滤（Core 实例默认只看 Core + Both）
-      if (!showAll && !f.instances.includes('core') && !f.instances.includes('both')) {
+      // 实例过滤（Core 实例默认只看 Core 或同时支持两个实例的）
+      if (!showAll && !f.instances.includes('core')) {
         return false;
       }
 

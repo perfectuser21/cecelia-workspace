@@ -31,7 +31,7 @@ export const features: Feature[] = [
     id: 'F-AUTH',
     name: '飞书认证',
     category: 'Foundation',
-    instances: ['both'],
+    instances: ['autopilot', 'core'],
     owner: '认证团队',
     priority: 'P0',
     hasRci: true,
@@ -45,7 +45,7 @@ export const features: Feature[] = [
     id: 'F-NOTIFICATION',
     name: '通知系统',
     category: 'Foundation',
-    instances: ['both'],
+    instances: ['autopilot', 'core'],
     owner: '基础设施团队',
     priority: 'P1',
     hasRci: false,
@@ -58,7 +58,7 @@ export const features: Feature[] = [
     id: 'F-LOGS',
     name: '日志系统',
     category: 'Foundation',
-    instances: ['both'],
+    instances: ['autopilot', 'core'],
     owner: '基础设施团队',
     priority: 'P1',
     hasRci: false,
@@ -223,7 +223,7 @@ export const getFeatureStats = () => {
   const byInstance = {
     autopilot: features.filter((f) => f.instances.includes('autopilot')).length,
     core: features.filter((f) => f.instances.includes('core')).length,
-    both: features.filter((f) => f.instances.includes('both')).length,
+    both: features.filter((f) => f.instances.length === 2 && f.instances.includes('autopilot') && f.instances.includes('core')).length,
   };
 
   const byPriority = {
