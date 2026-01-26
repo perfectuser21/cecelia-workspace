@@ -22,6 +22,7 @@ const iconMap: Record<IconName, React.ComponentType<LucideProps>> = {
 
 interface DynamicIconProps extends LucideProps {
   name: IconName;
+  className?: string;
 }
 
 export function DynamicIcon({ name, ...props }: DynamicIconProps) {

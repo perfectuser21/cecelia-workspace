@@ -495,7 +495,7 @@ export default function ContentPublish() {
 
     setIsBatchDeleting(true);
     try {
-      await Promise.all(Array.from(selectedTaskIds).map((id) => publishApi.deleteTask(id)));
+      await Promise.all(Array.from(selectedTaskIds).map((id: string) => publishApi.deleteTask(id)));
       setSelectedTaskIds(new Set());
       await loadData();
     } catch (error: any) {

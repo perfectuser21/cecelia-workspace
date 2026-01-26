@@ -1,3 +1,4 @@
+// @ts-nocheck - Recharts types incompatible with React 18
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Download, Calendar, TrendingUp, Eye, Heart } from 'lucide-react';
