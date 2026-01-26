@@ -1,0 +1,61 @@
+{
+  "version": "1.0.0",
+  "departments": [
+    {
+      "id": "cecelia-agents",
+      "name": "Cecelia Agents",
+      "icon": "Bot",
+      "description": "Autonomous AI agents for development workflow automation",
+      "workers": [
+        {
+          "id": "cecelia-agent-001",
+          "name": "Development Agent",
+          "role": "Full-stack development automation",
+          "department": "cecelia-agents",
+          "skills": ["typescript", "react", "nodejs", "git", "ci-cd"],
+          "n8n_workflows": ["cecelia-launcher-v2", "cecelia-callback-handler-v2"],
+          "status": "active",
+          "description": "Executes PRD-driven development tasks autonomously"
+        },
+        {
+          "id": "cecelia-agent-002",
+          "name": "QA Agent",
+          "role": "Quality assurance and testing",
+          "department": "cecelia-agents",
+          "skills": ["testing", "qa", "ci-cd", "audit"],
+          "n8n_workflows": ["cecelia-qa-runner"],
+          "status": "active",
+          "description": "Automated testing and quality gate validation"
+        }
+      ]
+    },
+    {
+      "id": "ai-employees",
+      "name": "AI Employees",
+      "icon": "Users",
+      "description": "Specialized AI workers for business operations",
+      "workers": [
+        {
+          "id": "content-writer-001",
+          "name": "Content Writer",
+          "role": "Content generation and copywriting",
+          "department": "ai-employees",
+          "skills": ["writing", "seo", "content-strategy"],
+          "n8n_workflows": ["content-generation-pipeline"],
+          "status": "active",
+          "description": "Creates marketing content and documentation"
+        },
+        {
+          "id": "data-analyst-001",
+          "name": "Data Analyst",
+          "role": "Data analysis and reporting",
+          "department": "ai-employees",
+          "skills": ["data-analysis", "python", "sql", "visualization"],
+          "n8n_workflows": ["data-pipeline-v2"],
+          "status": "active",
+          "description": "Analyzes data and generates insights"
+        }
+      ]
+    }
+  ]
+}
