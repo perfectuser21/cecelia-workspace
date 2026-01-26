@@ -1,0 +1,201 @@
+// Feature Registry and Types
+export * from './types';
+export * from './registry';
+export { coreInstanceConfig, coreTheme } from './config';
+
+import type { CoreConfig, CoreRoute, NavGroup, NavGroupItem, FeatureManifest } from './types';
+import { coreInstanceConfig } from './config';
+
+// Feature manifests - lazy loaded
+// Top-level navigation features (these appear in sidebar)
+export const coreFeatures = {
+  // Primary navigation - 3 top-level entries
+  'ops': () => import('./ops'),
+  'company': () => import('./company'),
+  'portfolio': () => import('./portfolio'),
+  // Sub-features (imported by primary features, no direct nav)
+  'claude-monitor': () => import('./claude-monitor'),
+  'vps-monitor': () => import('./vps-monitor'),
+  'engine': () => import('./engine'),
+  'n8n': () => import('./n8n'),
+  'cecelia': () => import('./cecelia'),
+  'canvas': () => import('./canvas'),
+  'dev-panorama': () => import('./dev-panorama'),
+  'panorama': () => import('./panorama'),
+  'workers': () => import('./workers'),
+  'tasks': () => import('./tasks'),
+  'devgate': () => import('./devgate'),
+};
+
+// Autopilot features (loaded when running Autopilot instance)
+export const autopilotFeatures = {
+  'autopilot': () => import('./autopilot'),
+};
+
+// Load all features and register them
+export async function loadAllFeatures() {
+  const { featureRegistry } = await import('./registry');
+
+  const manifests = await Promise.all(
+    Object.values(coreFeatures).map(loader => loader().then(m => m.default))
+  );
+
+  featureRegistry.registerAll(manifests);
+  return featureRegistry;
+}
+
+/**
+ * Build complete Core configuration from feature manifests
+ * This is the main entry point for Autopilot to load Core config dynamically
+ */
+export async function buildCoreConfig(): Promise<CoreConfig> {
+  const manifests = await Promise.all(
+    Object.values(coreFeatures).map(loader => loader().then(m => m.default))
+  );
+
+  const navGroups = buildNavGroupsFromManifests(manifests);
+  const pageComponents = collectPageComponents(manifests);
+  const allRoutes = collectAllRoutes(manifests);
+
+  return {
+    instanceConfig: coreInstanceConfig,
+    navGroups,
+    pageComponents,
+    allRoutes,
+  };
+}
+
+/**
+ * Build Autopilot configuration from feature manifests
+ */
+export async function buildAutopilotConfig(): Promise<CoreConfig> {
+  const manifests = await Promise.all(
+    Object.values(autopilotFeatures).map(loader => loader().then(m => m.default))
+  );
+
+  const navGroups = buildNavGroupsFromManifests(manifests);
+  const pageComponents = collectPageComponents(manifests);
+  const allRoutes = collectAllRoutes(manifests);
+
+  // Autopilot instance config
+  const autopilotInstanceConfig = {
+    instance: 'autopilot',
+    name: '悦升云端',
+    theme: {
+      logo: '/logo-color.png',
+      logoCollapsed: '/logo-white.png',
+      favicon: '/favicon.svg',
+      primaryColor: '#3b82f6', // blue-500
+      secondaryColor: '#60a5fa', // blue-400
+      sidebarGradient: 'linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%)',
+    },
+  };
+
+  return {
+    instanceConfig: autopilotInstanceConfig,
+    navGroups,
+    pageComponents,
+    allRoutes,
+  };
+}
+
+function buildNavGroupsFromManifests(manifests: FeatureManifest[]): NavGroup[] {
+  const groupMap = new Map<string, { label: string; icon?: string; order: number; items: NavGroupItem[] }>();
+
+  for (const manifest of manifests) {
+    if (manifest.navGroups) {
+      for (const group of manifest.navGroups) {
+        if (!groupMap.has(group.id)) {
+          groupMap.set(group.id, {
+            label: group.label,
+            icon: group.icon,
+            order: group.order ?? 0,
+            items: [],
+          });
+        }
+      }
+    }
+  }
+
+  const topLevelItems: NavGroupItem[] = [];
+
+  for (const manifest of manifests) {
+    for (const route of manifest.routes) {
+      if (!route.navItem) continue;
+
+      const navItem: NavGroupItem = {
+        path: route.path,
+        icon: route.navItem.icon || 'Circle',
+        label: route.navItem.label,
+        featureKey: `${manifest.id}-${route.component}`,
+        component: route.component,
+      };
+
+      if (route.navItem.group) {
+        const group = groupMap.get(route.navItem.group);
+        if (group) {
+          group.items.push({ ...navItem, order: route.navItem.order } as NavGroupItem & { order?: number });
+        } else {
+          topLevelItems.push(navItem);
+        }
+      } else {
+        topLevelItems.push({ ...navItem, order: route.navItem.order } as NavGroupItem & { order?: number });
+      }
+    }
+  }
+
+  for (const group of groupMap.values()) {
+    group.items.sort((a, b) => ((a as any).order ?? 0) - ((b as any).order ?? 0));
+  }
+
+  topLevelItems.sort((a, b) => ((a as any).order ?? 0) - ((b as any).order ?? 0));
+
+  const result: NavGroup[] = [];
+
+  const sortedGroups = Array.from(groupMap.entries())
+    .sort((a, b) => a[1].order - b[1].order);
+
+  for (const [, group] of sortedGroups) {
+    result.push({
+      title: group.label,
+      items: group.items,
+    });
+  }
+
+  if (topLevelItems.length > 0) {
+    result.push({
+      title: '',
+      items: topLevelItems,
+    });
+  }
+
+  return result;
+}
+
+function collectPageComponents(manifests: FeatureManifest[]): Record<string, () => Promise<{ default: any }>> {
+  const components: Record<string, () => Promise<{ default: any }>> = {};
+
+  for (const manifest of manifests) {
+    for (const [key, loader] of Object.entries(manifest.components)) {
+      components[key] = loader;
+    }
+  }
+
+  return components;
+}
+
+function collectAllRoutes(manifests: FeatureManifest[]): CoreRoute[] {
+  const routes: CoreRoute[] = [];
+
+  for (const manifest of manifests) {
+    for (const route of manifest.routes) {
+      routes.push({
+        path: route.path,
+        component: route.component,
+        requireAuth: true,
+      });
+    }
+  }
+
+  return routes;
+}
