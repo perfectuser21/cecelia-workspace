@@ -51,6 +51,22 @@ jobs:
         working-directory: apps/core
         run: npm run build
 
+  # Aggregate job for branch protection (required by GitHub)
+  test:
+    runs-on: ubuntu-latest
+    name: All Tests Passed
+    needs: [test-frontend, test-core]
+    if: always()
+
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.test-frontend.result }}" != "success" ] || [ "${{ needs.test-core.result }}" != "success" ]; then
+            echo "❌ Some tests failed"
+            exit 1
+          fi
+          echo "✅ All tests passed"
+
   # Deploy job - requires manual trigger or webhook
   # Uncomment when ready
   # deploy:
