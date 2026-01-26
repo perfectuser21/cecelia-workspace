@@ -60,6 +60,25 @@
 
 ---
 
+### [2026-01-23] AI 员工页面接入实时 API
+
+**任务**: 将 AI 员工页面从静态数据改为调用 n8n-live-status API 获取实时统计
+
+**Bug**: 无
+
+**技术要点**:
+1. `fetchLiveStatus('local')` 返回实时执行数据，包含 runningExecutions 和 recentCompleted
+2. 使用 `Map<employeeId, stats>` 按员工聚合统计，避免 O(n²) 嵌套循环
+3. try-catch 实现 graceful degradation，API 失败时返回默认数据
+
+**优化点**:
+1. 代码改动集中在一个文件，职责清晰
+2. 错误处理使用 console.error 记录日志便于调试
+
+**影响程度**: Low - 功能增强，无破坏性变更
+
+---
+
 ### [2026-01-19] AI 员工界面改进 - 图标统一 + 折叠面板
 
 **任务**: 替换 emoji 为统一图标，改为折叠面板，添加详情页

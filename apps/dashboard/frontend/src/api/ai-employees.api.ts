@@ -150,20 +150,83 @@ function createDefaultDepartments(): DepartmentWithStats[] {
 /**
  * 获取所有员工的任务统计
  *
- * 注意：n8n-live-status API 尚未在 autopilot 后端实现，
- * 目前返回静态配置数据。等后端 API 就绪后再接入实时数据。
+ * 从 n8n-live-status API 获取实时数据，按员工聚合统计
  */
 export async function fetchAiEmployeesWithStats(): Promise<DepartmentWithStats[]> {
-  // TODO: 等 n8n-live-status API 在 autopilot 后端实现后取消注释
-  // try {
-  //   const liveStatus = await fetchLiveStatus('local');
-  //   // ... 处理实时数据
-  // } catch (error) {
-  //   console.error('Failed to fetch AI employees stats:', error);
-  // }
+  try {
+    const liveStatus = await fetchLiveStatus('local');
 
-  // 目前直接返回静态配置数据
-  return createDefaultDepartments();
+    // 创建员工统计映射
+    const employeeStatsMap = new Map<string, EmployeeTaskStats>();
+
+    // 处理所有执行记录
+    const allExecutions: N8nExecution[] = [
+      ...liveStatus.runningExecutions.map(r => ({
+        id: r.id,
+        workflowId: r.workflowId,
+        workflowName: r.workflowName,
+        status: 'running' as const,
+        startedAt: r.startedAt,
+      })),
+      ...liveStatus.recentCompleted,
+    ];
+
+    // 遍历所有员工，为每个员工计算统计
+    for (const dept of AI_DEPARTMENTS) {
+      for (const employee of dept.employees) {
+        const stats: EmployeeTaskStats = {
+          todayTotal: 0,
+          todaySuccess: 0,
+          todayError: 0,
+          todayRunning: 0,
+          successRate: 0,
+          recentTasks: [],
+        };
+
+        // 匹配员工的任务
+        for (const execution of allExecutions) {
+          const task = mapExecutionToTask(execution);
+          if (task && employee.abilities.some(a => a.id === task.abilityId)) {
+            stats.recentTasks.push(task);
+            stats.todayTotal++;
+
+            if (task.status === 'success') {
+              stats.todaySuccess++;
+            } else if (task.status === 'error') {
+              stats.todayError++;
+            } else if (task.status === 'running' || task.status === 'waiting') {
+              stats.todayRunning++;
+            }
+          }
+        }
+
+        // 计算成功率
+        const completedTasks = stats.todaySuccess + stats.todayError;
+        stats.successRate = completedTasks > 0
+          ? Math.round((stats.todaySuccess / completedTasks) * 100)
+          : 0;
+
+        employeeStatsMap.set(employee.id, stats);
+      }
+    }
+
+    // 构建带统计的部门数据
+    return AI_DEPARTMENTS.map(dept => ({
+      ...dept,
+      employees: dept.employees.map(emp => ({
+        ...emp,
+        stats: employeeStatsMap.get(emp.id) || createDefaultStats(),
+      })),
+      todayTotal: dept.employees.reduce(
+        (sum, emp) => sum + (employeeStatsMap.get(emp.id)?.todayTotal || 0),
+        0
+      ),
+    }));
+  } catch (error) {
+    console.error('Failed to fetch AI employees stats:', error);
+    // 失败时返回默认数据
+    return createDefaultDepartments();
+  }
 }
 
 /**

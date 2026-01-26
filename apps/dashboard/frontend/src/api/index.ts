@@ -8,3 +8,5 @@ export * from './publish.api';
 // tasks.api moved to zenithjoy-core
 export * from './video-editor.api';
 export * from './instance.api';
+export * from './scraping.api';
+export * from './dashboard.api';
