@@ -64,10 +64,7 @@ export default function FeishuLogin() {
         console.log('Login successful, user data:', data.user);
         console.log('Your Feishu ID:', data.user.feishu_user_id);
         login(data.user, data.user.access_token);
-
-        // 登录成功后跳转回原来想访问的页面
-        const redirect = searchParams.get('redirect') || '/';
-        navigate(redirect);
+        navigate('/');
       } else {
         throw new Error(data.error || '登录失败');
       }
