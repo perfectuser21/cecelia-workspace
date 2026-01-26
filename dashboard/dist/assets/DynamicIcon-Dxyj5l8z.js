@@ -1,0 +1,1 @@
+import{j as r,J as a,am as t,h as c,V as e,an as i,ao as m,ap as p}from"./index-Dqj6srrm.js";const x={Monitor:p,Code:m,Wallet:i,Video:e,BarChart3:c,Wrench:t,User:a};function j({name:o,...s}){const n=x[o]||a;return r.jsx(n,{...s})}export{j as D};

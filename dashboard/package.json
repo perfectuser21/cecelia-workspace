@@ -1,0 +1,86 @@
+{
+  "name": "social-metrics-frontend",
+  "version": "1.0.0",
+  "description": "Frontend dashboard for social media metrics collection",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "prepare": "cd .. && husky dashboard/.husky || true"
+  },
+  "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
+    "@tldraw/tldraw": "^3.15.5",
+    "@types/d3": "^7.4.3",
+    "@types/react-grid-layout": "^1.3.6",
+    "axios": "^1.6.2",
+    "d3": "^7.9.0",
+    "echarts": "^6.0.0",
+    "konva": "^10.2.0",
+    "lucide-react": "^0.294.0",
+    "mermaid": "^11.12.2",
+    "qrcode.react": "^3.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-grid-layout": "^2.2.2",
+    "react-konva": "^18.2.14",
+    "react-resizable": "^3.1.3",
+    "react-router-dom": "^6.20.0",
+    "reactflow": "^11.11.4",
+    "recharts": "^2.15.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@testing-library/jest-dom": "^6.1.5",
+    "@testing-library/react": "^14.1.2",
+    "@testing-library/user-event": "^14.5.1",
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/coverage-v8": "^1.0.4",
+    "@vitest/ui": "^1.0.4",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^9.0.0",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.26",
+    "globals": "^17.1.0",
+    "husky": "^8.0.3",
+    "jsdom": "^23.0.1",
+    "lint-staged": "^15.2.0",
+    "postcss": "^8.4.32",
+    "prettier": "^3.2.0",
+    "tailwindcss": "^3.3.6",
+    "typescript": "^5.3.3",
+    "typescript-eslint": "^8.53.1",
+    "vite": "^5.0.8",
+    "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^1.0.4"
+  },
+  "prettier": {
+    "semi": true,
+    "singleQuote": true,
+    "trailingComma": "es5",
+    "printWidth": 100,
+    "tabWidth": 2
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{js,jsx,json,css,md}": [
+      "prettier --write"
+    ]
+  }
+}
