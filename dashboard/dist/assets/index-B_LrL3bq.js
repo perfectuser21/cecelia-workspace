@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/PortfolioOverview-BIrTm4aS.js","assets/index-B6elV0yr.js","assets/index-8Ap_duhP.css"])))=>i.map(i=>d[i]);
+import{_ as o}from"./index-B6elV0yr.js";const r={id:"portfolio",name:"Portfolio",version:"1.0.0",source:"core",instances:["core"],routes:[{path:"/portfolio",component:"PortfolioOverview",navItem:{label:"Portfolio",icon:"TrendingUp",order:3}}],components:{PortfolioOverview:()=>o(()=>import("./PortfolioOverview-BIrTm4aS.js"),__vite__mapDeps([0,1,2]))}};export{r as default};

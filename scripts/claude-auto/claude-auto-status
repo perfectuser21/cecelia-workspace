@@ -1,0 +1,17 @@
+#!/bin/bash
+# 查看 Claude 账号轮换器状态
+
+CURRENT_ACCOUNT_FILE="$HOME/.claude/current-account"
+
+if [ -f "$CURRENT_ACCOUNT_FILE" ]; then
+  current=$(cat "$CURRENT_ACCOUNT_FILE")
+  echo "当前使用账号: $current"
+else
+  echo "未初始化，请先运行 claude-auto-setup"
+  exit 1
+fi
+
+# 尝试获取账号信息
+echo ""
+echo "账号详情:"
+claude whoami 2>/dev/null || echo "  (无法获取账号信息)"

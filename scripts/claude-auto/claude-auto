@@ -1,0 +1,160 @@
+#!/bin/bash
+# Claude Code 自动账号轮换器
+# 用法：claude-auto <任意 claude 命令参数>
+# 示例：claude-auto -p "fix bug"
+
+set -e
+
+# ============= 配置区 =============
+ACCOUNT_1_SESSION="~/.claude/session1.json"
+ACCOUNT_2_SESSION="~/.claude/session2.json"
+CURRENT_ACCOUNT_FILE="~/.claude/current-account"
+CLAUDE_SESSION_FILE="~/.claude/config/session.json"
+
+# ============= 函数区 =============
+
+# 获取当前使用的账号
+get_current_account() {
+  if [ -f "$CURRENT_ACCOUNT_FILE" ]; then
+    cat "$CURRENT_ACCOUNT_FILE"
+  else
+    echo "1"  # 默认账号1
+  fi
+}
+
+# 切换账号
+switch_account() {
+  local target_account=$1
+  echo "[claude-auto] 切换到账号 $target_account..." >&2
+
+  if [ "$target_account" = "1" ]; then
+    cp "$ACCOUNT_1_SESSION" "$CLAUDE_SESSION_FILE"
+    echo "1" > "$CURRENT_ACCOUNT_FILE"
+  elif [ "$target_account" = "2" ]; then
+    cp "$ACCOUNT_2_SESSION" "$CLAUDE_SESSION_FILE"
+    echo "2" > "$CURRENT_ACCOUNT_FILE"
+  else
+    echo "[claude-auto] 错误：未知账号 $target_account" >&2
+    exit 1
+  fi
+}
+
+# 检测是否是额度错误
+is_quota_error() {
+  local output="$1"
+
+  # 检测常见的额度耗尽错误信息
+  if echo "$output" | grep -qiE "(quota|rate limit|429|too many requests|exceeded)"; then
+    return 0  # 是额度错误
+  else
+    return 1  # 不是额度错误
+  fi
+}
+
+# 执行 Claude 命令
+run_claude() {
+  local temp_output=$(mktemp)
+  local temp_error=$(mktemp)
+
+  # 执行命令，捕获输出和错误
+  if claude "$@" > "$temp_output" 2> "$temp_error"; then
+    # 成功
+    cat "$temp_output"
+    rm "$temp_output" "$temp_error"
+    return 0
+  else
+    # 失败，检查是否是额度问题
+    local exit_code=$?
+    local error_msg=$(cat "$temp_error")
+
+    cat "$temp_output"  # 输出正常输出
+
+    rm "$temp_output" "$temp_error"
+
+    if is_quota_error "$error_msg"; then
+      echo "[claude-auto] 检测到额度不足" >&2
+      return 2  # 特殊返回码：额度不足
+    else
+      echo "$error_msg" >&2
+      return $exit_code
+    fi
+  fi
+}
+
+# 智能选择账号（基于额度）
+smart_select_account() {
+  local quota_cache="$HOME/.claude/quota-cache.json"
+
+  # 如果缓存存在且小于5分钟，使用缓存
+  if [ -f "$quota_cache" ]; then
+    local cache_age=$(( $(date +%s) - $(stat -c %Y "$quota_cache") ))
+    if [ $cache_age -lt 300 ]; then
+      # 使用缓存的结果
+      local status1=$(grep -oP '"account1_status":\s*\K\d+' "$quota_cache" 2>/dev/null || echo "3")
+      local status2=$(grep -oP '"account2_status":\s*\K\d+' "$quota_cache" 2>/dev/null || echo "3")
+
+      # 0=充足, 1=偏低, 2=耗尽, 3=未知
+      if [ "$status1" -eq 0 ]; then
+        echo "1"
+        return
+      elif [ "$status2" -eq 0 ]; then
+        echo "2"
+        return
+      elif [ "$status1" -eq 1 ]; then
+        echo "1"
+        return
+      elif [ "$status2" -eq 1 ]; then
+        echo "2"
+        return
+      fi
+    fi
+  fi
+
+  # 缓存过期或不存在，返回当前账号
+  get_current_account
+}
+
+# ============= 主逻辑 =============
+
+# 初始化：确保配置文件存在
+if [ ! -f "$ACCOUNT_1_SESSION" ] || [ ! -f "$ACCOUNT_2_SESSION" ]; then
+  echo "[claude-auto] 错误：请先运行 claude-auto-setup 初始化账号配置" >&2
+  exit 1
+fi
+
+# 智能选择账号（基于额度情况）
+recommended_account=$(smart_select_account)
+current_account=$(get_current_account)
+
+if [ "$recommended_account" != "$current_account" ]; then
+  echo "[claude-auto] 智能切换到额度更充足的账号 $recommended_account" >&2
+  switch_account "$recommended_account"
+  current_account=$recommended_account
+else
+  echo "[claude-auto] 使用账号 $current_account" >&2
+fi
+
+# 第一次尝试
+run_claude "$@"
+result=$?
+
+if [ $result -eq 2 ]; then
+  # 额度不足，尝试切换账号
+  if [ "$current_account" = "1" ]; then
+    switch_account 2
+  else
+    switch_account 1
+  fi
+
+  echo "[claude-auto] 账号额度不足，切换到备用账号并重试..." >&2
+  run_claude "$@"
+  result=$?
+
+  if [ $result -eq 2 ]; then
+    echo "[claude-auto] 错误：两个账号额度均已用完" >&2
+    echo "[claude-auto] 运行 'claude-quota-check' 查看详细信息" >&2
+    exit 1
+  fi
+fi
+
+exit $result

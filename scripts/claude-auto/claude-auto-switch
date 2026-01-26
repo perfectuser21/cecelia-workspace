@@ -1,0 +1,41 @@
+#!/bin/bash
+# 手动切换 Claude 账号
+
+ACCOUNT_1_SESSION="$HOME/.claude/session1.json"
+ACCOUNT_2_SESSION="$HOME/.claude/session2.json"
+CURRENT_ACCOUNT_FILE="$HOME/.claude/current-account"
+CLAUDE_SESSION_FILE="$HOME/.claude/config/session.json"
+
+if [ $# -ne 1 ]; then
+  echo "用法: claude-auto-switch [1|2]"
+  echo ""
+  echo "当前账号: $(cat $CURRENT_ACCOUNT_FILE 2>/dev/null || echo '未知')"
+  exit 1
+fi
+
+target_account=$1
+
+if [ "$target_account" != "1" ] && [ "$target_account" != "2" ]; then
+  echo "错误：账号必须是 1 或 2"
+  exit 1
+fi
+
+if [ ! -f "$ACCOUNT_1_SESSION" ] || [ ! -f "$ACCOUNT_2_SESSION" ]; then
+  echo "错误：请先运行 claude-auto-setup 初始化账号"
+  exit 1
+fi
+
+# 切换账号
+if [ "$target_account" = "1" ]; then
+  cp "$ACCOUNT_1_SESSION" "$CLAUDE_SESSION_FILE"
+  echo "1" > "$CURRENT_ACCOUNT_FILE"
+  echo "✓ 已切换到账号 1"
+else
+  cp "$ACCOUNT_2_SESSION" "$CLAUDE_SESSION_FILE"
+  echo "2" > "$CURRENT_ACCOUNT_FILE"
+  echo "✓ 已切换到账号 2"
+fi
+
+# 显示当前账号信息
+echo ""
+claude whoami 2>/dev/null || echo "(无法获取账号信息)"

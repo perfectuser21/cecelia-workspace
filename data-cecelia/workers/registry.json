@@ -1,0 +1,348 @@
+{
+  "$schema": "./registry.schema.json",
+  "version": "1.0.0",
+  "description": "AI 员工注册表 - 业务到 Runner 的映射",
+  "n8n": {
+    "baseUrl": "http://localhost:5679",
+    "webhookBase": "http://localhost:5679/webhook"
+  },
+  "features": {
+    "devops": {
+      "name": "DevOps",
+      "description": "开发运维",
+      "businesses": {
+        "devgate.push": {
+          "name": "DevGate 指标推送",
+          "type": "L1",
+          "owner": "spark",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "DevGate Nightly Push",
+              "workflowId": "7vQUOfubH4vp8CiD",
+              "webhook": "/webhook/devgate-push",
+              "method": "POST"
+            },
+            {
+              "type": "script",
+              "path": "zenithjoy-engine/scripts/devgate/push-metrics.sh",
+              "env": ["DEVGATE_API_TOKEN"]
+            }
+          ]
+        },
+        "cecelia.execute": {
+          "name": "无头 Claude 执行",
+          "type": "L2",
+          "owner": "spark",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "Trigger Claude via HTTP",
+              "workflowId": "efoglxmVKtH3f72i",
+              "webhook": "/webhook/trigger-claude",
+              "method": "POST"
+            }
+          ]
+        },
+        "cecelia.callback": {
+          "name": "执行回调处理",
+          "type": "L2",
+          "owner": "echo",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "cecelia-callback-simple",
+              "workflowId": "cb210"
+            }
+          ]
+        },
+        "task.dispatch": {
+          "name": "任务调度分发",
+          "type": "L3",
+          "owner": "echo",
+          "dependsOn": ["cecelia.execute", "cecelia.callback"],
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "Task Dispatcher v2.0",
+              "workflowId": "FkD3AmxALsv6Y3Pv"
+            }
+          ]
+        }
+      }
+    },
+    "dataops": {
+      "name": "DataOps",
+      "description": "数据采集",
+      "businesses": {
+        "scrape.douyin": {
+          "name": "抖音数据爬取",
+          "type": "L2",
+          "owner": "xiaoxi",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "抖音数据爬取",
+              "workflowId": "XLJpgMKRaFl5A0ac"
+            }
+          ]
+        },
+        "scrape.xhs": {
+          "name": "小红书数据爬取",
+          "type": "L2",
+          "owner": "xiaoxi",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "小红书数据爬取",
+              "workflowId": "OwM8yZyuavAox6As"
+            }
+          ]
+        },
+        "scrape.weibo": {
+          "name": "微博数据爬取",
+          "type": "L2",
+          "owner": "xiaoxi",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "微博数据爬取",
+              "workflowId": "AasGvUFHJWJaQDbq"
+            }
+          ]
+        },
+        "scrape.zhihu": {
+          "name": "知乎数据爬取",
+          "type": "L2",
+          "owner": "xiaoxi",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "知乎数据爬取",
+              "workflowId": "EbtOjA2QSNt6ozXS"
+            }
+          ]
+        },
+        "scrape.kuaishou": {
+          "name": "快手数据爬取",
+          "type": "L2",
+          "owner": "xiaoxi",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "快手数据爬取",
+              "workflowId": "R3IdHs48TA8OpNfz"
+            }
+          ]
+        },
+        "scrape.shipinhao": {
+          "name": "视频号数据爬取",
+          "type": "L2",
+          "owner": "xiaoxi",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "视频号数据爬取",
+              "workflowId": "8A5XjFey4VuaMAGz"
+            }
+          ]
+        },
+        "scrape.gzh": {
+          "name": "公众号数据爬取",
+          "type": "L2",
+          "owner": "xiaoxi",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "公众号数据爬取",
+              "workflowId": "1E22MOIOzsAmJNpW"
+            }
+          ]
+        },
+        "scrape.toutiao": {
+          "name": "头条数据爬取",
+          "type": "L2",
+          "owner": "xiaoxi",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "今日头条数据爬取",
+              "workflowId": "LsDUA828fpueSlSB"
+            }
+          ]
+        },
+        "scrape.all": {
+          "name": "全平台数据采集",
+          "type": "L3",
+          "owner": "xiaoxi",
+          "dependsOn": [
+            "scrape.douyin",
+            "scrape.xhs",
+            "scrape.weibo",
+            "scrape.zhihu",
+            "scrape.kuaishou",
+            "scrape.shipinhao",
+            "scrape.gzh",
+            "scrape.toutiao"
+          ],
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "数据采集调度器",
+              "workflowId": "wdLC5o0cPgUUWwxC"
+            }
+          ]
+        }
+      }
+    },
+    "mediaops": {
+      "name": "MediaOps",
+      "description": "内容运营",
+      "businesses": {
+        "publish.toutiao": {
+          "name": "发布头条",
+          "type": "L2",
+          "owner": "xiaoyun",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "Notion → 头条小号发布",
+              "workflowId": "5M3urR15jub8HJkZ"
+            }
+          ]
+        },
+        "publish.all": {
+          "name": "全平台发布",
+          "type": "L3",
+          "owner": "xiaoyun",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "内容发布",
+              "workflowId": "LWRGLXdnGpRx8mMG"
+            }
+          ]
+        }
+      }
+    },
+    "sysops": {
+      "name": "SysOps",
+      "description": "系统运维",
+      "businesses": {
+        "patrol.check": {
+          "name": "系统巡检",
+          "type": "L2",
+          "owner": "xiaowei",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "监控巡逻",
+              "workflowId": "Dsd1Np4CeWknDKTe"
+            }
+          ]
+        },
+        "backup.nightly": {
+          "name": "夜间备份",
+          "type": "L2",
+          "owner": "xiaowei",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "夜间备份",
+              "workflowId": "0IH41vXMF1ARp0em"
+            }
+          ]
+        },
+        "docs.check": {
+          "name": "文档检查",
+          "type": "L2",
+          "owner": "xiaowei",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "夜间文档检查",
+              "workflowId": "QGkZUh4efweB4rMx"
+            }
+          ]
+        },
+        "scheduler.nightly": {
+          "name": "夜间调度总控",
+          "type": "L3",
+          "owner": "xiaowei",
+          "dependsOn": ["patrol.check", "backup.nightly", "docs.check"],
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "nightly-scheduler",
+              "workflowId": "xiMnTQEK6wNh0s6n"
+            }
+          ]
+        }
+      }
+    },
+    "integration": {
+      "name": "Integration",
+      "description": "系统集成",
+      "businesses": {
+        "sync.feature": {
+          "name": "Feature 完成同步",
+          "type": "L2",
+          "owner": "xiaotong",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "Feature Completion Sync",
+              "workflowId": "L3QmOHQon2FRoLd7"
+            }
+          ]
+        },
+        "sync.workflow": {
+          "name": "工作流变更同步",
+          "type": "L2",
+          "owner": "xiaotong",
+          "runners": [
+            {
+              "type": "n8n",
+              "workflow": "sync-workflow-changelog",
+              "workflowId": "zpeQOXbDXCD5xupA"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "workers": {
+    "spark": {
+      "name": "Spark",
+      "alias": "小火",
+      "department": "研发部",
+      "role": "执行者"
+    },
+    "echo": {
+      "name": "Echo",
+      "alias": "小回",
+      "department": "研发部",
+      "role": "协调者"
+    },
+    "xiaoyun": {
+      "name": "小运",
+      "department": "新媒体部",
+      "role": "运营"
+    },
+    "xiaoxi": {
+      "name": "小析",
+      "department": "新媒体部",
+      "role": "数据"
+    },
+    "xiaowei": {
+      "name": "小维",
+      "department": "运维部",
+      "role": "运维"
+    },
+    "xiaotong": {
+      "name": "小通",
+      "department": "集成部",
+      "role": "集成"
+    }
+  }
+}

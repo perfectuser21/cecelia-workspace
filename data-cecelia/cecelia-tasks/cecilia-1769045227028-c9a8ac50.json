@@ -1,0 +1,15 @@
+{
+  "id": "cecilia-1769045227028-c9a8ac50",
+  "project": "zenithjoy-core",
+  "branch": "current",
+  "prompt": "Test prompt for L1 audit",
+  "status": "completed",
+  "audit_level": "L1",
+  "created_at": "2026-01-22T01:27:07.028Z",
+  "started_at": "2026-01-22T01:27:47.357Z",
+  "completed_at": "2026-01-22T01:29:05.450Z",
+  "result": {
+    "success": true,
+    "output": "L1 audit done"
+  }
+}

@@ -1,0 +1,70 @@
+services:
+  # Production (main branch) - port 5211
+  # 只有合并到 main 分支时才重新 build
+  # 使用 /home/xx/prod 目录 (main 分支)
+  zenithjoy-core:
+    build: .
+    container_name: zenithjoy-core
+    restart: unless-stopped
+    ports:
+      - "5211:5211"
+    env_file:
+      - /home/xx/.credentials/feishu.env
+    environment:
+      - PORT=5211
+      - NODE_ENV=production
+      - CODE_BASE_PATH=/home/xx/prod
+      - AUTOPILOT_BACKEND=http://host.docker.internal:3333
+      - FEISHU_AUTH_BACKEND=http://feishu-auth-backend:3002
+      - N8N_BACKEND=http://n8n-self-hosted:5678
+      - DASHBOARD_FRONTEND_PATH=/app/dashboard-frontend
+    networks:
+      - default
+      - n8n-network
+    volumes:
+      # 前端资源 (prod 目录)
+      - /home/xx/prod/cecelia-workspace/dashboard/dist:/app/dashboard-frontend:ro
+      # 代码目录 (prod 目录，main 分支)
+      - /home/xx/prod/zenithjoy-engine:/home/xx/prod/zenithjoy-engine:ro
+      - /home/xx/prod/zenithjoy-core:/home/xx/prod/zenithjoy-core:ro
+      - /home/xx/prod/cecelia-workspace:/home/xx/prod/cecelia-workspace:ro
+      - ./data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Development (develop branch) - port 5212
+  # 使用 /home/xx/dev 目录 (develop 分支)
+  # 直接跑源码，不需要 build，改代码自动生效
+  zenithjoy-core-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: zenithjoy-core-dev
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - /home/xx/.credentials/feishu.env
+      - /home/xx/.credentials/devgate.env
+      - /home/xx/.credentials/openai.env
+    environment:
+      - PORT=5212
+      - NODE_ENV=development
+      - CODE_BASE_PATH=/home/xx/dev
+      - AUTOPILOT_BACKEND=http://localhost:3333
+      - FEISHU_AUTH_BACKEND=http://localhost:3002
+      - N8N_BACKEND=http://localhost:5678
+      - DASHBOARD_FRONTEND_PATH=/app/dashboard-frontend
+    volumes:
+      # 前端 (开发版，dev 目录)
+      - /home/xx/dev/cecelia-workspace/dashboard/dist-dev:/app/dashboard-frontend:ro
+      # 源码 + 依赖 (挂载整个项目，tsx 直接跑)
+      - .:/app
+      # 数据目录
+      - ./data:/app/data
+      # VPS 开发目录 (用于 Cecelia VPS 工具)
+      - /home/xx/dev:/home/xx/dev:ro
+
+networks:
+  n8n-network:
+    external: true
+    name: n8n-social-media-scraper_n8n-network

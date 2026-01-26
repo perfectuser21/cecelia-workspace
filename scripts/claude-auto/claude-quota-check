@@ -1,0 +1,158 @@
+#!/bin/bash
+# Claude 账号额度检查器
+# 通过调用 API 获取当前账号的额度信息
+
+set -e
+
+QUOTA_CACHE="$HOME/.claude/quota-cache.json"
+
+# 颜色定义
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# 检查指定账号的额度
+check_account_quota() {
+  local account_num=$1
+  local session_file="$HOME/.claude/session${account_num}.json"
+
+  if [ ! -f "$session_file" ]; then
+    echo "  状态: 未配置"
+    return 1
+  fi
+
+  # 临时切换到该账号
+  local original_session="$HOME/.claude/config/session.json"
+  local backup_session=$(mktemp)
+  cp "$original_session" "$backup_session"
+  cp "$session_file" "$original_session"
+
+  # 发送一个最小的测试请求来获取额度信息
+  local temp_output=$(mktemp)
+  local temp_header=$(mktemp)
+
+  # 使用 curl 直接调用 API 来获取响应头
+  # 注意：这需要从 session 中提取 API key
+  local api_key=$(extract_api_key_from_session "$session_file")
+
+  if [ -z "$api_key" ]; then
+    # 如果无法提取 API key，用 claude CLI 做一个最小请求
+    local result=$(claude -p "hi" --max-tokens 1 2>&1 | head -1)
+
+    # 尝试从错误信息中解析额度状态
+    if echo "$result" | grep -qi "rate limit\|quota"; then
+      echo -e "  状态: ${RED}额度不足${NC}"
+      echo "  重置时间: 未知"
+      quota_status="exhausted"
+    else
+      echo -e "  状态: ${GREEN}正常${NC}"
+      echo "  重置时间: 未知 (CLI 不提供详细信息)"
+      quota_status="available"
+    fi
+  else
+    # 使用 API 获取详细额度信息
+    curl -s -D "$temp_header" \
+      -H "x-api-key: $api_key" \
+      -H "anthropic-version: 2023-06-01" \
+      -H "content-type: application/json" \
+      -d '{"model":"claude-sonnet-4-5-20250929","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}' \
+      https://api.anthropic.com/v1/messages > "$temp_output" 2>&1
+
+    # 解析响应头
+    local requests_remaining=$(grep -i "anthropic-ratelimit-requests-remaining" "$temp_header" | cut -d: -f2 | tr -d ' \r')
+    local requests_reset=$(grep -i "anthropic-ratelimit-requests-reset" "$temp_header" | cut -d: -f2 | tr -d ' \r')
+    local tokens_remaining=$(grep -i "anthropic-ratelimit-tokens-remaining" "$temp_header" | cut -d: -f2 | tr -d ' \r')
+    local tokens_reset=$(grep -i "anthropic-ratelimit-tokens-reset" "$temp_header" | cut -d: -f2 | tr -d ' \r')
+
+    if [ -n "$requests_remaining" ]; then
+      if [ "$requests_remaining" -gt 10 ]; then
+        echo -e "  状态: ${GREEN}充足${NC}"
+        quota_status="plenty"
+      elif [ "$requests_remaining" -gt 0 ]; then
+        echo -e "  状态: ${YELLOW}偏低${NC}"
+        quota_status="low"
+      else
+        echo -e "  状态: ${RED}已耗尽${NC}"
+        quota_status="exhausted"
+      fi
+
+      echo "  剩余请求: $requests_remaining"
+      echo "  剩余 tokens: $tokens_remaining"
+
+      if [ -n "$requests_reset" ]; then
+        local reset_time=$(date -d "@$requests_reset" "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "$requests_reset")
+        echo "  重置时间: $reset_time"
+      fi
+    else
+      echo -e "  状态: ${YELLOW}未知${NC} (无法获取详细信息)"
+      quota_status="unknown"
+    fi
+  fi
+
+  # 恢复原账号
+  cp "$backup_session" "$original_session"
+  rm "$backup_session" "$temp_output" "$temp_header" 2>/dev/null || true
+
+  # 返回状态码
+  case "$quota_status" in
+    plenty) return 0 ;;
+    low) return 1 ;;
+    exhausted) return 2 ;;
+    *) return 3 ;;
+  esac
+}
+
+# 从 session 文件中提取 API key（这个函数可能需要根据实际格式调整）
+extract_api_key_from_session() {
+  local session_file=$1
+
+  # 尝试从 session 文件中提取 API key
+  # 注意：实际格式可能不同，需要根据真实文件调整
+  if [ -f "$session_file" ]; then
+    grep -oP '"apiKey"\s*:\s*"\K[^"]+' "$session_file" 2>/dev/null || \
+    grep -oP '"api_key"\s*:\s*"\K[^"]+' "$session_file" 2>/dev/null || \
+    grep -oP '"key"\s*:\s*"\K[^"]+' "$session_file" 2>/dev/null || \
+    echo ""
+  fi
+}
+
+# 主逻辑
+echo "==================================="
+echo "Claude Code 账号额度检查"
+echo "==================================="
+echo ""
+
+echo "账号 1:"
+check_account_quota 1
+status1=$?
+echo ""
+
+echo "账号 2:"
+check_account_quota 2
+status2=$?
+echo ""
+
+# 推荐使用哪个账号
+echo "==================================="
+if [ $status1 -eq 0 ]; then
+  echo -e "建议使用: ${GREEN}账号 1${NC} (额度充足)"
+elif [ $status2 -eq 0 ]; then
+  echo -e "建议使用: ${GREEN}账号 2${NC} (额度充足)"
+elif [ $status1 -eq 1 ]; then
+  echo -e "建议使用: ${YELLOW}账号 1${NC} (额度偏低但可用)"
+elif [ $status2 -eq 1 ]; then
+  echo -e "建议使用: ${YELLOW}账号 2${NC} (额度偏低但可用)"
+else
+  echo -e "${RED}警告: 两个账号额度均不足${NC}"
+fi
+echo "==================================="
+
+# 保存检查结果到缓存
+cat > "$QUOTA_CACHE" <<EOF
+{
+  "last_check": "$(date -Iseconds)",
+  "account1_status": $status1,
+  "account2_status": $status2
+}
+EOF

@@ -1,0 +1,52 @@
+{
+  "createdAt": "2026-01-17T12:17:44.065Z",
+  "taskName": "cp-migrate-personal-to-core",
+  "items": [
+    {
+      "id": 1,
+      "name": "PRD",
+      "status": "pending"
+    },
+    {
+      "id": 2,
+      "name": "DoD",
+      "status": "pending"
+    },
+    {
+      "id": 3,
+      "name": "Branch",
+      "status": "done",
+      "completedAt": "2026-01-17T12:17:44.065Z"
+    },
+    {
+      "id": 4,
+      "name": "Code",
+      "status": "pending"
+    },
+    {
+      "id": 5,
+      "name": "Test",
+      "status": "pending"
+    },
+    {
+      "id": 6,
+      "name": "Local Test",
+      "status": "pending"
+    },
+    {
+      "id": 7,
+      "name": "PR",
+      "status": "pending"
+    },
+    {
+      "id": 8,
+      "name": "QA",
+      "status": "pending"
+    },
+    {
+      "id": 9,
+      "name": "Merge",
+      "status": "pending"
+    }
+  ]
+}

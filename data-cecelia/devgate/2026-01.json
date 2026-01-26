@@ -1,0 +1,259 @@
+{
+  "window": {
+    "since": "2026-01-01T00:00:00Z",
+    "until": "2026-02-01T00:00:00Z"
+  },
+  "summary": {
+    "total_tests": 1,
+    "p0_count": 0,
+    "p1_count": 0,
+    "rci_coverage": {
+      "total": 0,
+      "covered": 0,
+      "pct": 100
+    },
+    "manual_tests": 0
+  },
+  "new_rci": [
+    {
+      "file": "regression-contract.yaml",
+      "function": "B1-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "C1-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "C2-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "C3-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "C4-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "C5-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "C6-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "C7-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "C7-002",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "C7-003",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "E1-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "E1-002",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "E1-003",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "E2-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "E2-002",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "E2-003",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "H1-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "H1-002",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "H1-003",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "H2-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "H2-002",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "H2-003",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "H2-004",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "H2-005",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "H2-006",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "H2-007",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "H2-008",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "H2-009",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "H2-010",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "H3-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "H4-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "H4-002",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "N1-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "N1-002",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "N1-003",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "W1-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "W1-002",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "W1-003",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "W1-004",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "W1-005",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "W3-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "W3-002",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "W4-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "W4-002",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "W5-001",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "W5-002",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "W5-003",
+      "reason": "New RCI entry added in 2026-01"
+    },
+    {
+      "file": "regression-contract.yaml",
+      "function": "W5-004",
+      "reason": "New RCI entry added in 2026-01"
+    }
+  ]
+}

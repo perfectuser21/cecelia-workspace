@@ -1,0 +1,64 @@
+#!/bin/bash
+# Claude Code 账号轮换器 - 初始化脚本
+
+set -e
+
+ACCOUNT_1_SESSION="$HOME/.claude/session1.json"
+ACCOUNT_2_SESSION="$HOME/.claude/session2.json"
+CLAUDE_SESSION_FILE="$HOME/.claude/config/session.json"
+
+echo "==================================="
+echo "Claude Code 双账号轮换器 - 初始化"
+echo "==================================="
+echo ""
+
+# 创建配置目录
+mkdir -p "$HOME/.claude/config"
+
+# 账号 1
+echo ">>> 第 1 步：配置账号 1"
+echo "请在浏览器中登录你的第一个 Claude 账号，完成后按回车..."
+read -r
+
+claude login
+if [ ! -f "$CLAUDE_SESSION_FILE" ]; then
+  echo "错误：登录失败，找不到 session 文件"
+  exit 1
+fi
+
+cp "$CLAUDE_SESSION_FILE" "$ACCOUNT_1_SESSION"
+echo "✓ 账号 1 已保存"
+echo ""
+
+# 账号 2
+echo ">>> 第 2 步：配置账号 2"
+echo "请先登出账号 1..."
+claude logout
+
+echo "现在请在浏览器中登录你的第二个 Claude 账号，完成后按回车..."
+read -r
+
+claude login
+if [ ! -f "$CLAUDE_SESSION_FILE" ]; then
+  echo "错误：登录失败，找不到 session 文件"
+  exit 1
+fi
+
+cp "$CLAUDE_SESSION_FILE" "$ACCOUNT_2_SESSION"
+echo "✓ 账号 2 已保存"
+echo ""
+
+# 设置默认账号
+cp "$ACCOUNT_1_SESSION" "$CLAUDE_SESSION_FILE"
+echo "1" > "$HOME/.claude/current-account"
+
+echo "==================================="
+echo "✓ 初始化完成！"
+echo "==================================="
+echo ""
+echo "使用方法："
+echo "  claude-auto -p \"your prompt\"    # 自动轮换使用两个账号"
+echo "  claude-auto-status               # 查看当前使用的账号"
+echo "  claude-auto-switch [1|2]         # 手动切换账号"
+echo ""
+echo "现在默认使用账号 1"

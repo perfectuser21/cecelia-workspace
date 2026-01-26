@@ -1,0 +1,200 @@
+[
+  {
+    "id": "cp-cecelia-page-hierarchy",
+    "prd_path": ".prd.md",
+    "project": "zenithjoy-core",
+    "feature_branch": "cp-cecelia-page-hierarchy",
+    "status": "running",
+    "total_checkpoints": 6,
+    "completed_checkpoints": 0,
+    "failed_checkpoints": 0,
+    "started_at": "2026-01-23T08:30:51.563Z",
+    "updated_at": "2026-01-23T08:30:51.600Z",
+    "mode": "interactive",
+    "prd_title": "Cecelia 页面分层重构",
+    "prd_summary": "将单页显示改为分层结构",
+    "steps": [
+      {
+        "id": 1,
+        "name": "PRD",
+        "status": "done",
+        "completed_at": "2026-01-23T08:30:51.600Z"
+      },
+      {
+        "id": 2,
+        "name": "DoD",
+        "status": "done",
+        "completed_at": "2026-01-23T08:30:51.600Z"
+      },
+      {
+        "id": 3,
+        "name": "Branch",
+        "status": "done",
+        "completed_at": "2026-01-23T08:30:51.600Z"
+      },
+      {
+        "id": 4,
+        "name": "Code",
+        "status": "done",
+        "completed_at": "2026-01-23T08:30:51.600Z"
+      },
+      {
+        "id": 5,
+        "name": "Test",
+        "status": "in_progress",
+        "started_at": "2026-01-23T08:30:51.600Z"
+      },
+      {
+        "id": 6,
+        "name": "Local Test",
+        "status": "pending"
+      },
+      {
+        "id": 7,
+        "name": "PR",
+        "status": "pending"
+      },
+      {
+        "id": 8,
+        "name": "QA",
+        "status": "pending"
+      },
+      {
+        "id": 9,
+        "name": "Merge",
+        "status": "pending"
+      }
+    ],
+    "current_step": 5,
+    "current_action": "重构页面"
+  },
+  {
+    "id": "cp-engine-qa-system",
+    "prd_path": ".prd.md",
+    "project": "zenithjoy-engine",
+    "feature_branch": "cp-engine-qa-system",
+    "status": "running",
+    "total_checkpoints": 4,
+    "completed_checkpoints": 0,
+    "failed_checkpoints": 0,
+    "started_at": "2026-01-23T08:54:16.339Z",
+    "updated_at": "2026-01-23T08:54:16.372Z",
+    "mode": "headless",
+    "prd_title": "QA 系统重构",
+    "prd_summary": "统一 QA 测试框架",
+    "steps": [
+      {
+        "id": 1,
+        "name": "PRD",
+        "status": "done",
+        "completed_at": "2026-01-23T08:54:16.372Z"
+      },
+      {
+        "id": 2,
+        "name": "DoD",
+        "status": "done",
+        "completed_at": "2026-01-23T08:54:16.372Z"
+      },
+      {
+        "id": 3,
+        "name": "Branch",
+        "status": "in_progress",
+        "started_at": "2026-01-23T08:54:16.372Z"
+      },
+      {
+        "id": 4,
+        "name": "Code",
+        "status": "pending"
+      },
+      {
+        "id": 5,
+        "name": "Test",
+        "status": "pending"
+      },
+      {
+        "id": 6,
+        "name": "Local Test",
+        "status": "pending"
+      },
+      {
+        "id": 7,
+        "name": "PR",
+        "status": "pending"
+      },
+      {
+        "id": 8,
+        "name": "QA",
+        "status": "pending"
+      },
+      {
+        "id": 9,
+        "name": "Merge",
+        "status": "pending"
+      }
+    ],
+    "current_step": 3,
+    "current_action": "编写测试用例"
+  },
+  {
+    "id": "cp-voice-展示-engine-模块详细信息",
+    "prd_path": ".prd-1769161061571.md",
+    "project": "zenithjoy-core",
+    "feature_branch": "cp-voice-展示-engine-模块详细信息",
+    "status": "running",
+    "total_checkpoints": 8,
+    "completed_checkpoints": 0,
+    "failed_checkpoints": 0,
+    "started_at": "2026-01-23T09:37:41.571Z",
+    "updated_at": "2026-01-23T09:37:41.572Z",
+    "mode": "interactive",
+    "steps": [
+      {
+        "id": 1,
+        "name": "PRD",
+        "status": "pending"
+      },
+      {
+        "id": 2,
+        "name": "DoD",
+        "status": "pending"
+      },
+      {
+        "id": 3,
+        "name": "Branch",
+        "status": "pending"
+      },
+      {
+        "id": 4,
+        "name": "Code",
+        "status": "pending"
+      },
+      {
+        "id": 5,
+        "name": "Test",
+        "status": "pending"
+      },
+      {
+        "id": 6,
+        "name": "Local Test",
+        "status": "pending"
+      },
+      {
+        "id": 7,
+        "name": "PR",
+        "status": "pending"
+      },
+      {
+        "id": 8,
+        "name": "QA",
+        "status": "pending"
+      },
+      {
+        "id": 9,
+        "name": "Merge",
+        "status": "pending"
+      }
+    ],
+    "current_step": 1,
+    "current_action": "任务: 展示 Engine 模块详细信息"
+  }
+]
