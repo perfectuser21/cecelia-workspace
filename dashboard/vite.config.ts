@@ -28,8 +28,6 @@ export default defineConfig({
       'react-grid-layout': path.resolve(__dirname, 'node_modules/react-grid-layout'),
       'react-resizable': path.resolve(__dirname, 'node_modules/react-resizable'),
       'reactflow': path.resolve(__dirname, 'node_modules/reactflow'),
-      'konva': path.resolve(__dirname, 'node_modules/konva'),
-      'react-konva': path.resolve(__dirname, 'node_modules/react-konva'),
     },
     // Dedupe to ensure single instances of dependencies
     dedupe: [

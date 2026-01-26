@@ -7,7 +7,7 @@ on:
     branches: [main, develop]
 
 jobs:
-  build:
+  quality-check:
     runs-on: ubuntu-latest
 
     steps:
@@ -18,14 +18,41 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: apps/dashboard/frontend/package-lock.json
+          cache-dependency-path: dashboard/package-lock.json
 
       - name: Install dependencies
-        working-directory: apps/dashboard/frontend
+        working-directory: dashboard
         run: npm ci
 
+      - name: Type check
+        working-directory: dashboard
+        run: npm run type-check
+
+      - name: Lint
+        working-directory: dashboard
+        run: npm run lint
+
+      - name: Format check
+        working-directory: dashboard
+        run: npm run format:check
+
+      - name: Test
+        working-directory: dashboard
+        run: npm run test:run
+
+      - name: Test coverage
+        working-directory: dashboard
+        run: npm run test:coverage
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./dashboard/coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: false
+
       - name: Build
-        working-directory: apps/dashboard/frontend
+        working-directory: dashboard
         run: npm run build
 
   # Deploy job - requires manual trigger or webhook
