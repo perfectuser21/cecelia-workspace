@@ -4,21 +4,26 @@ import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 import fs from 'fs'
 
-// Support both local dev (sibling repo) and CI (nested checkout)
-// If zenithjoy-core is not available, Core features will be disabled
-const localCorePath = path.resolve(__dirname, '../../../../zenithjoy-core/features')
-const ciCorePath = path.resolve(__dirname, '../../../zenithjoy-core/features')
-const coreAvailable = fs.existsSync(localCorePath) || fs.existsSync(ciCorePath)
-const coreFeaturesPath = fs.existsSync(localCorePath) ? localCorePath
-  : fs.existsSync(ciCorePath) ? ciCorePath
+// Support monorepo structure (cecelia-workspace)
+// Core features are now in apps/core/features
+const monorepoCorePath = path.resolve(__dirname, '../../core/features')
+const monorepoDataPath = path.resolve(__dirname, '../../core/data')
+const coreAvailable = fs.existsSync(monorepoCorePath)
+const coreFeaturesPath = coreAvailable
+  ? monorepoCorePath
   : path.resolve(__dirname, './src/stubs/core-features') // fallback stub
 
 export default defineConfig({
   resolve: {
-    alias: {
-      '@features/core': coreFeaturesPath,
-      '@': path.resolve(__dirname, './src'),
-    },
+    alias: [
+      { find: '@features/core', replacement: coreFeaturesPath },
+      { find: '@', replacement: path.resolve(__dirname, './src') },
+      // Support Core data imports - match the relative path pattern from Core features
+      ...(coreAvailable ? [{
+        find: /^\.\.\/\.\.\/data/,
+        replacement: monorepoDataPath
+      }] : [])
+    ],
     // Dedupe to ensure single instances of dependencies
     dedupe: [
       'react', 'react-dom', 'react-router-dom',
