@@ -41,3 +41,7 @@ apps/cecelia-frontend/database/
 .quality-gate-passed
 .cecelia-run-id
 *.backup-*
+.qa-evidence.json
+.qa-rci-result.json
+.qa-gp-result.json
+.qa-logs/
