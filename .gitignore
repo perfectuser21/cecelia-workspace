@@ -30,8 +30,10 @@ logs/
 # Uploads
 apps/dashboard/data/uploads/
 
-# Core backend data
+# Core backend data (but allow config files needed for build)
 apps/core/data/
+!apps/core/data/workers/
+!apps/core/data/workers/workers.config.json
 
 # Cecelia frontend data (local only)
 apps/cecelia-frontend/data/
