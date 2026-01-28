@@ -27,6 +27,7 @@ export const coreFeatures = {
   'devgate': () => import('./devgate'),
   'quality': () => import('./quality'),
   'planner': () => import('./planner'),
+  'brain': () => import('./brain'),
 };
 
 // Load all features and register them
