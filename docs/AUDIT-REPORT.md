@@ -1,34 +1,61 @@
 # Audit Report
 
-Branch: cp-brain-decision-pack-v2
-Date: 2026-01-28
-Scope: apps/core/src/brain/routes.js
+Branch: cp-01290002-okr-hierarchy
+Date: 2026-01-29
+Scope: apps/core/src/task-system/goals.js, apps/core/src/task-system/db.js, apps/core/src/dashboard/server.ts
 Target Level: L2
 
-Summary:
-  L1: 0
-  L2: 0
-  L3: 0
-  L4: 0
+## Summary
 
-Decision: PASS
+| Layer | Count |
+|-------|-------|
+| L1 (Blocking) | 0 |
+| L2 (Functional) | 0 |
+| L3 (Best Practice) | 1 |
+| L4 (Over-optimization) | 0 |
 
-Findings: []
+## Decision: PASS
 
-Blockers: []
+## Findings
+
+### L3 (Best Practice - Optional)
+
+- **id**: A3-001
+  - **layer**: L3
+  - **file**: apps/core/src/task-system/goals.js
+  - **line**: 177-190
+  - **issue**: DELETE endpoint does not warn about cascade deletion of child Key Results
+  - **fix**: Consider adding a confirmation or returning information about deleted children
+  - **status**: optional (not blocking)
+
+## Blockers
+
+None - L1 and L2 issues are cleared.
 
 ## Audit Details
 
 ### Round 1: L1 阻塞性问题检查
-- ✅ routes.js: 无语法错误，所有导入正确，路由结构完整
-- ✅ 新增常量 PACK_VERSION 和 DEFAULT_TTL_SECONDS 定义正确
-- ✅ decision_mode 参数解析正确，有默认值
+- ✅ goals.js: 无语法错误，所有导入正确
+- ✅ 数据库迁移 SQL 有效，添加 parent_id/type/weight 字段
+- ✅ API 路由结构完整，CRUD 操作正常
 
 ### Round 2: L2 功能性问题检查
-- ✅ recent_decisions.action 读取顺序正确：先 .action 再 .next_action 再 'unknown'
-- ✅ action_constraints 结构完整，scheduled 模式限制正确
-- ✅ system_health 默认值处理，避免 null 传播
-- ✅ task_digest 字段映射正确，包含 id/title/status/priority/updated_at/due_at
+- ✅ POST /goals: Objective/KR 类型验证正确
+- ✅ PATCH /goals: 进度更新触发父级重算逻辑正确
+- ✅ GET /goals/:id/children: 父级验证和子级查询正确
+- ✅ recalculateParentProgress: 加权平均算法正确
+- ✅ 所有端点有 try-catch 错误处理
+- ✅ 参数化查询，无 SQL 注入风险
 
-### 结论
-Decision Pack v2.0 代码质量良好，无 L1/L2 问题。新增字段向后兼容，不破坏现有 API 消费者。
+### Code Quality Notes
+
+1. **Input Validation**: Proper validation for Objective/KR type constraints
+2. **Error Handling**: All endpoints have try-catch with meaningful error messages
+3. **Business Logic**: Weighted progress calculation is correctly implemented
+4. **Database Safety**: Uses parameterized queries (SQL injection protected)
+5. **API Design**: RESTful conventions followed, proper HTTP status codes
+
+### Test Coverage
+
+- 9 tests passing
+- Covers: schema validation, CRUD operations, hierarchy queries, progress calculation
