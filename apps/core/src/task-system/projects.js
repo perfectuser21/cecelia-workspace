@@ -40,16 +40,16 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/projects - Create project
+// POST /api/projects - Create project (or Feature if parent_id provided)
 router.post('/', async (req, res) => {
   try {
-    const { workspace_id, name, description, repo_path, icon, color, status, metadata } = req.body;
-    
+    const { workspace_id, parent_id, name, description, repo_path, icon, color, status, metadata } = req.body;
+
     const result = await pool.query(
-      'INSERT INTO projects (workspace_id, name, description, repo_path, icon, color, status, metadata) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-      [workspace_id, name, description, repo_path, icon || '📦', color || '#3b82f6', status || 'active', metadata || {}]
+      'INSERT INTO projects (workspace_id, parent_id, name, description, repo_path, icon, color, status, metadata) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+      [workspace_id, parent_id || null, name, description, repo_path, icon || '📦', color || '#3b82f6', status || 'active', metadata || {}]
     );
-    
+
     res.status(201).json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Failed to create project', details: err.message });
@@ -127,6 +127,19 @@ router.delete('/:id', async (req, res) => {
     res.json({ message: 'Project deleted', id: result.rows[0].id });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete project', details: err.message });
+  }
+});
+
+// GET /api/projects/:id/children - Get project's sub-projects (Features)
+router.get('/:id/children', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM projects WHERE parent_id = $1 ORDER BY created_at DESC',
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to list sub-projects', details: err.message });
   }
 });
 
