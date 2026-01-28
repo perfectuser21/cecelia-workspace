@@ -1,24 +1,23 @@
 # QA Decision
 
-Decision: NO_RCI
+Decision: MUST_ADD_RCI
 Priority: P1
 RepoType: Business
 
-Tests:
-  - dod_item: "action 不再显示 unknown"
-    method: manual
-    location: manual:api-test - curl /api/brain/status 验证 recent_decisions.action
+## Tests
 
-  - dod_item: "包含元数据字段"
-    method: manual
-    location: manual:new-fields - 验证 pack_version/generated_at/ttl_seconds
+| DoD Item | Method | Location |
+|----------|--------|----------|
+| goals 表包含 parent_id, type, weight 字段 | auto | apps/core/src/task-system/__tests__/goals.test.js |
+| 可以创建 Objective 和关联的 Key Results | auto | apps/core/src/task-system/__tests__/goals.test.js |
+| 更新 KR 进度时 O 进度自动更新 | auto | apps/core/src/task-system/__tests__/goals.test.js |
+| API 返回层级结构 | auto | apps/core/src/task-system/__tests__/goals.test.js |
 
-  - dod_item: "支持 mode 参数"
-    method: manual
-    location: manual:mode-param - curl /api/brain/status?mode=scheduled
+## RCI
 
-RCI:
-  new: []
-  update: []
+- new: [RCI-TASK-001]
+- update: []
 
-Reason: Brain API 的 decision pack 增强是内部接口优化，不涉及外部契约变更。变更范围限于 routes.js 的 GET /status 端点，增加元数据和修复 action 名称显示，属于 API 响应格式增强，无需纳入回归契约。
+## Reason
+
+OKR 层级是任务管理系统的核心功能扩展，影响数据模型和 API，需要回归保护确保 O→KR 关系和自动进度计算不被破坏。
