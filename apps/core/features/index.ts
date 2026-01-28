@@ -26,6 +26,7 @@ export const coreFeatures = {
   'tasks': () => import('./tasks'),
   'devgate': () => import('./devgate'),
   'quality': () => import('./quality'),
+  'planner': () => import('./planner'),
 };
 
 // Load all features and register them
@@ -151,11 +152,19 @@ function collectAllRoutes(manifests: FeatureManifest[]): CoreRoute[] {
 
   for (const manifest of manifests) {
     for (const route of manifest.routes) {
-      routes.push({
-        path: route.path,
-        component: route.component,
-        requireAuth: true,
-      });
+      if (route.redirect) {
+        routes.push({
+          path: route.path,
+          redirect: route.redirect,
+          requireAuth: false,
+        });
+      } else if (route.component) {
+        routes.push({
+          path: route.path,
+          component: route.component,
+          requireAuth: route.requireAuth ?? true,
+        });
+      }
     }
   }
 
