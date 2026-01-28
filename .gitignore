@@ -43,3 +43,14 @@ apps/cecelia-frontend/database/
 .quality-gate-passed
 .cecelia-run-id
 *.backup-*
+
+# Secrets
+workflows/.secrets
+*.secrets
+.archived/
+workflows/.claude/
+
+# Build outputs
+dist/
+dist-dev/
+*.dist/
