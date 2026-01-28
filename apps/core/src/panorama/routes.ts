@@ -265,4 +265,602 @@ router.get('/health', (_req: Request, res: Response) => {
   });
 });
 
+/**
+ * Read monitor data from host-generated JSON file
+ * The vps-monitor script runs on the host and writes to /tmp/vps-monitor.json
+ */
+function getHostMonitorData(): any | null {
+  const monitorFile = '/tmp/vps-monitor.json';
+  try {
+    if (existsSync(monitorFile)) {
+      const content = readFileSync(monitorFile, 'utf-8');
+      return JSON.parse(content);
+    }
+  } catch {
+    // File not available or parse error
+  }
+  return null;
+}
+
+/**
+ * Get running Claude sessions from host monitor data
+ */
+function getClaudeSessions(): { sessions: any[]; total: number } {
+  const hostData = getHostMonitorData();
+  if (hostData?.claude) {
+    return {
+      sessions: hostData.claude.sessions || [],
+      total: hostData.claude.active_sessions || 0,
+    };
+  }
+
+  // Fallback to container-local detection (limited)
+  const sessions: any[] = [];
+  try {
+    const psOutput = execSync(
+      "ps aux | grep -E 'claude' | grep -v grep | grep -v chrome-devtools",
+      { encoding: 'utf-8' }
+    );
+
+    const lines = psOutput.trim().split('\n').filter(Boolean);
+    for (const line of lines) {
+      const parts = line.split(/\s+/);
+      if (parts.length >= 11) {
+        const pid = parts[1];
+        const cpu = parseFloat(parts[2]);
+        const mem = parseFloat(parts[3]);
+        const time = parts[9];
+
+        let cwd = '';
+        try {
+          cwd = execSync(`readlink -f /proc/${pid}/cwd 2>/dev/null`, { encoding: 'utf-8' }).trim();
+        } catch {
+          // Ignore - process may have ended
+        }
+
+        const project = cwd.split('/').pop() || 'unknown';
+        const repo = cwd.includes('/dev/') ? cwd.split('/dev/')[1]?.split('/')[0] || '' : '';
+
+        sessions.push({
+          pid,
+          cpu,
+          memory: mem,
+          runtime: time,
+          project,
+          repository: repo,
+          cwd,
+          status: cpu > 10 ? 'active' : 'idle',
+        });
+      }
+    }
+  } catch {
+    // No claude sessions running
+  }
+
+  return { sessions, total: sessions.length };
+}
+
+/**
+ * Get Docker containers status from host monitor data
+ */
+function getDockerContainers(): any[] {
+  const hostData = getHostMonitorData();
+  if (hostData?.docker?.containers) {
+    return hostData.docker.containers;
+  }
+
+  // Fallback (won't work in container without socket)
+  const containers: any[] = [];
+  try {
+    const output = execSync(
+      'docker ps --format "{{.Names}}|{{.Status}}|{{.Ports}}" 2>/dev/null',
+      { encoding: 'utf-8' }
+    );
+
+    const lines = output.trim().split('\n').filter(Boolean);
+    for (const line of lines) {
+      const [name, status, ports] = line.split('|');
+      containers.push({ name, status, ports: ports || '' });
+    }
+  } catch {
+    // Docker not available or error
+  }
+
+  return containers;
+}
+
+/**
+ * GET /api/panorama/command-center
+ * Get comprehensive command center data
+ * Prefers host monitor data when available
+ */
+router.get('/command-center', (_req: Request, res: Response) => {
+  try {
+    // Try to get host monitor data first (most accurate)
+    const hostData = getHostMonitorData();
+
+    if (hostData) {
+      // Use host monitor data directly
+      const byRepository: Record<string, any[]> = {};
+      for (const session of hostData.claude?.sessions || []) {
+        const repo = session.repository || 'other';
+        if (!byRepository[repo]) {
+          byRepository[repo] = [];
+        }
+        byRepository[repo].push(session);
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          timestamp: hostData.timestamp,
+          vps: hostData.vps,
+          claude: {
+            active_sessions: hostData.claude?.active_sessions || 0,
+            sessions: hostData.claude?.sessions || [],
+            by_repository: byRepository,
+          },
+          docker: hostData.docker,
+          capacity: hostData.capacity,
+        },
+      });
+    }
+
+    // Fallback to container-local detection
+    const vitals = getSystemVitals();
+    const claudeSessions = getClaudeSessions();
+    const containers = getDockerContainers();
+
+    const byRepository: Record<string, any[]> = {};
+    for (const session of claudeSessions.sessions) {
+      const repo = session.repository || 'other';
+      if (!byRepository[repo]) {
+        byRepository[repo] = [];
+      }
+      byRepository[repo].push(session);
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        timestamp: new Date().toISOString(),
+        vps: {
+          cpu: {
+            usage: Math.round(vitals.cpu.usage * 10) / 10,
+            cores: vitals.cpu.cores,
+            load: vitals.load,
+          },
+          memory: {
+            total_gb: Math.round(vitals.memory.total / 1024 / 1024 / 1024 * 10) / 10,
+            used_gb: Math.round(vitals.memory.used / 1024 / 1024 / 1024 * 10) / 10,
+            percent: Math.round(vitals.memory.percent * 10) / 10,
+          },
+          disk: {
+            total_gb: Math.round(vitals.disk.total / 1024 / 1024 / 1024),
+            used_gb: Math.round(vitals.disk.used / 1024 / 1024 / 1024),
+            percent: Math.round(vitals.disk.percent * 10) / 10,
+          },
+          uptime: vitals.uptime.formatted,
+        },
+        claude: {
+          active_sessions: claudeSessions.total,
+          sessions: claudeSessions.sessions,
+          by_repository: byRepository,
+        },
+        docker: {
+          containers: containers,
+          running: containers.filter(c => c.status.startsWith('Up')).length,
+        },
+        capacity: {
+          max_concurrent: 3,
+          current_load: claudeSessions.total,
+          available_slots: Math.max(0, 3 - claudeSessions.total),
+        },
+      },
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * Read planner data from host-generated JSON file
+ */
+function getPlannerData(): any | null {
+  const plannerFile = '/tmp/vps-planner.json';
+  try {
+    if (existsSync(plannerFile)) {
+      const content = readFileSync(plannerFile, 'utf-8');
+      return JSON.parse(content);
+    }
+  } catch {
+    // File not available or parse error
+  }
+  return null;
+}
+
+/**
+ * GET /api/panorama/planner
+ * Get comprehensive planning data - repos, PRDs, capacity
+ */
+router.get('/planner', (_req: Request, res: Response) => {
+  try {
+    const data = getPlannerData();
+
+    if (!data) {
+      return res.json({
+        success: false,
+        error: 'Planner data not available',
+      });
+    }
+
+    return res.json({
+      success: true,
+      data,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * GET /api/panorama/status
+ * Simple status endpoint for AI/voice assistant integration
+ * Returns human-readable summary of current state
+ */
+router.get('/status', (_req: Request, res: Response) => {
+  try {
+    const hostData = getHostMonitorData();
+
+    if (!hostData) {
+      return res.json({
+        success: true,
+        summary: 'VPS 监控数据不可用',
+        details: null,
+      });
+    }
+
+    const claudeActive = (hostData.claude?.sessions || []).filter((s: any) => s.status === 'active').length;
+    const claudeIdle = (hostData.claude?.sessions || []).filter((s: any) => s.status === 'idle').length;
+    const dockerRunning = hostData.docker?.running || 0;
+    const cpuUsage = hostData.vps?.cpu?.usage || 0;
+    const memPercent = hostData.vps?.memory?.percent || 0;
+    const available = hostData.capacity?.available_slots || 0;
+
+    // Build human-readable summary
+    const lines: string[] = [];
+    lines.push(`VPS 运行时间: ${hostData.vps?.uptime || 'unknown'}`);
+    lines.push(`CPU: ${cpuUsage}% | 内存: ${memPercent}%`);
+    lines.push(`Claude 会话: ${claudeActive} 活跃, ${claudeIdle} 空闲`);
+    lines.push(`Docker 容器: ${dockerRunning} 运行中`);
+    lines.push(`可用容量: ${available} 个槽位`);
+
+    // List active sessions
+    if (claudeActive > 0) {
+      lines.push('');
+      lines.push('活跃会话:');
+      for (const session of (hostData.claude?.sessions || []).filter((s: any) => s.status === 'active')) {
+        lines.push(`  - ${session.project} (${session.repository || 'no repo'}) CPU: ${session.cpu}%`);
+      }
+    }
+
+    return res.json({
+      success: true,
+      summary: lines.join('\n'),
+      details: {
+        uptime: hostData.vps?.uptime,
+        cpu: cpuUsage,
+        memory: memPercent,
+        claude_active: claudeActive,
+        claude_idle: claudeIdle,
+        docker_running: dockerRunning,
+        available_slots: available,
+        active_projects: (hostData.claude?.sessions || [])
+          .filter((s: any) => s.status === 'active')
+          .map((s: any) => s.project),
+      },
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * Semantic Brain API proxy routes
+ * Forward requests to the Task Intelligence system
+ */
+const SEMANTIC_BRAIN_URL = process.env.SEMANTIC_BRAIN_URL || 'http://localhost:5220';
+
+/**
+ * POST /api/panorama/tasks/parse
+ * Parse PRD content into structured tasks
+ */
+router.post('/tasks/parse', async (req: Request, res: Response) => {
+  try {
+    const { intent, context, use_history } = req.body;
+
+    const response = await fetch(`${SEMANTIC_BRAIN_URL}/parse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ intent, context, use_history }),
+    });
+
+    const data = await response.json();
+    return res.json({ success: true, data });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: message });
+  }
+});
+
+/**
+ * POST /api/panorama/tasks/schedule
+ * Schedule tasks and generate execution plan
+ */
+router.post('/tasks/schedule', async (req: Request, res: Response) => {
+  try {
+    const { tasks, constraints } = req.body;
+
+    const response = await fetch(`${SEMANTIC_BRAIN_URL}/schedule`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tasks, constraints }),
+    });
+
+    const data = await response.json();
+    return res.json({ success: true, data });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: message });
+  }
+});
+
+/**
+ * POST /api/panorama/tasks/plan
+ * Generate execution plan with bottleneck analysis
+ */
+router.post('/tasks/plan', async (req: Request, res: Response) => {
+  try {
+    const { tasks } = req.body;
+
+    const response = await fetch(`${SEMANTIC_BRAIN_URL}/plan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tasks }),
+    });
+
+    const data = await response.json();
+    return res.json({ success: true, data });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: message });
+  }
+});
+
+/**
+ * GET /api/panorama/tasks/detector/status
+ * Get detector service status
+ */
+router.get('/tasks/detector/status', async (_req: Request, res: Response) => {
+  try {
+    const response = await fetch(`${SEMANTIC_BRAIN_URL}/detector/status`);
+    const data = await response.json();
+    return res.json({ success: true, data });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: message });
+  }
+});
+
+/**
+ * GET /api/panorama/tasks/detector/events
+ * Get recent events from detector
+ */
+router.get('/tasks/detector/events', async (req: Request, res: Response) => {
+  try {
+    const params = new URLSearchParams();
+    if (req.query.limit) params.append('limit', String(req.query.limit));
+    if (req.query.event_type) params.append('event_type', String(req.query.event_type));
+    if (req.query.severity) params.append('severity', String(req.query.severity));
+
+    const url = `${SEMANTIC_BRAIN_URL}/detector/events${params.toString() ? '?' + params.toString() : ''}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    return res.json({ success: true, data });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: message });
+  }
+});
+
+/**
+ * GET /api/panorama/roadmap
+ * Get comprehensive roadmap view combining repos, PRDs, and parsed tasks
+ */
+router.get('/roadmap', async (_req: Request, res: Response) => {
+  try {
+    // Get planner data (repos, PRDs)
+    const plannerData = getPlannerData();
+    if (!plannerData) {
+      return res.json({
+        success: false,
+        error: 'Planner data not available',
+      });
+    }
+
+    // Build roadmap structure
+    const roadmap: any = {
+      timestamp: new Date().toISOString(),
+      summary: {
+        total_repos: plannerData.summary.total_repos,
+        total_prds: plannerData.summary.pending_prds,
+        active_work: plannerData.summary.active_working,
+        capacity: plannerData.capacity,
+      },
+      repositories: plannerData.repositories.map((repo: any) => ({
+        name: repo.name,
+        branch: repo.branch,
+        status: repo.status,
+        prd_count: repo.prd_count,
+        has_session: repo.has_session,
+        // PRDs for this repo
+        prds: plannerData.pending_work
+          .filter((p: any) => p.repo === repo.name)
+          .map((p: any) => ({
+            file: p.file,
+            title: p.title,
+            path: p.path,
+          })),
+      })),
+      active_work: plannerData.active_work,
+    };
+
+    return res.json({
+      success: true,
+      data: roadmap,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: message });
+  }
+});
+
+/**
+ * POST /api/panorama/roadmap/parse-prd
+ * Parse a specific PRD file into tasks
+ */
+router.post('/roadmap/parse-prd', async (req: Request, res: Response) => {
+  try {
+    const { prd_path } = req.body;
+
+    if (!prd_path) {
+      return res.status(400).json({
+        success: false,
+        error: 'prd_path is required',
+      });
+    }
+
+    // Read PRD content
+    if (!existsSync(prd_path)) {
+      return res.status(404).json({
+        success: false,
+        error: `PRD file not found: ${prd_path}`,
+      });
+    }
+
+    const prdContent = readFileSync(prd_path, 'utf-8');
+
+    // Send to Semantic Brain for parsing
+    const response = await fetch(`${SEMANTIC_BRAIN_URL}/parse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        intent: prdContent,
+        context: { source: 'prd', path: prd_path },
+        use_history: false,
+      }),
+    });
+
+    const data = await response.json();
+    return res.json({ success: true, data });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: message });
+  }
+});
+
+/**
+ * POST /api/panorama/execute
+ * 触发 Cecelia 执行 PRD（通过宿主机执行器服务）
+ */
+router.post('/execute', async (req: Request, res: Response) => {
+  try {
+    const { prd_path, priority } = req.body;
+
+    if (!prd_path) {
+      return res.status(400).json({
+        success: false,
+        error: 'prd_path is required',
+      });
+    }
+
+    // 调用宿主机的 cecelia-executor 服务
+    const EXECUTOR_URL = process.env.CECELIA_EXECUTOR_URL || 'http://localhost:5230';
+
+    const response = await fetch(`${EXECUTOR_URL}/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prd_path, priority }),
+    });
+
+    const data = await response.json() as { success: boolean; data?: Record<string, unknown>; error?: string };
+
+    if (data.success) {
+      return res.json({
+        success: true,
+        data: {
+          ...data.data,
+          priority: priority || 'P1',
+          message: 'Cecelia execution started',
+        },
+      });
+    } else {
+      return res.status(400).json(data);
+    }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: message });
+  }
+});
+
+/**
+ * GET /api/panorama/execution/:taskId
+ * 获取执行状态
+ */
+router.get('/execution/:taskId', async (req: Request, res: Response) => {
+  try {
+    const { taskId } = req.params;
+    const logFile = `/tmp/cecelia-${taskId}.log`;
+
+    if (!existsSync(logFile)) {
+      return res.status(404).json({
+        success: false,
+        error: 'Task not found',
+      });
+    }
+
+    const content = readFileSync(logFile, 'utf-8');
+    const lines = content.split('\n').slice(-50); // 最后 50 行
+
+    // 检查是否完成
+    const isComplete = content.includes('<promise>DONE</promise>') ||
+                       content.includes('DONE') ||
+                       content.includes('completed');
+
+    return res.json({
+      success: true,
+      data: {
+        task_id: taskId,
+        status: isComplete ? 'completed' : 'running',
+        log_tail: lines.join('\n'),
+      },
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({ success: false, error: message });
+  }
+});
+
 export default router;
