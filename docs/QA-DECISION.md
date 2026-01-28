@@ -5,64 +5,56 @@ Priority: P1
 RepoType: Business
 
 Tests:
-  - dod_item: "创建 RunDetailPanel 组件（右侧抽屉式）"
+  - dod_item: "创建 QuickActionsBar 组件"
     method: manual
-    location: manual:验证组件渲染和交互
+    location: manual:验证按钮渲染和布局
 
-  - dod_item: "显示 summary 信息"
+  - dod_item: "实现 Run QA Now 按钮"
     method: manual
-    location: manual:检查 summary 数据显示正确
+    location: manual:点击按钮验证 API 调用
 
-  - dod_item: "显示 tests 结果（饼图 + 列表）"
+  - dod_item: "实现 Sync Notion 按钮"
     method: manual
-    location: manual:验证饼图和列表渲染
+    location: manual:点击按钮验证同步触发
 
-  - dod_item: "显示 skipped_details（可展开）"
+  - dod_item: "实现 Health Check 按钮"
     method: manual
-    location: manual:验证可展开交互
+    location: manual:点击按钮验证健康检查结果
 
-  - dod_item: "显示 evidence 文件列表"
+  - dod_item: "创建 ConfirmDialog 组件"
     method: manual
-    location: manual:验证文件列表渲染
+    location: manual:验证对话框显示和交互
 
-  - dod_item: "点击 Run ID 触发抽屉打开"
+  - dod_item: "实现 Clear Queue 按钮（带确认）"
     method: manual
-    location: manual:点击测试抽屉打开
+    location: manual:验证确认弹窗和清空操作
 
-  - dod_item: "添加 Queue 卡片（显示 pending length）"
+  - dod_item: "实现 Restart Worker 按钮（带确认）"
     method: manual
-    location: manual:验证卡片显示队列长度
+    location: manual:验证确认弹窗和重启操作
 
-  - dod_item: "创建 Task Queue 列表组件"
-    method: manual
-    location: manual:验证列表组件渲染
-
-  - dod_item: "显示每个任务的详细信息"
-    method: manual
-    location: manual:验证任务信息展示
-
-  - dod_item: "添加 Worker Status 指示器"
-    method: manual
-    location: manual:验证 Worker 状态显示
-
-  - dod_item: "API: GET /api/quality/queue"
+  - dod_item: "API: POST /api/quality/trigger/runQA"
     method: auto
-    location: tests/api/quality-queue.test.ts
+    location: tests/api/quality-trigger-runqa.test.ts
 
-  - dod_item: "API: GET /api/quality/worker"
+  - dod_item: "API: POST /api/quality/trigger/syncNotion"
     method: auto
-    location: tests/api/quality-worker.test.ts
+    location: tests/api/quality-trigger-notion.test.ts
 
-  - dod_item: "API: GET /api/quality/runs/:runId/evidence"
+  - dod_item: "API: POST /api/quality/trigger/healthCheck"
     method: auto
-    location: tests/api/quality-evidence.test.ts
+    location: tests/api/quality-trigger-health.test.ts
 
-  - dod_item: "API: GET /api/quality/runs/:runId/logs/:filename"
+  - dod_item: "API: DELETE /api/quality/queue/clear"
     method: auto
-    location: tests/api/quality-logs.test.ts
+    location: tests/api/quality-queue-clear.test.ts
+
+  - dod_item: "API: POST /api/quality/worker/restart"
+    method: auto
+    location: tests/api/quality-worker-restart.test.ts
 
 RCI:
   new: []
   update: []
 
-Reason: 业务仓库的 UI 增强功能，不涉及核心路径，无需纳入回归契约。前端组件以手动验证为主，API 端点需要单元测试覆盖。
+Reason: 业务仓库的 UI 控制层功能，提供手动操作能力。前端交互以手动验证为主，API 端点需要单元测试覆盖。不涉及核心路径，无需纳入回归契约。
