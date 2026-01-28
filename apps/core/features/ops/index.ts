@@ -8,6 +8,11 @@ const manifest: FeatureManifest = {
   instances: ['core'],
 
   routes: [
+    // Default route - redirect to Ops Center
+    {
+      path: '/',
+      redirect: '/ops',
+    },
     // Ops Center 入口
     {
       path: '/ops',
@@ -100,6 +105,30 @@ const manifest: FeatureManifest = {
       path: '/ops/features',
       component: 'FeatureDashboard',
     },
+    // Task Intelligence (Planner)
+    {
+      path: '/ops/planner',
+      component: 'PlannerOverview',
+      navItem: { label: 'Command Center', icon: 'Monitor', order: 2 },
+    },
+    // Work Planning
+    {
+      path: '/ops/planning',
+      component: 'PlanningDashboard',
+      navItem: { label: '工作规划', icon: 'Calendar', order: 3 },
+    },
+    // Task Scheduler
+    {
+      path: '/ops/scheduler',
+      component: 'Scheduler',
+      navItem: { label: '任务调度', icon: 'Brain', order: 4 },
+    },
+    // Roadmap View
+    {
+      path: '/ops/roadmap',
+      component: 'RoadmapView',
+      navItem: { label: 'Roadmap', icon: 'Map', order: 5 },
+    },
   ],
 
   components: {
@@ -131,6 +160,14 @@ const manifest: FeatureManifest = {
     CeceliaRunDetail: () => import('../cecelia/pages/RunDetail'),
     // Feature Dashboard
     FeatureDashboard: () => import('../shared/pages/FeatureDashboard'),
+    // Task Intelligence (Planner)
+    PlannerOverview: () => import('../planner/pages/PlannerOverview'),
+    // Work Planning
+    PlanningDashboard: () => import('../planner/pages/PlanningDashboard'),
+    // Task Scheduler
+    Scheduler: () => import('../planner/pages/Scheduler'),
+    // Roadmap View
+    RoadmapView: () => import('../planner/pages/RoadmapView'),
   },
 };
 

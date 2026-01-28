@@ -14,7 +14,9 @@ export interface FeatureNavGroup {
 // Route configuration for a feature
 export interface FeatureRoute {
   path: string;
-  component: string;  // Component key in manifest.components
+  component?: string;  // Component key in manifest.components
+  redirect?: string;   // Redirect to another path
+  requireAuth?: boolean;
   navItem?: {
     label: string;
     icon?: string;
@@ -83,7 +85,8 @@ export interface InstanceConfig {
 // Route configuration for DynamicRouter
 export interface CoreRoute {
   path: string;
-  component: string;
+  component?: string;
+  redirect?: string;
   requireAuth?: boolean;
 }
 
