@@ -87,6 +87,10 @@ async function internalLogDecision(trigger, inputSummary, decision, result) {
 
 // ==================== 状态读取 API ====================
 
+// Decision Pack 版本
+const PACK_VERSION = '2.0.0';
+const DEFAULT_TTL_SECONDS = 300; // 5 分钟
+
 /**
  * GET /api/brain/status
  * 精简决策包（给 LLM/皮层用）
@@ -94,55 +98,108 @@ async function internalLogDecision(trigger, inputSummary, decision, result) {
  */
 router.get('/status', async (req, res) => {
   try {
+    // 支持 ?mode=interactive|scheduled|incident
+    const decisionMode = req.query.mode || 'interactive';
+
     const [policy, workingMemory, topTasks, recentDecisions, snapshot] = await Promise.all([
       getActivePolicy(),
       getWorkingMemory(),
       getTopTasks(10),
-      getRecentDecisions(3),
+      getRecentDecisions(5),
       getLatestSnapshot()
     ]);
 
-    // 精简决策包 - 固定 schema
+    const now = new Date();
+
+    // 精简决策包 - 固定 schema v2.0.0
     const decisionPack = {
-      // 策略版本
+      // === 包元数据 ===
+      pack_version: PACK_VERSION,
+      generated_at: now.toISOString(),
+      ttl_seconds: DEFAULT_TTL_SECONDS,
+      decision_mode: decisionMode,
+
+      // === 动作约束（幂等、安全闸门）===
+      action_constraints: {
+        require_idempotency_key: true,
+        idempotency_ttl_seconds: IDEMPOTENCY_TTL / 1000,
+        max_actions_per_turn: decisionMode === 'scheduled' ? 1 : 3,
+        allowed_actions: Object.keys(ALLOWED_ACTIONS),
+        scheduled_forbidden: decisionMode === 'scheduled' ? ['create-task', 'create-goal'] : []
+      },
+
+      // === 策略版本 ===
       policy_version: policy?.version || 0,
       policy_rules: {
         priority_order: policy?.content_json?.priority_order || ['P0', 'P1', 'P2'],
-        confidence_threshold: policy?.content_json?.confidence_threshold || 0.6,
-        allowed_actions: Object.keys(ALLOWED_ACTIONS)
+        confidence_threshold: policy?.content_json?.confidence_threshold || 0.6
       },
 
-      // 工作记忆（只取关键 key）
+      // === 工作记忆（只取关键 key）===
       memory: {
         current_focus: workingMemory.current_focus || null,
         today_intent: workingMemory.today_intent || null,
         blocked_by: workingMemory.blocked_by || { items: [] }
       },
 
-      // 最近决策摘要（3 条）
+      // === 最近决策摘要（5 条，带 action 名）===
       recent_decisions: recentDecisions.map(d => ({
         ts: d.ts,
-        action: d.llm_output_json?.next_action || 'unknown',
-        status: d.status
+        action: d.llm_output_json?.action || d.llm_output_json?.next_action || 'unknown',
+        trigger: d.trigger || 'unknown',
+        status: d.status,
+        duplicate: d.action_result_json?.duplicate || false
       })),
 
-      // 系统快照摘要
+      // === 系统健康摘要（可量化）===
       system_health: snapshot?.snapshot_json ? {
         n8n_ok: snapshot.snapshot_json.n8n?.status === 'ok',
         n8n_failures_1h: snapshot.snapshot_json.n8n?.failures_1h || 0,
-        task_system_ok: snapshot.snapshot_json.task_system?.status === 'ok'
-      } : null,
+        n8n_active_workflows: snapshot.snapshot_json.n8n?.active_workflows || 0,
+        n8n_executions_1h: snapshot.snapshot_json.n8n?.executions_1h || 0,
+        task_system_ok: snapshot.snapshot_json.task_system?.status === 'ok',
+        open_tasks_total: (snapshot.snapshot_json.task_system?.open_p0 || 0) +
+                          (snapshot.snapshot_json.task_system?.open_p1 || 0),
+        stale_tasks: snapshot.snapshot_json.task_system?.stale_count || 0
+      } : {
+        n8n_ok: false,
+        n8n_failures_1h: 0,
+        task_system_ok: false,
+        open_tasks_total: 0,
+        stale_tasks: 0
+      },
       snapshot_ts: snapshot?.ts || null,
 
-      // 优先任务（P0 全部 + P1 前 5）
-      tasks: {
-        p0: topTasks.filter(t => t.priority === 'P0').slice(0, 5),
-        p1: topTasks.filter(t => t.priority === 'P1').slice(0, 5),
+      // === 任务摘要（P0 top5 + P1 top5，带关键字段）===
+      task_digest: {
+        p0: topTasks
+          .filter(t => t.priority === 'P0')
+          .slice(0, 5)
+          .map(t => ({
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            priority: t.priority,
+            updated_at: t.updated_at,
+            due_at: t.due_at || null
+          })),
+        p1: topTasks
+          .filter(t => t.priority === 'P1')
+          .slice(0, 5)
+          .map(t => ({
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            priority: t.priority,
+            updated_at: t.updated_at,
+            due_at: t.due_at || null
+          })),
         stats: {
           open_p0: topTasks.filter(t => t.priority === 'P0' && t.status !== 'completed').length,
           open_p1: topTasks.filter(t => t.priority === 'P1' && t.status !== 'completed').length,
           in_progress: topTasks.filter(t => t.status === 'in_progress').length,
-          queued: topTasks.filter(t => t.status === 'queued').length
+          queued: topTasks.filter(t => t.status === 'queued').length,
+          overdue: topTasks.filter(t => t.due_at && new Date(t.due_at) < now && t.status !== 'completed').length
         }
       }
     };
