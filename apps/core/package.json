@@ -9,8 +9,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/dashboard/server.ts",
-    "start": "node dist/dashboard/server.js",
+    "dev": "tsx watch src/api/server.ts",
+    "start": "node dist/api/server.js",
     "cecilia": "tsx src/cecilia/cli.ts",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit"
@@ -24,10 +24,12 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
     "@octokit/rest": "^22.0.1",
     "commander": "^12.1.0",
     "express": "^4.21.0",
     "http-proxy-middleware": "^3.0.0",
+    "pg": "^8.17.2",
     "uuid": "^10.0.0"
   },
   "devDependencies": {
