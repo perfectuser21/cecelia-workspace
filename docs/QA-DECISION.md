@@ -1,6 +1,6 @@
 # QA Decision
 
-Decision: UPDATE_RCI
+Decision: NO_RCI
 Priority: P1
 RepoType: Business
 
@@ -8,17 +8,15 @@ RepoType: Business
 
 | DoD Item | Method | Location |
 |----------|--------|----------|
-| GET /api/okr/trees 返回所有顶层 Objectives | auto | apps/core/src/okr/__tests__/trees.test.js |
-| GET /api/okr/trees/:id 返回完整 OKR 树 | auto | apps/core/src/okr/__tests__/trees.test.js |
-| POST /api/okr/trees 一次性创建 O + 多个 KR | auto | apps/core/src/okr/__tests__/trees.test.js |
-| PUT /api/okr/trees/:id 支持添加/删除 KR | auto | apps/core/src/okr/__tests__/trees.test.js |
-| DELETE /api/okr/trees/:id 级联删除 O 及其 KR | auto | apps/core/src/okr/__tests__/trees.test.js |
+| 算法能自动选择合理的焦点 | auto | apps/core/src/brain/__tests__/focus.test.js |
+| 支持手动覆盖 | auto | apps/core/src/brain/__tests__/focus.test.js |
+| Decision Pack 包含焦点信息 | auto | apps/core/src/brain/__tests__/focus.test.js |
 
 ## RCI
 
 - new: []
-- update: [RCI-TASK-001]
+- update: []
 
 ## Reason
 
-OKR Tree API 在 PRD 01 的数据模型基础上提供树形 CRUD 操作，复用现有 goals 表，需要更新回归契约保护新 API 端点。
+新增 Brain Focus API，属于内部工具功能增强，不涉及已有核心路径。优先级 P1，无需纳入回归契约。测试通过单元测试验证算法正确性和 API 行为即可。

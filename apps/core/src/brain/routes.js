@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getSystemStatus, getRecentDecisions, getWorkingMemory, getActivePolicy, getTopTasks } from './orchestrator.js';
 import { createSnapshot, getRecentSnapshots, getLatestSnapshot } from './perception.js';
 import { createTask, updateTask, createGoal, updateGoal, triggerN8n, setMemory, batchUpdateTasks } from './actions.js';
+import { getDailyFocus, setDailyFocus, clearDailyFocus, getFocusSummary } from './focus.js';
 import pool from '../task-system/db.js';
 import crypto from 'crypto';
 
@@ -88,7 +89,7 @@ async function internalLogDecision(trigger, inputSummary, decision, result) {
 // ==================== 状态读取 API ====================
 
 // Decision Pack 版本
-const PACK_VERSION = '2.0.0';
+const PACK_VERSION = '2.1.0';
 const DEFAULT_TTL_SECONDS = 300; // 5 分钟
 
 /**
@@ -101,12 +102,13 @@ router.get('/status', async (req, res) => {
     // 支持 ?mode=interactive|scheduled|incident
     const decisionMode = req.query.mode || 'interactive';
 
-    const [policy, workingMemory, topTasks, recentDecisions, snapshot] = await Promise.all([
+    const [policy, workingMemory, topTasks, recentDecisions, snapshot, dailyFocus] = await Promise.all([
       getActivePolicy(),
       getWorkingMemory(),
       getTopTasks(10),
       getRecentDecisions(5),
-      getLatestSnapshot()
+      getLatestSnapshot(),
+      getFocusSummary()
     ]);
 
     const now = new Date();
@@ -118,6 +120,9 @@ router.get('/status', async (req, res) => {
       generated_at: now.toISOString(),
       ttl_seconds: DEFAULT_TTL_SECONDS,
       decision_mode: decisionMode,
+
+      // === 今日焦点 ===
+      daily_focus: dailyFocus,
 
       // === 动作约束（幂等、安全闸门）===
       action_constraints: {
@@ -304,6 +309,61 @@ router.get('/tasks', async (req, res) => {
     res.json(tasks);
   } catch (err) {
     res.status(500).json({ error: 'Failed to get tasks', details: err.message });
+  }
+});
+
+// ==================== Focus API（优先级引擎） ====================
+
+/**
+ * GET /api/brain/focus
+ * 获取今日焦点
+ */
+router.get('/focus', async (req, res) => {
+  try {
+    const focus = await getDailyFocus();
+    if (focus) {
+      res.json(focus);
+    } else {
+      res.json({ focus: null, reason: '没有活跃的 Objective' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get focus', details: err.message });
+  }
+});
+
+/**
+ * POST /api/brain/focus/set
+ * 手动设置今日焦点（覆盖算法选择）
+ */
+router.post('/focus/set', async (req, res) => {
+  try {
+    const { objective_id } = req.body;
+
+    if (!objective_id) {
+      return res.status(400).json({ error: 'objective_id is required' });
+    }
+
+    const result = await setDailyFocus(objective_id);
+    res.json(result);
+  } catch (err) {
+    if (err.message === 'Objective not found') {
+      res.status(404).json({ error: err.message });
+    } else {
+      res.status(500).json({ error: 'Failed to set focus', details: err.message });
+    }
+  }
+});
+
+/**
+ * POST /api/brain/focus/clear
+ * 清除手动设置，恢复自动选择
+ */
+router.post('/focus/clear', async (req, res) => {
+  try {
+    const result = await clearDailyFocus();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to clear focus', details: err.message });
   }
 });
 
