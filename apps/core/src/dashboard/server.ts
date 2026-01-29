@@ -6,6 +6,7 @@
 
 import 'dotenv/config';
 import express from 'express';
+import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { createProxyMiddleware } from 'http-proxy-middleware';
@@ -21,7 +22,6 @@ import taskSystemRoutes from '../task-system/routes.js';
 import brainRoutes from '../brain/routes.js';
 import okrRoutes from '../okr/routes.js';
 import watchdogRoutes from '../watchdog/routes.js';
-import orchestratorRoutes from '../orchestrator/routes.js';
 import { startMonitor as startWatchdogMonitor } from '../watchdog/service.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -64,24 +64,16 @@ app.use('/api/quality', createProxyMiddleware({
   pathRewrite: (path) => `/api${path}`  // /state → /api/state
 }));
 
-// Proxy specific orchestrator paths to cecelia-brain API
-// /api/orchestrator/health → /orchestrator/health (proxy)
-// /api/orchestrator/chat → local orchestratorRoutes (not proxied)
-app.use('/api/orchestrator/health', createProxyMiddleware({
+// Proxy all /api/orchestrator/* to cecelia-brain API
+// All orchestrator routes (chat, voice, state, health) are now in Brain
+// Note: Express strips mount path, so /api/orchestrator/chat becomes /chat
+const orchestratorProxy = createProxyMiddleware({
   target: BRAIN_API,
   changeOrigin: true,
-  pathRewrite: { '^/api/orchestrator': '/orchestrator' }
-}));
-app.use('/api/orchestrator/state', createProxyMiddleware({
-  target: BRAIN_API,
-  changeOrigin: true,
-  pathRewrite: { '^/api/orchestrator': '/orchestrator' }
-}));
-app.use('/api/orchestrator/query', createProxyMiddleware({
-  target: BRAIN_API,
-  changeOrigin: true,
-  pathRewrite: { '^/api/orchestrator': '/orchestrator' }
-}));
+  pathRewrite: (path) => `/orchestrator${path}`,  // /chat → /orchestrator/chat
+  ws: true,  // Enable WebSocket proxying for realtime voice
+});
+app.use('/api/orchestrator', orchestratorProxy);
 
 // Proxy /api/v1/* to autopilot backend
 app.use('/api/v1', createProxyMiddleware({
@@ -160,9 +152,6 @@ app.use('/api/okr', okrRoutes);
 // Watchdog API routes (agent activity monitoring)
 app.use('/api/watchdog', watchdogRoutes);
 
-// Orchestrator API routes (chat + actions)
-app.use('/api/orchestrator', orchestratorRoutes);
-
 // Static frontend files (single frontend, theme switches by hostname in JS)
 // Compiled server is at apps/core/dist/dashboard/server.js
 // Frontend is at apps/dashboard/frontend/dist
@@ -183,8 +172,21 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   });
 });
 
-// Start server
-app.listen(PORT, () => {
+// Start server with WebSocket support
+const server = createServer(app);
+
+// Handle WebSocket upgrade for orchestrator realtime
+server.on('upgrade', (req, socket, head) => {
+  if (req.url?.startsWith('/api/orchestrator/realtime/ws')) {
+    // Strip /api prefix only - pathRewrite adds /orchestrator
+    // /api/orchestrator/realtime/ws -> /realtime/ws -> /orchestrator/realtime/ws (via pathRewrite)
+    req.url = '/realtime/ws';
+    console.log('[WebSocket Upgrade] Proxying, input URL rewritten to:', req.url);
+    orchestratorProxy.upgrade(req, socket as any, head);
+  }
+});
+
+server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 
   // Start watchdog monitor automatically

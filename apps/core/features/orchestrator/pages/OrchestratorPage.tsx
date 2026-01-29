@@ -11,29 +11,49 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Phone,
+  PhoneOff,
+  Volume2,
+  Mic,
+  MessageCircle,
+  Minimize2,
+  X,
+  Cpu,
+  Activity,
+  Users,
+  Server
 } from 'lucide-react';
+import { useRealtimeVoice } from '../hooks/useRealtimeVoice';
 
-interface Project {
-  id: string;
-  name: string;
-  status: string;
-}
-
+// Types
 interface KeyResult {
   id: string;
   title: string;
   progress: number;
   weight: number;
+  status: string;
 }
 
-interface OKRTree {
+interface Objective {
   id: string;
   title: string;
   status: string;
   priority: string;
   progress: number;
+  description?: string;
   keyResults: KeyResult[];
+  projects?: Project[];
+}
+
+interface Project {
+  id: string;
+  name: string;
+  status: string;
+  description?: string;
+  repo_path?: string;
+  goal_id?: string;
+  tasks?: Task[];
 }
 
 interface Task {
@@ -41,176 +61,222 @@ interface Task {
   title: string;
   priority: string;
   status: string;
+  description?: string;
   goal_id?: string;
+  project_id?: string;
 }
 
-interface SystemState {
-  focus: { objective?: { id: string; title: string; progress: number } } | null;
-  projects: Project[];
-  okrTrees: OKRTree[];
-  tasks: { total: Record<string, number>; top: Task[] };
+interface Worker {
+  id: string;
+  name: string;
+  status: 'running' | 'idle' | 'error';
+  project?: string;
+  task?: string;
+  started_at?: string;
 }
 
 interface ChatMessage {
+  id: string;
   role: 'user' | 'assistant';
   content: string;
-  highlights?: string[];
-  actions?: Array<{ type: string; label: string; params: Record<string, unknown> }>;
+  isVoice?: boolean;
+  isStreaming?: boolean;
 }
 
-interface ChatResponse {
-  message: string;
-  highlights: string[];
-  actions: Array<{ type: string; label: string; params: Record<string, unknown> }>;
+type DetailType = 'okr' | 'project' | 'task' | null;
+interface DetailView {
+  type: DetailType;
+  data: any;
+}
+
+// Block types
+interface Block {
+  id: string;
+  type: 'heading' | 'text' | 'bullet' | 'numbered' | 'todo' | 'divider' | 'code';
+  content: string;
+  checked?: boolean;
+}
+
+function BlockRenderer({ blocks }: { blocks: Block[] }) {
+  if (!blocks || blocks.length === 0) return null;
+  return (
+    <div className="space-y-1 mt-2">
+      {blocks.map((block, idx) => {
+        switch (block.type) {
+          case 'heading':
+            return <h4 key={block.id || idx} className="text-sm font-semibold text-slate-900 dark:text-white pt-2">{block.content}</h4>;
+          case 'text':
+            return <p key={block.id || idx} className="text-sm text-slate-600 dark:text-slate-300">{block.content}</p>;
+          case 'bullet':
+            return <div key={block.id || idx} className="flex gap-2 text-sm text-slate-600 dark:text-slate-300"><span>•</span><span>{block.content}</span></div>;
+          default:
+            return <p key={block.id || idx} className="text-sm text-slate-600 dark:text-slate-300">{block.content}</p>;
+        }
+      })}
+    </div>
+  );
 }
 
 export default function OrchestratorPage() {
-  const [state, setState] = useState<SystemState | null>(null);
+  const [objectives, setObjectives] = useState<Objective[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [workers, setWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedOKRs, setExpandedOKRs] = useState<Set<string>>(new Set());
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [highlights, setHighlights] = useState<Set<string>>(new Set());
-  const [expandedOKRs, setExpandedOKRs] = useState<Set<string>>(new Set());
+  const [chatOpen, setChatOpen] = useState(true);
+  const [detail, setDetail] = useState<DetailView>({ type: null, data: null });
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const currentStreamingIdRef = useRef<string | null>(null);
 
-  // 获取系统状态
-  const fetchState = useCallback(async () => {
+  const generateId = () => `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+  const fetchData = useCallback(async () => {
     try {
-      const [brainRes, projectsRes, goalsRes, tasksRes] = await Promise.all([
-        fetch('/api/brain/status'),
-        fetch('/api/tasks/projects'),
+      const [goalsRes, projectsRes, tasksRes, watchdogRes] = await Promise.all([
         fetch('/api/tasks/goals'),
-        fetch('/api/tasks/tasks?status=queued,in_progress&limit=20')
+        fetch('/api/tasks/projects'),
+        fetch('/api/tasks/tasks?limit=50'),
+        fetch('/api/watchdog/status')
       ]);
 
-      const [brain, projects, goals, tasks] = await Promise.all([
-        brainRes.json(),
-        projectsRes.json(),
+      const [goals, projectsData, tasksData, watchdog] = await Promise.all([
         goalsRes.json(),
-        tasksRes.json()
+        projectsRes.json(),
+        tasksRes.json(),
+        watchdogRes.json()
       ]);
 
-      const objectives = goals.filter((g: any) => g.type === 'objective' || !g.parent_id);
-      const keyResults = goals.filter((g: any) => g.type === 'key_result' || g.parent_id);
+      // Build OKR tree: Objectives with their Key Results
+      const objectivesMap = new Map<string, Objective>();
+      const keyResults: any[] = [];
 
-      const okrTrees = objectives.map((obj: any) => ({
-        id: obj.id,
-        title: obj.title,
-        status: obj.status,
-        priority: obj.priority,
-        progress: obj.progress || 0,
-        keyResults: keyResults
-          .filter((kr: any) => kr.parent_id === obj.id)
-          .map((kr: any) => ({
+      goals.forEach((g: any) => {
+        if (g.type === 'key_result' || g.parent_id) {
+          keyResults.push(g);
+        } else {
+          objectivesMap.set(g.id, {
+            id: g.id,
+            title: g.title,
+            status: g.status,
+            priority: g.priority || 'P2',
+            progress: g.progress || 0,
+            description: g.description,
+            keyResults: [],
+            projects: []
+          });
+        }
+      });
+
+      // Attach KRs to their Objectives
+      keyResults.forEach(kr => {
+        const obj = objectivesMap.get(kr.parent_id);
+        if (obj) {
+          obj.keyResults.push({
             id: kr.id,
             title: kr.title,
             progress: kr.progress || 0,
-            weight: kr.weight || 0
-          }))
-      }));
-
-      setState({
-        focus: brain.daily_focus,
-        projects: projects.slice(0, 10),
-        okrTrees: okrTrees.slice(0, 10),
-        tasks: {
-          total: brain.task_digest?.stats || {},
-          top: tasks.slice(0, 10)
+            weight: parseFloat(kr.weight) || 0,
+            status: kr.status
+          });
         }
       });
+
+      // Link projects to objectives
+      projectsData.forEach((p: any) => {
+        if (p.goal_id) {
+          const obj = objectivesMap.get(p.goal_id);
+          if (obj) {
+            obj.projects = obj.projects || [];
+            obj.projects.push(p);
+          }
+        }
+      });
+
+      setObjectives(Array.from(objectivesMap.values()));
+      setProjects(projectsData);
+      setTasks(tasksData);
+
+      // Workers from watchdog
+      if (watchdog.success && watchdog.data?.agents) {
+        setWorkers(watchdog.data.agents.map((a: any) => ({
+          id: a.id,
+          name: a.name || `Worker ${a.id.slice(0, 8)}`,
+          status: a.status === 'healthy' ? 'running' : a.status === 'stale' ? 'idle' : 'error',
+          project: a.project,
+          task: a.task,
+          started_at: a.started_at
+        })));
+      }
     } catch (error) {
-      console.error('Failed to fetch state:', error);
+      console.error('Failed to fetch data:', error);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchState();
-  }, [fetchState]);
+  const handleToolCall = useCallback((toolName: string, result: any) => {
+    console.log('[Orchestrator] Tool:', toolName, result);
+    if (result?.action === 'open_detail' && result.type && result.data) {
+      setDetail({ type: result.type, data: result.data });
+    }
+    fetchData();
+  }, [fetchData]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  const handleUserSpeech = useCallback((transcript: string) => {
+    setMessages(prev => [...prev, { id: generateId(), role: 'user', content: transcript, isVoice: true }]);
+  }, []);
 
-  // 发送消息
+  const handleAssistantSpeech = useCallback((transcript: string, isComplete: boolean) => {
+    setMessages(prev => {
+      if (currentStreamingIdRef.current) {
+        const idx = prev.findIndex(m => m.id === currentStreamingIdRef.current);
+        if (idx >= 0) {
+          const updated = [...prev];
+          updated[idx] = { ...updated[idx], content: transcript, isStreaming: !isComplete };
+          if (isComplete) currentStreamingIdRef.current = null;
+          return updated;
+        }
+      }
+      const newId = generateId();
+      currentStreamingIdRef.current = isComplete ? null : newId;
+      return [...prev, { id: newId, role: 'assistant', content: transcript, isVoice: true, isStreaming: !isComplete }];
+    });
+  }, []);
+
+  const realtime = useRealtimeVoice({
+    onUserSpeech: handleUserSpeech,
+    onAssistantSpeech: handleAssistantSpeech,
+    onToolCall: handleToolCall
+  });
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
   const sendMessage = async () => {
     if (!input.trim() || sending) return;
-
     const userMessage = input.trim();
     setInput('');
     setSending(true);
-
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-
+    setMessages(prev => [...prev, { id: generateId(), role: 'user', content: userMessage }]);
     try {
       const res = await fetch('/api/orchestrator/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userMessage,
-          history: messages.slice(-10).map(m => ({
-            role: m.role,
-            content: m.content
-          }))
-        })
+        body: JSON.stringify({ message: userMessage })
       });
-
       const data = await res.json();
-
       if (data.success && data.response) {
-        const response: ChatResponse = data.response;
-
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: response.message,
-          highlights: response.highlights,
-          actions: response.actions
-        }]);
-
-        // 设置高亮
-        if (response.highlights?.length) {
-          setHighlights(new Set(response.highlights));
-          // 展开相关 OKR
-          response.highlights.forEach(h => {
-            if (h.startsWith('okr:')) {
-              setExpandedOKRs(prev => new Set([...prev, h.replace('okr:', '')]));
-            }
-          });
-          // 3秒后清除高亮
-          setTimeout(() => setHighlights(new Set()), 3000);
-        }
+        setMessages(prev => [...prev, { id: generateId(), role: 'assistant', content: data.response.message }]);
       }
-    } catch (error) {
-      console.error('Chat error:', error);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: '抱歉，出现了错误。请重试。'
-      }]);
+    } catch {
+      setMessages(prev => [...prev, { id: generateId(), role: 'assistant', content: '出错了' }]);
     } finally {
       setSending(false);
-    }
-  };
-
-  // 执行动作
-  const executeAction = async (action: { type: string; params: Record<string, unknown> }) => {
-    try {
-      const res = await fetch('/api/orchestrator/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(action)
-      });
-
-      if (res.ok) {
-        fetchState(); // 刷新状态
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: `✅ 已执行: ${action.type}`
-        }]);
-      }
-    } catch (error) {
-      console.error('Action error:', error);
     }
   };
 
@@ -223,304 +289,393 @@ export default function OrchestratorPage() {
     });
   };
 
-  const isHighlighted = (type: string, id: string) => highlights.has(`${type}:${id}`);
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'P0': return 'text-red-500 bg-red-50 dark:bg-red-900/20';
-      case 'P1': return 'text-amber-500 bg-amber-50 dark:bg-amber-900/20';
-      case 'P2': return 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20';
-      default: return 'text-slate-500 bg-slate-50 dark:bg-slate-700/50';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed': return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
-      case 'in_progress': return <Clock className="w-4 h-4 text-amber-500" />;
-      default: return <AlertCircle className="w-4 h-4 text-slate-400" />;
-    }
-  };
-
-  // 渲染消息内容，处理 [[type:id:name]] 引用
-  const renderMessage = (content: string) => {
-    const parts = content.split(/(\[\[[^\]]+\]\])/g);
-    return parts.map((part, i) => {
-      const match = part.match(/\[\[(\w+):([^:]+):([^\]]+)\]\]/);
-      if (match) {
-        const [, type, id, name] = match;
-        return (
-          <button
-            key={i}
-            onClick={() => {
-              setHighlights(new Set([`${type}:${id}`]));
-              if (type === 'okr') setExpandedOKRs(prev => new Set([...prev, id]));
-              setTimeout(() => setHighlights(new Set()), 3000);
-            }}
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded text-sm hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors"
-          >
-            {type === 'okr' && <Target className="w-3 h-3" />}
-            {type === 'task' && <ListTodo className="w-3 h-3" />}
-            {type === 'project' && <FolderKanban className="w-3 h-3" />}
-            {name}
-          </button>
-        );
-      }
-      return <span key={i}>{part}</span>;
+  const toggleProject = (id: string) => {
+    setExpandedProjects(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
   };
 
+  const openDetail = useCallback(async (type: DetailType, data: any) => {
+    try {
+      const res = await fetch('/api/orchestrator/realtime/tool', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool_name: 'open_detail', arguments: { type, id: data.id } })
+      });
+      const result = await res.json();
+      if (result.success && result.result?.data) {
+        setDetail({ type, data: result.result.data });
+      } else {
+        setDetail({ type, data });
+      }
+    } catch {
+      setDetail({ type, data });
+    }
+  }, []);
+
+  const closeDetail = () => setDetail({ type: null, data: null });
+
+  const getPriorityColor = (p: string) => {
+    if (p === 'P0') return 'text-red-500 bg-red-50 dark:bg-red-900/20';
+    if (p === 'P1') return 'text-amber-500 bg-amber-50 dark:bg-amber-900/20';
+    return 'text-slate-500 bg-slate-50 dark:bg-slate-700/50';
+  };
+
+  const getStatusIcon = (s: string) => {
+    if (s === 'completed') return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />;
+    if (s === 'in_progress') return <Clock className="w-3.5 h-3.5 text-amber-500" />;
+    return <AlertCircle className="w-3.5 h-3.5 text-slate-400" />;
+  };
+
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-slate-400" />
-      </div>
-    );
+    return <div className="flex items-center justify-center h-64"><RefreshCw className="w-8 h-8 animate-spin text-slate-400" /></div>;
   }
 
+  const runningWorkers = workers.filter(w => w.status === 'running').length;
+  const totalCapacity = 3; // Max concurrent workers
+
   return (
-    <div className="flex h-[calc(100vh-8rem)] gap-6">
-      {/* 左侧状态面板 */}
-      <div className="w-80 flex-shrink-0 space-y-4 overflow-y-auto">
-        {/* 今日焦点 */}
-        <div className={`bg-white dark:bg-slate-800 rounded-xl p-4 border transition-all ${
-          state?.focus?.objective && isHighlighted('okr', state.focus.objective.id)
-            ? 'border-blue-500 ring-2 ring-blue-500/20'
-            : 'border-slate-200 dark:border-slate-700'
-        }`}>
-          <div className="flex items-center gap-2 mb-3">
-            <Target className="w-5 h-5 text-violet-500" />
-            <h3 className="font-semibold text-slate-900 dark:text-white">今日焦点</h3>
+    <div className="flex flex-col h-[calc(100vh-4rem)] gap-3 p-4">
+      {/* Top: Compact Status Bar */}
+      <div className="flex gap-3 flex-shrink-0 h-14">
+        {/* Worker Seats */}
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-violet-500" />
+            <span className="text-xs text-slate-500">Seats</span>
           </div>
-          {state?.focus?.objective ? (
-            <div>
-              <p className="text-sm font-medium text-slate-900 dark:text-white">
-                {state.focus.objective.title}
-              </p>
-              <div className="mt-2 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-violet-500 to-purple-500 transition-all"
-                  style={{ width: `${state.focus.objective.progress || 0}%` }}
-                />
-              </div>
-              <p className="mt-1 text-xs text-slate-500">{state.focus.objective.progress || 0}%</p>
-            </div>
-          ) : (
-            <p className="text-sm text-slate-400">未设置焦点</p>
-          )}
-        </div>
-
-        {/* Projects */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-          <div className="flex items-center gap-2 mb-3">
-            <FolderKanban className="w-5 h-5 text-blue-500" />
-            <h3 className="font-semibold text-slate-900 dark:text-white">Projects</h3>
-          </div>
-          <div className="space-y-1">
-            {state?.projects.map(project => (
+          <div className="flex gap-1">
+            {[...Array(totalCapacity)].map((_, i) => (
               <div
-                key={project.id}
-                className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-all ${
-                  isHighlighted('project', project.id)
-                    ? 'bg-blue-100 dark:bg-blue-900/30 ring-1 ring-blue-500'
-                    : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                key={i}
+                className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-medium ${
+                  i < runningWorkers
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400'
+                    : 'bg-slate-100 text-slate-400 dark:bg-slate-700'
                 }`}
+                title={workers[i]?.name || `Seat ${i + 1}`}
               >
-                <span className="text-slate-600 dark:text-slate-300">{project.name}</span>
+                {i < runningWorkers ? '●' : '○'}
               </div>
             ))}
+          </div>
+          <span className="text-xs text-slate-600 dark:text-slate-400">{runningWorkers}/{totalCapacity} active</span>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="flex-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <Target className="w-4 h-4 text-emerald-500" />
+            <span className="text-sm font-medium text-slate-900 dark:text-white">{objectives.length}</span>
+            <span className="text-xs text-slate-400">OKRs</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <FolderKanban className="w-4 h-4 text-blue-500" />
+            <span className="text-sm font-medium text-slate-900 dark:text-white">{projects.length}</span>
+            <span className="text-xs text-slate-400">Projects</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-amber-500" />
+            <span className="text-sm font-medium text-slate-900 dark:text-white">{tasks.filter(t => t.status === 'in_progress').length}</span>
+            <span className="text-xs text-slate-400">Active</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <span className="text-sm font-medium text-slate-900 dark:text-white">{tasks.filter(t => t.status === 'completed').length}</span>
+            <span className="text-xs text-slate-400">Done</span>
           </div>
         </div>
 
-        {/* OKR Trees */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-          <div className="flex items-center gap-2 mb-3">
-            <Target className="w-5 h-5 text-emerald-500" />
-            <h3 className="font-semibold text-slate-900 dark:text-white">OKR</h3>
-          </div>
-          <div className="space-y-2">
-            {state?.okrTrees.map(okr => (
-              <div key={okr.id}>
-                <button
-                  onClick={() => toggleOKR(okr.id)}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-all ${
-                    isHighlighted('okr', okr.id)
-                      ? 'bg-emerald-100 dark:bg-emerald-900/30 ring-1 ring-emerald-500'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
-                  }`}
-                >
-                  {expandedOKRs.has(okr.id) ? (
-                    <ChevronDown className="w-4 h-4 text-slate-400" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 text-slate-400" />
-                  )}
-                  <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${getPriorityColor(okr.priority)}`}>
-                    {okr.priority}
-                  </span>
-                  <span className="flex-1 text-left text-slate-700 dark:text-slate-200 truncate">
-                    {okr.title}
-                  </span>
-                  <span className="text-xs text-slate-400">{okr.progress}%</span>
-                </button>
-                {expandedOKRs.has(okr.id) && okr.keyResults.length > 0 && (
-                  <div className="ml-6 mt-1 space-y-1">
-                    {okr.keyResults.map(kr => (
-                      <div
-                        key={kr.id}
-                        className="flex items-center gap-2 px-2 py-1 text-xs text-slate-500 dark:text-slate-400"
-                      >
-                        <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-emerald-500"
-                            style={{ width: `${kr.progress}%` }}
-                          />
-                        </div>
-                        <span className="truncate">{kr.title}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Tasks */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-          <div className="flex items-center gap-2 mb-3">
-            <ListTodo className="w-5 h-5 text-amber-500" />
-            <h3 className="font-semibold text-slate-900 dark:text-white">Tasks</h3>
-            <span className="text-xs text-slate-400">
-              P0: {state?.tasks.total.open_p0 || 0} | P1: {state?.tasks.total.open_p1 || 0}
-            </span>
-          </div>
-          <div className="space-y-1">
-            {state?.tasks.top.map(task => (
-              <div
-                key={task.id}
-                className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-all ${
-                  isHighlighted('task', task.id)
-                    ? 'bg-amber-100 dark:bg-amber-900/30 ring-1 ring-amber-500'
-                    : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
-                }`}
-              >
-                {getStatusIcon(task.status)}
-                <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${getPriorityColor(task.priority)}`}>
-                  {task.priority}
-                </span>
-                <span className="flex-1 text-slate-600 dark:text-slate-300 truncate">
-                  {task.title}
-                </span>
-              </div>
-            ))}
+        {/* VPS Status (placeholder - needs real data) */}
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 flex items-center gap-3">
+          <Server className="w-4 h-4 text-slate-400" />
+          <div className="text-xs">
+            <div className="text-slate-900 dark:text-white font-medium">VPS</div>
+            <div className="text-slate-400">4C/8G</div>
           </div>
         </div>
       </div>
 
-      {/* 右侧聊天界面 */}
-      <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-        {/* 头部 */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-200 dark:border-slate-700">
-          <div className="p-2 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl">
-            <Brain className="w-5 h-5 text-white" />
+      {/* Main Content */}
+      <div className="flex gap-3 flex-1 min-h-0">
+        {/* Left: OKR Tree */}
+        <div className="w-80 flex-shrink-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col">
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-100 dark:border-slate-700">
+            <Target className="w-4 h-4 text-emerald-500" />
+            <span className="font-medium text-sm text-slate-900 dark:text-white">OKR Hierarchy</span>
           </div>
-          <div>
-            <h2 className="font-semibold text-slate-900 dark:text-white">Orchestrator</h2>
-            <p className="text-xs text-slate-500">对话式任务拆解</p>
-          </div>
-          <button
-            onClick={fetchState}
-            className="ml-auto p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-          >
-            <RefreshCw className="w-4 h-4 text-slate-400" />
-          </button>
-        </div>
-
-        {/* 消息列表 */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {messages.length === 0 && (
-            <div className="text-center py-12">
-              <Sparkles className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-              <p className="text-slate-500 dark:text-slate-400">
-                告诉我你想做什么，我来帮你拆解任务
-              </p>
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
-                {['查看 Brain MVP 进度', '帮我规划今天的工作', '有哪些 P0 任务？'].map(q => (
-                  <button
-                    key={q}
-                    onClick={() => setInput(q)}
-                    className="px-3 py-1.5 text-sm bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[80%] px-4 py-3 rounded-2xl ${
-                  msg.role === 'user'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white'
-                }`}
-              >
-                <div className="text-sm whitespace-pre-wrap">
-                  {msg.role === 'assistant' ? renderMessage(msg.content) : msg.content}
+          <div className="flex-1 overflow-y-auto p-2">
+            {objectives.map(obj => (
+              <div key={obj.id} className="mb-1">
+                {/* Objective */}
+                <div
+                  onClick={() => toggleOKR(obj.id)}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer"
+                >
+                  {expandedOKRs.has(obj.id) ?
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> :
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                  }
+                  <Target className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="text-sm text-slate-900 dark:text-white flex-1 truncate">{obj.title}</span>
+                  <span className={`px-1.5 py-0.5 text-[10px] rounded ${getPriorityColor(obj.priority)}`}>{obj.priority}</span>
                 </div>
-                {msg.actions && msg.actions.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {msg.actions.map((action, j) => (
-                      <button
-                        key={j}
-                        onClick={() => executeAction(action)}
-                        className="px-3 py-1.5 text-xs bg-white dark:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-500 transition-colors shadow-sm"
+
+                {/* Key Results */}
+                {expandedOKRs.has(obj.id) && (
+                  <div className="ml-5 border-l border-slate-200 dark:border-slate-700 pl-2">
+                    {obj.keyResults.map(kr => (
+                      <div
+                        key={kr.id}
+                        onClick={() => openDetail('okr', kr)}
+                        className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer rounded"
                       >
-                        {action.label}
-                      </button>
+                        {getStatusIcon(kr.status)}
+                        <span className="text-xs text-slate-700 dark:text-slate-300 flex-1 truncate">{kr.title}</span>
+                        <div className="flex items-center gap-1">
+                          <div className="w-10 h-1 bg-slate-100 dark:bg-slate-600 rounded-full">
+                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${kr.progress}%` }} />
+                          </div>
+                          <span className="text-[10px] text-slate-400 w-7">{kr.progress}%</span>
+                        </div>
+                      </div>
                     ))}
+
+                    {/* Linked Projects under OKR */}
+                    {obj.projects && obj.projects.length > 0 && (
+                      <div className="mt-1 pt-1 border-t border-slate-100 dark:border-slate-700/50">
+                        {obj.projects.map(p => (
+                          <div
+                            key={p.id}
+                            onClick={() => openDetail('project', p)}
+                            className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer rounded"
+                          >
+                            <FolderKanban className="w-3 h-3 text-blue-500" />
+                            <span className="text-xs text-slate-600 dark:text-slate-400 truncate">{p.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            </div>
-          ))}
-          {sending && (
-            <div className="flex justify-start">
-              <div className="px-4 py-3 bg-slate-100 dark:bg-slate-700 rounded-2xl">
-                <div className="flex items-center gap-2 text-sm text-slate-500">
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  思考中...
-                </div>
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* 输入框 */}
-        <div className="px-5 py-4 border-t border-slate-200 dark:border-slate-700">
-          <div className="flex items-center gap-3">
-            <input
-              type="text"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-              placeholder="输入你的需求..."
-              className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-700 border-0 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              onClick={sendMessage}
-              disabled={!input.trim() || sending}
-              className="p-2.5 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-300 dark:disabled:bg-slate-600 text-white rounded-xl transition-colors"
-            >
-              <Send className="w-5 h-5" />
-            </button>
+            ))}
           </div>
         </div>
+
+        {/* Middle: Projects & Tasks */}
+        <div className="flex-1 flex flex-col gap-3 min-w-0">
+          {/* Projects */}
+          <div className="flex-1 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col min-h-0">
+            <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-100 dark:border-slate-700">
+              <FolderKanban className="w-4 h-4 text-blue-500" />
+              <span className="font-medium text-sm text-slate-900 dark:text-white">Projects</span>
+              <span className="text-xs text-slate-400 ml-auto">{projects.length}</span>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2">
+              {projects.map(p => {
+                const projectTasks = tasks.filter(t => t.project_id === p.id);
+                return (
+                  <div key={p.id} className="mb-1">
+                    <div
+                      onClick={() => projectTasks.length > 0 ? toggleProject(p.id) : openDetail('project', p)}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer"
+                    >
+                      {projectTasks.length > 0 ? (
+                        expandedProjects.has(p.id) ?
+                          <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> :
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                      ) : <span className="w-3.5" />}
+                      <FolderKanban className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="text-sm text-slate-900 dark:text-white flex-1 truncate">{p.name}</span>
+                      {projectTasks.length > 0 && (
+                        <span className="text-[10px] text-slate-400">{projectTasks.length} tasks</span>
+                      )}
+                    </div>
+
+                    {expandedProjects.has(p.id) && projectTasks.length > 0 && (
+                      <div className="ml-5 border-l border-slate-200 dark:border-slate-700 pl-2">
+                        {projectTasks.map(t => (
+                          <div
+                            key={t.id}
+                            onClick={() => openDetail('task', t)}
+                            className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer rounded"
+                          >
+                            {getStatusIcon(t.status)}
+                            <span className={`px-1 py-0.5 text-[10px] rounded ${getPriorityColor(t.priority)}`}>{t.priority}</span>
+                            <span className="text-xs text-slate-700 dark:text-slate-300 truncate">{t.title}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Active Tasks */}
+          <div className="h-40 flex-shrink-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col">
+            <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-100 dark:border-slate-700">
+              <ListTodo className="w-4 h-4 text-amber-500" />
+              <span className="font-medium text-sm text-slate-900 dark:text-white">Active Tasks</span>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2">
+              {tasks.filter(t => t.status === 'in_progress' || t.status === 'queued').slice(0, 10).map(t => (
+                <div
+                  key={t.id}
+                  onClick={() => openDetail('task', t)}
+                  className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer rounded"
+                >
+                  {getStatusIcon(t.status)}
+                  <span className={`px-1 py-0.5 text-[10px] rounded ${getPriorityColor(t.priority)}`}>{t.priority}</span>
+                  <span className="text-xs text-slate-900 dark:text-white truncate flex-1">{t.title}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Detail Panel */}
+        {detail.type && (
+          <div className="w-80 flex-shrink-0 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+              {detail.type === 'okr' && <Target className="w-5 h-5 text-emerald-500" />}
+              {detail.type === 'project' && <FolderKanban className="w-5 h-5 text-blue-500" />}
+              {detail.type === 'task' && <ListTodo className="w-5 h-5 text-amber-500" />}
+              <span className="font-semibold text-slate-900 dark:text-white flex-1 truncate">
+                {detail.data?.title || detail.data?.name}
+              </span>
+              <button onClick={closeDetail} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded">
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {detail.data.status && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 w-16">Status</span>
+                  <span className={`px-2 py-0.5 text-xs rounded-full ${
+                    detail.data.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                    detail.data.status === 'in_progress' ? 'bg-amber-100 text-amber-700' :
+                    'bg-slate-100 text-slate-600'
+                  }`}>{detail.data.status}</span>
+                </div>
+              )}
+              {detail.data.priority && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 w-16">Priority</span>
+                  <span className={`px-2 py-0.5 text-xs rounded ${getPriorityColor(detail.data.priority)}`}>{detail.data.priority}</span>
+                </div>
+              )}
+              {detail.data.progress !== undefined && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 w-16">Progress</span>
+                  <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-700 rounded-full">
+                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${detail.data.progress}%` }} />
+                  </div>
+                  <span className="text-xs text-slate-600">{detail.data.progress}%</span>
+                </div>
+              )}
+              {detail.data.description && (
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+                  <span className="text-xs text-slate-500">Description</span>
+                  <p className="text-sm text-slate-700 dark:text-slate-300 mt-1">{detail.data.description}</p>
+                </div>
+              )}
+              {detail.data.content && detail.data.content.length > 0 && (
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+                  <span className="text-xs text-slate-500">Content</span>
+                  <BlockRenderer blocks={detail.data.content} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Chat Panel */}
+        {chatOpen ? (
+          <div className="w-56 flex-shrink-0 flex flex-col bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 dark:border-slate-700 flex-shrink-0">
+              <div className="p-1 bg-gradient-to-br from-violet-500 to-purple-600 rounded">
+                <Brain className="w-3 h-3 text-white" />
+              </div>
+              <span className="font-medium text-sm text-slate-900 dark:text-white">Cecelia</span>
+              {realtime.isConnected && (
+                <span className="flex items-center gap-1 text-xs text-emerald-500">
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                  {realtime.isRecording && <Mic className="w-3 h-3" />}
+                  {realtime.isPlaying && <Volume2 className="w-3 h-3" />}
+                </span>
+              )}
+              <button onClick={() => setChatOpen(false)} className="ml-auto p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded">
+                <Minimize2 className="w-3 h-3 text-slate-400" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-0">
+              {messages.length === 0 && (
+                <div className="text-center py-6">
+                  <Sparkles className="w-5 h-5 mx-auto text-slate-300 dark:text-slate-600 mb-1" />
+                  <p className="text-[10px] text-slate-400">Say something</p>
+                </div>
+              )}
+              {messages.map(msg => (
+                <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[90%] px-2 py-1 rounded-lg text-xs ${
+                    msg.role === 'user' ? 'bg-blue-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white'
+                  } ${msg.isStreaming ? 'animate-pulse' : ''}`}>
+                    {msg.isVoice && <span className="mr-1">{msg.role === 'user' ? '🎤' : '🔊'}</span>}
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+              {sending && (
+                <div className="flex justify-start">
+                  <div className="px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                    <RefreshCw className="w-3 h-3 animate-spin text-slate-400" />
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+            <div className="p-2 border-t border-slate-100 dark:border-slate-700 flex-shrink-0">
+              {realtime.error && <p className="text-[10px] text-red-500 mb-1 truncate">{realtime.error}</p>}
+              <div className="flex gap-1">
+                <button
+                  onClick={realtime.isConnected ? realtime.disconnect : realtime.connect}
+                  className={`p-1.5 rounded ${realtime.isConnected ? 'bg-red-500' : 'bg-emerald-500'} text-white`}
+                >
+                  {realtime.isConnected ? <PhoneOff className="w-3 h-3" /> : <Phone className="w-3 h-3" />}
+                </button>
+                <input
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && sendMessage()}
+                  placeholder="Type..."
+                  disabled={realtime.isConnected}
+                  className="flex-1 px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-xs disabled:opacity-50"
+                />
+                <button
+                  onClick={sendMessage}
+                  disabled={!input.trim() || sending || realtime.isConnected}
+                  className="p-1.5 bg-blue-500 disabled:bg-slate-300 text-white rounded"
+                >
+                  <Send className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setChatOpen(true)}
+            className="fixed bottom-6 right-6 p-3 bg-violet-500 text-white rounded-full shadow-lg z-50"
+          >
+            <MessageCircle className="w-5 h-5" />
+            {realtime.isConnected && <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full animate-pulse" />}
+          </button>
+        )}
       </div>
     </div>
   );
