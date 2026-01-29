@@ -1,8 +1,8 @@
 # Audit Report
 
-Branch: cp-01290002-okr-hierarchy
+Branch: cp-okr-hierarchy
 Date: 2026-01-29
-Scope: apps/core/src/task-system/goals.js, apps/core/src/task-system/db.js, apps/core/src/dashboard/server.ts
+Scope: apps/core/src/okr/routes.js, apps/core/src/okr/routes.d.ts, apps/core/src/okr/__tests__/trees.test.js, apps/core/src/dashboard/server.ts, apps/core/package.json
 Target Level: L2
 
 ## Summary
@@ -11,7 +11,7 @@ Target Level: L2
 |-------|-------|
 | L1 (Blocking) | 0 |
 | L2 (Functional) | 0 |
-| L3 (Best Practice) | 1 |
+| L3 (Best Practice) | 2 |
 | L4 (Over-optimization) | 0 |
 
 ## Decision: PASS
@@ -22,10 +22,18 @@ Target Level: L2
 
 - **id**: A3-001
   - **layer**: L3
-  - **file**: apps/core/src/task-system/goals.js
-  - **line**: 177-190
-  - **issue**: DELETE endpoint does not warn about cascade deletion of child Key Results
-  - **fix**: Consider adding a confirmation or returning information about deleted children
+  - **file**: apps/core/src/okr/routes.js
+  - **line**: multiple
+  - **issue**: 可以考虑添加输入验证中间件（如 express-validator）
+  - **fix**: 可选优化，当前手动验证已满足需求
+  - **status**: optional (not blocking)
+
+- **id**: A3-002
+  - **layer**: L3
+  - **file**: apps/core/src/okr/routes.js
+  - **line**: 79, 142, 334
+  - **issue**: 事务处理逻辑重复，可抽取为通用函数
+  - **fix**: 可选优化，当前可读性良好
   - **status**: optional (not blocking)
 
 ## Blockers
@@ -35,27 +43,31 @@ None - L1 and L2 issues are cleared.
 ## Audit Details
 
 ### Round 1: L1 阻塞性问题检查
-- ✅ goals.js: 无语法错误，所有导入正确
-- ✅ 数据库迁移 SQL 有效，添加 parent_id/type/weight 字段
+- ✅ routes.js: 无语法错误，所有导入正确
+- ✅ 数据库连接复用 task-system/db.js
 - ✅ API 路由结构完整，CRUD 操作正常
 
 ### Round 2: L2 功能性问题检查
-- ✅ POST /goals: Objective/KR 类型验证正确
-- ✅ PATCH /goals: 进度更新触发父级重算逻辑正确
-- ✅ GET /goals/:id/children: 父级验证和子级查询正确
-- ✅ recalculateParentProgress: 加权平均算法正确
+- ✅ POST /trees: title 必填验证正确
+- ✅ PUT /trees: 支持添加/更新/删除 KR，进度自动重算
+- ✅ DELETE /trees: 正确级联删除 KR
 - ✅ 所有端点有 try-catch 错误处理
+- ✅ 事务管理正确（BEGIN/COMMIT/ROLLBACK）
+- ✅ client.release() 在 finally 中确保资源释放
 - ✅ 参数化查询，无 SQL 注入风险
 
 ### Code Quality Notes
 
-1. **Input Validation**: Proper validation for Objective/KR type constraints
+1. **Transaction Safety**: All write operations use transactions with proper rollback
 2. **Error Handling**: All endpoints have try-catch with meaningful error messages
-3. **Business Logic**: Weighted progress calculation is correctly implemented
+3. **Business Logic**: Weighted progress calculation correctly recalculated on update
 4. **Database Safety**: Uses parameterized queries (SQL injection protected)
 5. **API Design**: RESTful conventions followed, proper HTTP status codes
+6. **TypeScript**: Type declarations provided for route module
 
 ### Test Coverage
 
-- 9 tests passing
-- Covers: schema validation, CRUD operations, hierarchy queries, progress calculation
+- 12 tests passing for OKR Tree API
+- Covers: list trees, get tree, create tree, update tree, delete tree
+- Transaction rollback tested
+- Progress recalculation tested
