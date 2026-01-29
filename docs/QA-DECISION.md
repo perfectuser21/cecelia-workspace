@@ -1,24 +1,27 @@
 # QA Decision
 
-Decision: NO_RCI
-Priority: P2
-RepoType: Business
+## Feature: Cecelia 前端连接 Orchestrator
 
-## Tests
+## Decision: Manual Testing Only
 
-| DoD Item | Method | Location |
-|----------|--------|----------|
-| /okr 页面可访问 | manual | 浏览器访问 /okr 路由验证页面加载 |
-| 显示所有 OKR 树 | manual | 验证 OKR 树组件显示正确数据 |
-| 显示今日焦点 | manual | 验证 FocusPanel 组件显示焦点数据 |
-| 进度条正确显示 | manual | 验证进度条百分比与数据一致 |
-| 响应式布局 | manual | 验证移动端和桌面端布局正确 |
+### Rationale
+- 这是前端 UI + WebSocket 集成
+- 涉及浏览器 API（MediaRecorder, AudioContext）
+- 需要真实 OpenAI Realtime API 连接
+- 自动化测试成本高，收益低
 
-## RCI
+### Test Strategy
+1. **构建验证**: `npm run build` 通过
+2. **手动测试**:
+   - 访问 /orchestrator 页面
+   - 点击麦克风按钮
+   - 验证 WebSocket 连接
+   - 语音对话测试
+   - 触发 run_orchestrator tool
 
-- new: []
-- update: []
-
-## Reason
-
-OKR Dashboard 是纯前端展示页面，不涉及核心业务流程，无需纳入回归契约。手动验证 UI 显示即可。
+### Acceptance Criteria
+- [ ] TypeScript 编译通过
+- [ ] 页面正常加载
+- [ ] WebSocket 连接成功
+- [ ] 语音输入/输出正常
+- [ ] Tool 调用正常

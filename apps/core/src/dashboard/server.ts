@@ -6,6 +6,7 @@
 
 import 'dotenv/config';
 import express from 'express';
+import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { createProxyMiddleware } from 'http-proxy-middleware';
@@ -66,11 +67,13 @@ app.use('/api/quality', createProxyMiddleware({
 // Proxy all /api/orchestrator/* to cecelia-brain API
 // All orchestrator routes (chat, voice, state, health) are now in Brain
 // Note: Express strips mount path, so /api/orchestrator/chat becomes /chat
-app.use('/api/orchestrator', createProxyMiddleware({
+const orchestratorProxy = createProxyMiddleware({
   target: BRAIN_API,
   changeOrigin: true,
-  pathRewrite: (path) => `/orchestrator${path}`  // /chat → /orchestrator/chat
-}));
+  pathRewrite: (path) => `/orchestrator${path}`,  // /chat → /orchestrator/chat
+  ws: true,  // Enable WebSocket proxying for realtime voice
+});
+app.use('/api/orchestrator', orchestratorProxy);
 
 // Proxy /api/v1/* to autopilot backend
 app.use('/api/v1', createProxyMiddleware({
@@ -169,8 +172,21 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   });
 });
 
-// Start server
-app.listen(PORT, () => {
+// Start server with WebSocket support
+const server = createServer(app);
+
+// Handle WebSocket upgrade for orchestrator realtime
+server.on('upgrade', (req, socket, head) => {
+  if (req.url?.startsWith('/api/orchestrator/realtime/ws')) {
+    // Strip /api prefix only - pathRewrite adds /orchestrator
+    // /api/orchestrator/realtime/ws -> /realtime/ws -> /orchestrator/realtime/ws (via pathRewrite)
+    req.url = '/realtime/ws';
+    console.log('[WebSocket Upgrade] Proxying, input URL rewritten to:', req.url);
+    orchestratorProxy.upgrade(req, socket as any, head);
+  }
+});
+
+server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 
   // Start watchdog monitor automatically
