@@ -64,9 +64,20 @@ app.use('/api/quality', createProxyMiddleware({
   pathRewrite: (path) => `/api${path}`  // /state → /api/state
 }));
 
-// Proxy /api/orchestrator to cecelia-brain orchestrator API
-// /api/orchestrator/health → /orchestrator/health
-app.use('/api/orchestrator', createProxyMiddleware({
+// Proxy specific orchestrator paths to cecelia-brain API
+// /api/orchestrator/health → /orchestrator/health (proxy)
+// /api/orchestrator/chat → local orchestratorRoutes (not proxied)
+app.use('/api/orchestrator/health', createProxyMiddleware({
+  target: BRAIN_API,
+  changeOrigin: true,
+  pathRewrite: { '^/api/orchestrator': '/orchestrator' }
+}));
+app.use('/api/orchestrator/state', createProxyMiddleware({
+  target: BRAIN_API,
+  changeOrigin: true,
+  pathRewrite: { '^/api/orchestrator': '/orchestrator' }
+}));
+app.use('/api/orchestrator/query', createProxyMiddleware({
   target: BRAIN_API,
   changeOrigin: true,
   pathRewrite: { '^/api/orchestrator': '/orchestrator' }
