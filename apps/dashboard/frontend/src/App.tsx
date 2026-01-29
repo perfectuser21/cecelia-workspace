@@ -38,7 +38,7 @@ function convertCoreNavGroups(
 
 function AppContent() {
   const location = useLocation();
-  const { user, logout, isAuthenticated, isSuperAdmin } = useAuth();
+  const { user, logout, isAuthenticated, isSuperAdmin, authLoading } = useAuth();
   const { theme, setTheme } = useTheme();
   const { config, loading: instanceLoading, isFeatureEnabled, isCore, coreConfig } = useInstance();
   const [collapsed, setCollapsed] = useState(false);
@@ -79,13 +79,8 @@ function AppContent() {
     route => location.pathname === route.path && route.requireAuth === false
   );
 
-  // 如果未登录且不在登录页，且当前路由需要认证，显示登录页
-  if (!isAuthenticated && !location.pathname.startsWith('/login') && !currentRouteAllowsUnauthenticated) {
-    return <FeishuLogin />;
-  }
-
-  // 配置加载中时显示加载状态
-  if (instanceLoading) {
+  // 配置或认证加载中时显示加载状态
+  if (instanceLoading || authLoading) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${
         isCore
@@ -98,6 +93,11 @@ function AppContent() {
         </div>
       </div>
     );
+  }
+
+  // 如果未登录且不在登录页，且当前路由需要认证，显示登录页
+  if (!isAuthenticated && !location.pathname.startsWith('/login') && !currentRouteAllowsUnauthenticated) {
+    return <FeishuLogin />;
   }
 
   return (

@@ -41,6 +41,7 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   isSuperAdmin: boolean;
+  authLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,6 +49,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   // 初始化时从 cookie 读取用户信息（跨子域名共享）
   useEffect(() => {
@@ -87,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     }
+    setAuthLoading(false);
   }, []);
 
   const login = (newUser: User, newToken: string) => {
@@ -124,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     isAuthenticated: !!user && !!token,
     isSuperAdmin,
+    authLoading,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
