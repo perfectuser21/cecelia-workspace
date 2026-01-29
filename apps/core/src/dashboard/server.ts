@@ -21,7 +21,6 @@ import taskSystemRoutes from '../task-system/routes.js';
 import brainRoutes from '../brain/routes.js';
 import okrRoutes from '../okr/routes.js';
 import watchdogRoutes from '../watchdog/routes.js';
-import orchestratorRoutes from '../orchestrator/routes.js';
 import { startMonitor as startWatchdogMonitor } from '../watchdog/service.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -64,20 +63,9 @@ app.use('/api/quality', createProxyMiddleware({
   pathRewrite: (path) => `/api${path}`  // /state → /api/state
 }));
 
-// Proxy specific orchestrator paths to cecelia-brain API
-// /api/orchestrator/health → /orchestrator/health (proxy)
-// /api/orchestrator/chat → local orchestratorRoutes (not proxied)
-app.use('/api/orchestrator/health', createProxyMiddleware({
-  target: BRAIN_API,
-  changeOrigin: true,
-  pathRewrite: { '^/api/orchestrator': '/orchestrator' }
-}));
-app.use('/api/orchestrator/state', createProxyMiddleware({
-  target: BRAIN_API,
-  changeOrigin: true,
-  pathRewrite: { '^/api/orchestrator': '/orchestrator' }
-}));
-app.use('/api/orchestrator/query', createProxyMiddleware({
+// Proxy all /api/orchestrator/* to cecelia-brain API
+// All orchestrator routes (chat, voice, state, health) are now in Brain
+app.use('/api/orchestrator', createProxyMiddleware({
   target: BRAIN_API,
   changeOrigin: true,
   pathRewrite: { '^/api/orchestrator': '/orchestrator' }
@@ -159,9 +147,6 @@ app.use('/api/okr', okrRoutes);
 
 // Watchdog API routes (agent activity monitoring)
 app.use('/api/watchdog', watchdogRoutes);
-
-// Orchestrator API routes (chat + actions)
-app.use('/api/orchestrator', orchestratorRoutes);
 
 // Static frontend files (single frontend, theme switches by hostname in JS)
 // Compiled server is at apps/core/dist/dashboard/server.js

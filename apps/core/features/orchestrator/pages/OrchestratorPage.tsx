@@ -11,7 +11,10 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Mic,
+  MicOff,
+  Volume2
 } from 'lucide-react';
 
 interface Project {
@@ -74,6 +77,14 @@ export default function OrchestratorPage() {
   const [expandedOKRs, setExpandedOKRs] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Voice state
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   // 获取系统状态
   const fetchState = useCallback(async () => {
     try {
@@ -133,6 +144,140 @@ export default function OrchestratorPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // 开始录音
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        await processAudio(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+    }
+  };
+
+  // 停止录音
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  // 处理录音 → STT → Chat → TTS
+  const processAudio = async (audioBlob: Blob) => {
+    setSending(true);
+    try {
+      // Convert to base64
+      const reader = new FileReader();
+      const base64Audio = await new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const base64 = (reader.result as string).split(',')[1];
+          resolve(base64);
+        };
+        reader.readAsDataURL(audioBlob);
+      });
+
+      // STT: Audio → Text
+      const sttRes = await fetch('/api/orchestrator/voice/stt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audio: base64Audio })
+      });
+      const sttData = await sttRes.json();
+
+      if (!sttData.success || !sttData.text) {
+        throw new Error('STT failed');
+      }
+
+      const userMessage = sttData.text;
+      setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+
+      // Chat: Get response
+      const chatRes = await fetch('/api/orchestrator/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMessage })
+      });
+      const chatData = await chatRes.json();
+
+      if (chatData.success && chatData.response) {
+        const response: ChatResponse = chatData.response;
+
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: response.message,
+          highlights: response.highlights,
+          actions: response.actions
+        }]);
+
+        // Handle highlights
+        if (response.highlights?.length) {
+          setHighlights(new Set(response.highlights));
+          response.highlights.forEach(h => {
+            if (h.startsWith('okr:')) {
+              setExpandedOKRs(prev => new Set([...prev, h.replace('okr:', '')]));
+            }
+          });
+          setTimeout(() => setHighlights(new Set()), 3000);
+        }
+
+        // TTS: Text → Audio (if voice enabled)
+        if (voiceEnabled) {
+          await playTTS(response.message);
+        }
+      }
+    } catch (error) {
+      console.error('Voice processing error:', error);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '语音处理失败，请重试。'
+      }]);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // 播放 TTS
+  const playTTS = async (text: string) => {
+    try {
+      setIsPlaying(true);
+      const ttsRes = await fetch('/api/orchestrator/voice/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      const ttsData = await ttsRes.json();
+
+      if (ttsData.success && ttsData.audio) {
+        const audioSrc = `data:audio/mp3;base64,${ttsData.audio}`;
+        const audio = new Audio(audioSrc);
+        audioRef.current = audio;
+        audio.onended = () => setIsPlaying(false);
+        await audio.play();
+      }
+    } catch (error) {
+      console.error('TTS error:', error);
+    } finally {
+      setIsPlaying(false);
+    }
+  };
 
   // 发送消息
   const sendMessage = async () => {
@@ -504,22 +649,66 @@ export default function OrchestratorPage() {
         {/* 输入框 */}
         <div className="px-5 py-4 border-t border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-3">
+            {/* 语音开关 */}
+            <button
+              onClick={() => setVoiceEnabled(!voiceEnabled)}
+              className={`p-2.5 rounded-xl transition-colors ${
+                voiceEnabled
+                  ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
+              }`}
+              title={voiceEnabled ? '语音回复已开启' : '语音回复已关闭'}
+            >
+              <Volume2 className="w-5 h-5" />
+            </button>
+
+            {/* 麦克风按钮 */}
+            <button
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={sending}
+              className={`p-2.5 rounded-xl transition-colors ${
+                isRecording
+                  ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse'
+                  : 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300'
+              } disabled:opacity-50`}
+              title={isRecording ? '点击停止录音' : '点击开始语音输入'}
+            >
+              {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            </button>
+
             <input
               type="text"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-              placeholder="输入你的需求..."
-              className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-700 border-0 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder={isRecording ? '正在录音...' : '输入你的需求...'}
+              disabled={isRecording}
+              className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-700 border-0 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             />
             <button
               onClick={sendMessage}
-              disabled={!input.trim() || sending}
+              disabled={!input.trim() || sending || isRecording}
               className="p-2.5 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-300 dark:disabled:bg-slate-600 text-white rounded-xl transition-colors"
             >
               <Send className="w-5 h-5" />
             </button>
           </div>
+
+          {/* 录音状态指示 */}
+          {isRecording && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-red-500">
+              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              正在录音，点击麦克风按钮停止...
+            </div>
+          )}
+
+          {/* 播放状态指示 */}
+          {isPlaying && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-violet-500">
+              <Volume2 className="w-4 h-4 animate-pulse" />
+              正在播放语音...
+            </div>
+          )}
         </div>
       </div>
     </div>
