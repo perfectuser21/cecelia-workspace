@@ -1,15 +1,18 @@
 /**
  * Orchestrator Chat API
  * 对话式任务拆解和系统交互
+ * 使用 claude -p 无头模式调用
  */
 
 import { Router, Request, Response } from 'express';
-import Anthropic from '@anthropic-ai/sdk';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { writeFileSync, unlinkSync, mkdtempSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
+const execAsync = promisify(exec);
 const router = Router();
-
-// Claude client
-const anthropic = new Anthropic();
 
 // 系统提示词
 const SYSTEM_PROMPT = `你是 Orchestrator，一个智能任务管理助手。你可以：
@@ -27,8 +30,8 @@ const SYSTEM_PROMPT = `你是 Orchestrator，一个智能任务管理助手。�
 回复 JSON 格式：
 {
   "message": "你的回复文本，可以包含 [[okr:id:name]] 引用",
-  "highlights": ["okr:abc123", "task:def456"],  // 要高亮的对象
-  "actions": [  // 可选，建议的操作
+  "highlights": ["okr:abc123", "task:def456"],
+  "actions": [
     {
       "type": "create-task",
       "label": "创建任务: 设计登录 API",
@@ -42,8 +45,11 @@ const SYSTEM_PROMPT = `你是 Orchestrator，一个智能任务管理助手。�
  * 发送消息给 Orchestrator
  */
 router.post('/chat', async (req: Request, res: Response) => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'orchestrator-'));
+  const promptFile = join(tempDir, 'prompt.txt');
+
   try {
-    const { message, history = [] } = req.body;
+    const { message } = req.body;
 
     if (!message) {
       return res.status(400).json({ error: 'message is required' });
@@ -52,36 +58,39 @@ router.post('/chat', async (req: Request, res: Response) => {
     // 获取系统状态
     const systemState = await getSystemState();
 
-    // 构建消息
-    const messages = [
-      ...history.map((h: any) => ({
-        role: h.role as 'user' | 'assistant',
-        content: h.content as string
-      })),
-      {
-        role: 'user',
-        content: `当前系统状态：
+    // 构建完整 prompt
+    const fullPrompt = `${SYSTEM_PROMPT}
+
+当前系统状态：
 ${JSON.stringify(systemState, null, 2)}
 
-用户消息：${message}`
-      }
-    ];
+用户消息：${message}
 
-    // 调用 Claude
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2048,
-      system: SYSTEM_PROMPT,
-      messages
-    });
+请用 JSON 格式回复。`;
+
+    // 调用 claude -p (使用临时文件避免 shell 转义问题)
+    const claudePath = process.env.CLAUDE_CLI_PATH || '/home/xx/.local/bin/claude';
+    writeFileSync(promptFile, fullPrompt);
+    const { stdout } = await execAsync(
+      `cat "${promptFile}" | ${claudePath} -p - --output-format text`,
+      {
+        timeout: 90000,
+        maxBuffer: 1024 * 1024
+      }
+    );
 
     // 解析回复
-    const firstBlock = response.content[0];
-    const content = firstBlock.type === 'text' ? firstBlock.text : '';
+    const content = stdout.trim();
     let parsed;
 
     try {
-      parsed = JSON.parse(content);
+      // 尝试提取 JSON
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('No JSON found');
+      }
     } catch {
       // 如果不是 JSON，包装成标准格式
       parsed = {
@@ -101,6 +110,11 @@ ${JSON.stringify(systemState, null, 2)}
       error: 'Chat failed',
       details: error?.message || 'Unknown error'
     });
+  } finally {
+    // 清理临时文件
+    try {
+      unlinkSync(promptFile);
+    } catch { /* ignore */ }
   }
 });
 
