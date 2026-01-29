@@ -39,6 +39,9 @@ const N8N_BACKEND = process.env.N8N_BACKEND || 'http://localhost:5678';
 // Cecelia Quality API (quality monitoring)
 const QUALITY_API = process.env.QUALITY_API || 'http://localhost:5220';
 
+// Cecelia Brain API (semantic brain + orchestrator)
+const BRAIN_API = process.env.BRAIN_API || 'http://localhost:5220';
+
 // CORS
 app.use((_req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -58,6 +61,14 @@ app.use('/api/quality', createProxyMiddleware({
   target: QUALITY_API,
   changeOrigin: true,
   pathRewrite: (path) => `/api${path}`  // /state → /api/state
+}));
+
+// Proxy /api/orchestrator to cecelia-brain orchestrator API
+// /api/orchestrator/health → /orchestrator/health
+app.use('/api/orchestrator', createProxyMiddleware({
+  target: BRAIN_API,
+  changeOrigin: true,
+  pathRewrite: { '^/api/orchestrator': '/orchestrator' }
 }));
 
 // Proxy /api/v1/* to autopilot backend
