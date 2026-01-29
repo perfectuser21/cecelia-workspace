@@ -96,3 +96,25 @@
 2. 删除不再使用的组件（如 AiEmployeeCard）保持代码整洁
 
 **影响程度**: Low
+
+---
+
+### [2026-01-29] Brain Action Loop - Tick 机制
+
+**任务**: 实现定时自动推进机制，让 Brain 每隔 30 分钟自动检查状态并执行动作
+
+**Bug**: 分支命名不符合 Hook 规范 (`F-BRAIN-*` 不在 `cp-*` 或 `feature/*` 中)，需要重新创建分支为 `cp-brain-action-loop`
+
+**技术要点**:
+1. Tick 机制依赖 Daily Focus - 只处理与今日焦点相关的任务
+2. 决策逻辑：无 in_progress 任务时，自动开始下一个 queued 任务
+3. Stale 检测：in_progress 超过 24 小时的任务被标记为 stale
+4. 使用 working_memory 存储 tick 状态（enabled、last_tick、actions_today）
+5. 所有 tick 动作自动记录到 decision_log 表
+
+**优化点**:
+1. 分支命名规范需要更清晰文档化（cp-* 或 feature/*）
+2. Tick 模块复用了 focus.js 的 getDailyFocus() 和 actions.js 的 updateTask()，代码复用良好
+3. 测试覆盖了 15 个场景，包括状态管理、任务推进、stale 检测、focus 集成
+
+**影响程度**: Low - 功能增强，无破坏性变更
