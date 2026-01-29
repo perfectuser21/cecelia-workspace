@@ -65,10 +65,11 @@ app.use('/api/quality', createProxyMiddleware({
 
 // Proxy all /api/orchestrator/* to cecelia-brain API
 // All orchestrator routes (chat, voice, state, health) are now in Brain
+// Note: Express strips mount path, so /api/orchestrator/chat becomes /chat
 app.use('/api/orchestrator', createProxyMiddleware({
   target: BRAIN_API,
   changeOrigin: true,
-  pathRewrite: { '^/api/orchestrator': '/orchestrator' }
+  pathRewrite: (path) => `/orchestrator${path}`  // /chat → /orchestrator/chat
 }));
 
 // Proxy /api/v1/* to autopilot backend
