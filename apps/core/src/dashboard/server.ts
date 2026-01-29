@@ -19,6 +19,7 @@ import devgateRoutes from '../devgate/routes.js';
 import mediaRoutes from '../media/routes.js';
 import taskSystemRoutes from '../task-system/routes.js';
 import brainRoutes from '../brain/routes.js';
+import okrRoutes from '../okr/routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -127,6 +128,9 @@ app.use('/api/tasks', taskSystemRoutes);
 
 // Brain API routes (decision pack, actions, memory)
 app.use('/api/brain', brainRoutes);
+
+// OKR Tree API routes (tree-based OKR management)
+app.use('/api/okr', okrRoutes);
 
 // Static frontend files (single frontend, theme switches by hostname in JS)
 // Compiled server is at apps/core/dist/dashboard/server.js

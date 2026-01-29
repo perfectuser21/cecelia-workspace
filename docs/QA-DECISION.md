@@ -1,6 +1,6 @@
 # QA Decision
 
-Decision: MUST_ADD_RCI
+Decision: UPDATE_RCI
 Priority: P1
 RepoType: Business
 
@@ -8,16 +8,17 @@ RepoType: Business
 
 | DoD Item | Method | Location |
 |----------|--------|----------|
-| goals 表包含 parent_id, type, weight 字段 | auto | apps/core/src/task-system/__tests__/goals.test.js |
-| 可以创建 Objective 和关联的 Key Results | auto | apps/core/src/task-system/__tests__/goals.test.js |
-| 更新 KR 进度时 O 进度自动更新 | auto | apps/core/src/task-system/__tests__/goals.test.js |
-| API 返回层级结构 | auto | apps/core/src/task-system/__tests__/goals.test.js |
+| GET /api/okr/trees 返回所有顶层 Objectives | auto | apps/core/src/okr/__tests__/trees.test.js |
+| GET /api/okr/trees/:id 返回完整 OKR 树 | auto | apps/core/src/okr/__tests__/trees.test.js |
+| POST /api/okr/trees 一次性创建 O + 多个 KR | auto | apps/core/src/okr/__tests__/trees.test.js |
+| PUT /api/okr/trees/:id 支持添加/删除 KR | auto | apps/core/src/okr/__tests__/trees.test.js |
+| DELETE /api/okr/trees/:id 级联删除 O 及其 KR | auto | apps/core/src/okr/__tests__/trees.test.js |
 
 ## RCI
 
-- new: [RCI-TASK-001]
-- update: []
+- new: []
+- update: [RCI-TASK-001]
 
 ## Reason
 
-OKR 层级是任务管理系统的核心功能扩展，影响数据模型和 API，需要回归保护确保 O→KR 关系和自动进度计算不被破坏。
+OKR Tree API 在 PRD 01 的数据模型基础上提供树形 CRUD 操作，复用现有 goals 表，需要更新回归契约保护新 API 端点。
