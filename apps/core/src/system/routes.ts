@@ -13,9 +13,18 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  getDegradeState,
+  setDegraded,
+  checkNow,
+  startHealthChecks,
+} from './degrade.js';
 
 const execAsync = promisify(exec);
 const router = Router();
+
+// Start health checks on module load
+startHealthChecks();
 
 // ES module compatibility for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -309,6 +318,62 @@ router.post('/dlq/replay', async (req: Request, res: Response) => {
       success: true,
       results,
       finalStatus,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * GET /api/system/degrade
+ * Get current degradation state
+ */
+router.get('/degrade', async (req: Request, res: Response) => {
+  try {
+    // Run immediate check if requested
+    const state = req.query.check === 'true'
+      ? await checkNow()
+      : getDegradeState();
+
+    return res.json({
+      success: true,
+      state,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * POST /api/system/degrade
+ * Manually set degradation state (for testing)
+ */
+router.post('/degrade', (req: Request, res: Response) => {
+  try {
+    const { degraded, reason } = req.body;
+
+    if (typeof degraded !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: 'degraded must be a boolean',
+      });
+    }
+
+    setDegraded(degraded, reason);
+
+    return res.json({
+      success: true,
+      state: getDegradeState(),
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
