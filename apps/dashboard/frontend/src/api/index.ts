@@ -10,3 +10,4 @@ export * from './video-editor.api';
 export * from './instance.api';
 export * from './scraping.api';
 export * from './dashboard.api';
+export * from './system.api';
