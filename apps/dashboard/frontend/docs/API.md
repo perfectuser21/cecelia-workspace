@@ -11,6 +11,10 @@
 - [Publish API](#publish-api)
 - [Dashboard API](#dashboard-api)
 - [Instance API](#instance-api)
+- [Contents API](#contents-api)
+- [Video Editor API](#video-editor-api)
+- [Scraping API](#scraping-api)
+- [AI Employees API](#ai-employees-api)
 
 ---
 
@@ -342,3 +346,309 @@ const task = await publishApi.createTask({
   targetPlatforms: ['xiaohongshu', 'douyin'],
 });
 ```
+
+---
+
+## Contents API
+
+**文件**: `src/api/contents.api.ts`
+
+网站内容管理相关功能。
+
+### 类型定义
+
+#### WebsiteContent
+
+```typescript
+interface WebsiteContent {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  body: string | null;
+  content_type: 'article' | 'video' | 'post';
+  lang: 'zh' | 'en';
+  tags: string[];
+  reading_time: string | null;
+  faq: { question: string; answer: string }[];
+  key_takeaways: string[];
+  quotable_insights: string[];
+  video_url: string | null;
+  thumbnail_url: string | null;
+  status: 'draft' | 'published';
+  published_at: string | null;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+}
+```
+
+#### CreateContentInput
+
+```typescript
+interface CreateContentInput {
+  slug: string;
+  title: string;
+  description?: string;
+  body?: string;
+  content_type: 'article' | 'video' | 'post';
+  lang?: 'zh' | 'en';
+  tags?: string[];
+  reading_time?: string;
+  faq?: { question: string; answer: string }[];
+  key_takeaways?: string[];
+  quotable_insights?: string[];
+  video_url?: string;
+  thumbnail_url?: string;
+  status?: 'draft' | 'published';
+}
+```
+
+### API 函数
+
+| 函数 | 说明 | 参数 | 返回值 |
+|-----|------|------|--------|
+| `getAll(options?)` | 获取内容列表 | lang?, type?, status?, limit?, offset? | `{ data: WebsiteContent[]; total: number }` |
+| `getById(id)` | 获取单个内容 | id | `WebsiteContent` |
+| `create(data)` | 创建内容 | CreateContentInput | `WebsiteContent` |
+| `update(id, data)` | 更新内容 | id, Partial\<CreateContentInput\> | `WebsiteContent` |
+| `delete(id)` | 删除内容 | id | void |
+| `publish(id)` | 发布内容 | id | `WebsiteContent` |
+| `unpublish(id)` | 取消发布 | id | `WebsiteContent` |
+
+---
+
+## Video Editor API
+
+**文件**: `src/api/video-editor.api.ts`
+
+视频编辑处理相关功能，支持 AI 分析和自动剪辑。
+
+### 类型定义
+
+#### UploadedVideo
+
+```typescript
+interface UploadedVideo {
+  id: string;
+  originalName: string;
+  filePath: string;
+  fileSize: number;
+  mimeType: string;
+  duration?: number;
+  width?: number;
+  height?: number;
+  createdAt: string;
+}
+```
+
+#### ProcessOptions
+
+```typescript
+interface ProcessOptions {
+  trim?: { start: string; end: string };
+  resize?: { width: number; height: number; fit: 'cover' | 'contain' | 'fill' };
+  preset?: '9:16' | '16:9' | '1:1' | '4:3' | '3:4';
+  subtitle?: {
+    text: string;
+    style: 'bottom' | 'top' | 'center';
+    fontSize?: number;
+    fontColor?: string;
+    backgroundColor?: string;
+  };
+}
+```
+
+#### VideoJob
+
+```typescript
+interface VideoJob {
+  id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress: number;
+  outputPath?: string;
+  error?: string;
+  options: ProcessOptions;
+  originalVideo: UploadedVideo;
+  userPrompt?: string;
+  aiAnalysis?: string;
+  transcript?: string;
+  steps?: StepInfo[];
+  currentStep?: ProcessingStep;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+#### AiAnalysisResult
+
+```typescript
+interface AiAnalysisResult {
+  summary: string;
+  transcript?: string;
+  transcriptSegments?: TranscriptSegment[];
+  params: ProcessOptions;
+  operations?: AiEditOperation[];
+  estimatedDuration?: number;
+  silenceRanges?: { start: number; end: number }[];
+}
+```
+
+### API 函数
+
+| 函数 | 说明 | 参数 | 返回值 |
+|-----|------|------|--------|
+| `uploadVideo(file, onProgress?)` | 上传视频 | File, 进度回调 | `UploadedVideo` |
+| `getVideos()` | 获取所有视频 | 无 | `UploadedVideo[]` |
+| `getVideo(id)` | 获取视频信息 | id | `UploadedVideo` |
+| `deleteVideo(id)` | 删除视频 | id | void |
+| `processVideo(videoId, options)` | 创建处理任务 | videoId, ProcessOptions | `VideoJob` |
+| `getJobs()` | 获取所有任务 | 无 | `VideoJob[]` |
+| `getJobStatus(jobId)` | 获取任务状态 | jobId | `VideoJob` |
+| `deleteJob(jobId)` | 删除任务 | jobId | void |
+| `getDownloadUrl(jobId)` | 获取下载 URL | jobId | string |
+| `getPreviewUrl(filePath)` | 获取预览 URL | filePath | string |
+| `aiAnalyze(videoId, userPrompt)` | AI 分析视频 | videoId, 用户提示 | `AiAnalysisResult` |
+| `aiProcess(videoId, userPrompt)` | AI 智能处理 | videoId, 用户提示 | `{ id, status, message }` |
+
+### 预设尺寸
+
+| 预设 | 名称 | 尺寸 | 适用平台 |
+|------|------|------|----------|
+| `9:16` | 竖屏 | 1080x1920 | 抖音, TikTok, 快手 |
+| `16:9` | 横屏 | 1920x1080 | YouTube, B站 |
+| `1:1` | 方形 | 1080x1080 | Instagram, 微博 |
+| `4:3` | 传统 | 1440x1080 | 传统视频 |
+| `3:4` | 竖屏4:3 | 1080x1440 | 小红书 |
+
+---
+
+## Scraping API
+
+**文件**: `src/api/scraping.api.ts`
+
+数据采集任务管理，通过 N8N webhook 触发爬虫任务。
+
+### 类型定义
+
+#### ScrapingTask
+
+```typescript
+interface ScrapingTask {
+  id: string;
+  platform: 'xiaohongshu' | 'douyin' | 'weibo' | 'bilibili';
+  name: string;
+  description: string;
+  webhookPath: string;
+  status: 'idle' | 'running' | 'success' | 'error';
+  lastExecutedAt?: string;
+  lastResult?: {
+    success: boolean;
+    dataCount?: number;
+    error?: string;
+  };
+  stats: {
+    totalRuns: number;
+    successRuns: number;
+    dataCollected: number;
+  };
+}
+```
+
+#### TriggerResult
+
+```typescript
+interface TriggerResult {
+  success: boolean;
+  executionId?: string;
+  message?: string;
+  error?: string;
+}
+```
+
+### API 函数
+
+| 函数 | 说明 | 参数 | 返回值 |
+|-----|------|------|--------|
+| `fetchScrapingTasks()` | 获取所有爬虫任务 | 无 | `ScrapingTask[]` |
+| `fetchScrapingTask(taskId)` | 获取单个任务 | taskId | `ScrapingTask \| null` |
+| `triggerScrapingTask(taskId)` | 触发爬虫执行 | taskId | `TriggerResult` |
+| `resetTaskCache()` | 重置状态缓存 | 无 | void |
+
+### 预定义任务
+
+| ID | 平台 | 名称 | Webhook 路径 |
+|----|------|------|-------------|
+| `xiaohongshu-scraper` | 小红书 | 小红书采集 | `/webhook/xiaohongshu-scraper` |
+| `douyin-scraper` | 抖音 | 抖音采集 | `/webhook/douyin-scraper` |
+| `weibo-scraper` | 微博 | 微博采集 | `/webhook/weibo-scraper` |
+| `bilibili-scraper` | B站 | B站采集 | `/webhook/bilibili-scraper` |
+
+---
+
+## AI Employees API
+
+**文件**: `src/api/ai-employees.api.ts`
+
+AI 员工任务统计，聚合 N8N 数据按员工视角展示。
+
+### 类型定义
+
+#### EmployeeTask
+
+```typescript
+interface EmployeeTask {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  abilityId: string;
+  abilityName: string;
+  status: 'success' | 'error' | 'running' | 'waiting';
+  startedAt: string;
+  stoppedAt?: string;
+}
+```
+
+#### EmployeeTaskStats
+
+```typescript
+interface EmployeeTaskStats {
+  todayTotal: number;
+  todaySuccess: number;
+  todayError: number;
+  todayRunning: number;
+  successRate: number;
+  recentTasks: EmployeeTask[];
+}
+```
+
+#### AiEmployeeWithStats
+
+```typescript
+interface AiEmployeeWithStats extends AiEmployee {
+  stats: EmployeeTaskStats;
+}
+```
+
+#### DepartmentWithStats
+
+```typescript
+interface DepartmentWithStats extends Department {
+  employees: AiEmployeeWithStats[];
+  todayTotal: number;
+}
+```
+
+### API 函数
+
+| 函数 | 说明 | 参数 | 返回值 |
+|-----|------|------|--------|
+| `fetchAiEmployeesWithStats()` | 获取所有员工统计 | 无 | `DepartmentWithStats[]` |
+| `fetchEmployeeTasks(employeeId)` | 获取员工任务列表 | employeeId | `EmployeeTask[]` |
+
+### 数据来源
+
+该 API 从 N8N live-status API 获取实时数据：
+- 端点：`/api/v1/n8n-live-status/instances/{instance}/overview`
+- 数据包括：今日统计、运行中执行、最近完成执行
+- 按员工配置的 abilities 匹配 workflow 名称进行聚合

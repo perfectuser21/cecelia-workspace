@@ -1,5 +1,4 @@
 dev
-branch: cp-fix-session-complete
+branch: cp-api-docs-update-20260130
 prd: .prd.md
-started: 2026-01-30T21:30:55+08:00
-tasks_created: true
+started: 2026-01-30T14:00:00+08:00

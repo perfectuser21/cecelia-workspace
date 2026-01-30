@@ -1,12 +1,12 @@
-# QA Decision: 健康检查增强
+# QA Decision: API 文档更新
 
 ## Decision: NO_RCI
-## Priority: P1
+## Priority: P2
 ## RepoType: Business
 
 ## 问题分类
-- **类型**: Feature Enhancement
-- **影响范围**: 前端健康检查页面
+- **类型**: Documentation
+- **影响范围**: docs/API.md
 - **风险等级**: Low
 
 ## 测试策略
@@ -14,26 +14,26 @@
 ### 测试需求
 | DoD 条目 | 方式 | 位置 |
 |---------|------|------|
-| API 类型定义更新 | auto | npm run build (类型检查) |
-| 健康检查页面显示多服务状态 | manual | 访问页面查看 |
-| 延迟信息显示 | manual | 查看各服务延迟 |
+| API 文档包含所有模块 | manual | 检查 docs/API.md |
+| 文档格式一致 | manual | 对比现有文档 |
+| 构建无错误 | auto | npm run build |
 
 ### Tests
-- dod_item: "API 类型定义与后端一致"
+- dod_item: "API 文档包含所有 src/api/*.ts 模块"
+  method: manual
+  location: manual:检查 docs/API.md 目录是否包含 Contents/VideoEditor/Scraping/AiEmployees
+
+- dod_item: "新增模块文档格式与现有一致"
+  method: manual
+  location: manual:检查类型定义、API 函数表格格式
+
+- dod_item: "代码构建无错误"
   method: auto
-  location: manual:npm run build 无类型错误
-
-- dod_item: "健康检查页面显示各服务状态"
-  method: manual
-  location: manual:访问系统状态页面，验证 brain/workspace/quality/n8n 状态显示
-
-- dod_item: "延迟信息正确显示"
-  method: manual
-  location: manual:验证各服务延迟毫秒数显示
+  location: npm run build
 
 ### RCI
 - new: []
 - update: []
 
 ## Reason
-这是前端 UI 增强任务，更新 API 类型定义以匹配后端 PR #102 的多服务健康检查响应格式，并在页面上显示各服务状态和延迟信息。无需新增回归契约，通过类型检查和手动验证即可确保正确性。
+文档更新任务，无代码逻辑变更，不影响运行时行为。只需验证文档完整性和格式一致性。
