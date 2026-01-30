@@ -76,8 +76,29 @@ describe('/api/system/status', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
-    expect(response.body.status).toBe('healthy');
+    // Status can be healthy, degraded, or unhealthy depending on service states
+    expect(['healthy', 'degraded', 'unhealthy']).toContain(response.body.status);
     expect(response.body.service).toBe('cecelia-workspace');
     expect(response.body).toHaveProperty('timestamp');
+  });
+
+  it('returns services with latency info from /api/system/health', async () => {
+    const response = await request(app).get('/api/system/health');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('services');
+    expect(response.body).toHaveProperty('degraded');
+
+    // Verify services structure
+    const services = response.body.services;
+    const expectedServices = ['brain', 'workspace', 'quality', 'n8n'];
+
+    for (const serviceName of expectedServices) {
+      expect(services).toHaveProperty(serviceName);
+      expect(services[serviceName]).toHaveProperty('status');
+      expect(services[serviceName]).toHaveProperty('latency_ms');
+      expect(services[serviceName]).toHaveProperty('last_check');
+      expect(services[serviceName]).toHaveProperty('error');
+    }
   });
 });

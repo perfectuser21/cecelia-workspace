@@ -28,6 +28,7 @@ interface ServiceHealth {
   lastCheck: Date | null;
   lastError: string | null;
   consecutiveFailures: number;
+  latencyMs: number | null;
 }
 
 interface DegradeState {
@@ -37,8 +38,14 @@ interface DegradeState {
   services: {
     brain: ServiceHealth;
     workspace: ServiceHealth;
+    quality: ServiceHealth;
+    n8n: ServiceHealth;
   };
 }
+
+// Service endpoints
+const QUALITY_API = process.env.QUALITY_API || 'http://localhost:5681';
+const N8N_API = process.env.N8N_BACKEND || 'http://localhost:5679';
 
 // Global state
 let state: DegradeState = {
@@ -46,36 +53,41 @@ let state: DegradeState = {
   reason: null,
   enteredAt: null,
   services: {
-    brain: { healthy: true, lastCheck: null, lastError: null, consecutiveFailures: 0 },
-    workspace: { healthy: true, lastCheck: null, lastError: null, consecutiveFailures: 0 },
+    brain: { healthy: true, lastCheck: null, lastError: null, consecutiveFailures: 0, latencyMs: null },
+    workspace: { healthy: true, lastCheck: null, lastError: null, consecutiveFailures: 0, latencyMs: null },
+    quality: { healthy: true, lastCheck: null, lastError: null, consecutiveFailures: 0, latencyMs: null },
+    n8n: { healthy: true, lastCheck: null, lastError: null, consecutiveFailures: 0, latencyMs: null },
   },
 };
 
 let checkIntervalId: NodeJS.Timeout | null = null;
 
 /**
- * Check if a service is healthy
+ * Check if a service is healthy (with latency measurement)
  */
 async function checkServiceHealth(
   name: string,
   url: string,
   timeoutMs: number = 5000
-): Promise<{ healthy: boolean; error: string | null }> {
+): Promise<{ healthy: boolean; error: string | null; latencyMs: number }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const startTime = Date.now();
 
   try {
     const response = await fetch(url, { signal: controller.signal });
+    const latencyMs = Date.now() - startTime;
     clearTimeout(timeout);
 
     if (response.ok) {
-      return { healthy: true, error: null };
+      return { healthy: true, error: null, latencyMs };
     }
-    return { healthy: false, error: `HTTP ${response.status}` };
+    return { healthy: false, error: `HTTP ${response.status}`, latencyMs };
   } catch (error) {
+    const latencyMs = Date.now() - startTime;
     clearTimeout(timeout);
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return { healthy: false, error: message };
+    return { healthy: false, error: message, latencyMs };
   }
 }
 
@@ -83,11 +95,12 @@ async function checkServiceHealth(
  * Update service health state
  */
 function updateServiceHealth(
-  service: 'brain' | 'workspace',
-  result: { healthy: boolean; error: string | null }
+  service: 'brain' | 'workspace' | 'quality' | 'n8n',
+  result: { healthy: boolean; error: string | null; latencyMs: number }
 ): void {
   const svc = state.services[service];
   svc.lastCheck = new Date();
+  svc.latencyMs = result.latencyMs;
 
   if (result.healthy) {
     svc.healthy = true;
@@ -163,13 +176,19 @@ async function triggerDLQReplay(): Promise<void> {
  * Run health check cycle
  */
 async function runHealthCheck(): Promise<void> {
-  // Check Brain
-  const brainResult = await checkServiceHealth('brain', `${BRAIN_API}/api/brain/tick/status`);
-  updateServiceHealth('brain', brainResult);
+  // Check all services in parallel for better performance
+  const [brainResult, workspaceResult, qualityResult, n8nResult] = await Promise.all([
+    checkServiceHealth('brain', `${BRAIN_API}/api/brain/tick/status`),
+    checkServiceHealth('workspace', `${WORKSPACE_API}/api/system/health`),
+    checkServiceHealth('quality', `${QUALITY_API}/api/state`),
+    checkServiceHealth('n8n', `${N8N_API}/healthz`),
+  ]);
 
-  // Check Workspace (self-check, should always pass unless server is crashing)
-  const workspaceResult = await checkServiceHealth('workspace', `${WORKSPACE_API}/api/system/health`);
+  // Update all service health states
+  updateServiceHealth('brain', brainResult);
   updateServiceHealth('workspace', workspaceResult);
+  updateServiceHealth('quality', qualityResult);
+  updateServiceHealth('n8n', n8nResult);
 
   // Evaluate degraded state
   evaluateDegradeState();
@@ -247,4 +266,54 @@ export function setDegraded(degraded: boolean, reason?: string): void {
 export async function checkNow(): Promise<DegradeState> {
   await runHealthCheck();
   return getDegradeState();
+}
+
+/**
+ * Get comprehensive health status with latency info
+ */
+export interface HealthStatus {
+  overall: 'healthy' | 'degraded' | 'unhealthy';
+  services: {
+    [key: string]: {
+      status: 'healthy' | 'unhealthy';
+      latency_ms: number | null;
+      last_check: string | null;
+      error: string | null;
+    };
+  };
+  degraded: boolean;
+  degraded_reason: string | null;
+}
+
+export function getHealthStatus(): HealthStatus {
+  const services: HealthStatus['services'] = {};
+
+  for (const [name, svc] of Object.entries(state.services)) {
+    services[name] = {
+      status: svc.healthy ? 'healthy' : 'unhealthy',
+      latency_ms: svc.latencyMs,
+      last_check: svc.lastCheck?.toISOString() || null,
+      error: svc.lastError,
+    };
+  }
+
+  // Determine overall health
+  const healthyCount = Object.values(state.services).filter(s => s.healthy).length;
+  const totalCount = Object.keys(state.services).length;
+
+  let overall: 'healthy' | 'degraded' | 'unhealthy';
+  if (healthyCount === totalCount) {
+    overall = 'healthy';
+  } else if (healthyCount === 0) {
+    overall = 'unhealthy';
+  } else {
+    overall = 'degraded';
+  }
+
+  return {
+    overall,
+    services,
+    degraded: state.degraded,
+    degraded_reason: state.reason,
+  };
 }

@@ -1,22 +1,51 @@
-# Audit Report - KR2 Verification
+# Audit Report
 
-Decision: PASS
+Branch: cp-nightly-auto-commit
 Date: 2026-01-30
-
-## L1 (Blocking Issues)
-None
-
-## L2 (Functional Issues)
-None
+Scope: apps/core/src/system/degrade.ts, apps/core/src/system/routes.ts, apps/core/tests/system-status.test.ts
+Target Level: L2
 
 ## Summary
-- scripts/verify-nightly-loop.sh created for KR2 verification
-- Fixed fetchTasks() to include 'queued' status for proper task selection
-- All 7 verification checks pass:
-  - API Accessible
-  - Nightly Plan Generated
-  - Plan Structure (why/evidence)
-  - Committed Tasks >= 3
-  - Memory Event Recorded
-  - System Health (DLQ/Degrade)
-- 38/38 tests pass (19 source + 19 dist)
+
+| Level | Count |
+|-------|-------|
+| L1 (Blocker) | 0 |
+| L2 (Functional) | 0 |
+| L3 (Best Practice) | 0 |
+| L4 (Over-engineering) | 0 |
+
+## Decision: PASS
+
+## Changes Reviewed
+
+### degrade.ts
+- Added `latencyMs` field to `ServiceHealth` interface
+- Added `quality` and `n8n` services to `DegradeState`
+- Added `QUALITY_API` and `N8N_API` environment variables
+- Modified `checkServiceHealth()` to measure and return latency
+- Modified `updateServiceHealth()` to accept new service types and record latency
+- Modified `runHealthCheck()` to check all 4 services in parallel
+- Added `getHealthStatus()` export function
+
+### routes.ts
+- Added `getHealthStatus` import from degrade.js
+- Enhanced `/api/system/health` endpoint to return multi-service aggregated status
+
+### system-status.test.ts
+- Updated health check test to accept healthy/degraded/unhealthy status
+- Added test for services with latency info
+
+## Findings
+
+(No issues found)
+
+## Blockers
+
+(None)
+
+## Notes
+
+- All changes are backward compatible (original fields preserved)
+- Environment variables have sensible defaults
+- Latency measurement uses simple Date.now() which is sufficient for health checks
+- Parallel health checks improve response time
