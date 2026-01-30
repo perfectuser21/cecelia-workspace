@@ -7,6 +7,7 @@ import { Router, Request, Response } from 'express';
 import { execSync } from 'child_process';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { queryDevSessions, type DevSession } from '../system/dev-session.js';
 
 const router = Router();
 
@@ -374,8 +375,24 @@ function getDockerContainers(): any[] {
  * Get comprehensive command center data
  * Prefers host monitor data when available
  */
-router.get('/command-center', (_req: Request, res: Response) => {
+router.get('/command-center', async (_req: Request, res: Response) => {
   try {
+    // Get dev sessions from memory (KR1)
+    let devSessions: { active: DevSession[]; recent: DevSession[] } = {
+      active: [],
+      recent: [],
+    };
+    try {
+      const activeSessions = await queryDevSessions({ status: 'running', limit: 10 });
+      const recentSessions = await queryDevSessions({ limit: 10 });
+      devSessions = {
+        active: activeSessions,
+        recent: recentSessions.filter(s => s.status !== 'running'),
+      };
+    } catch {
+      // Dev sessions query may fail if DB not available
+    }
+
     // Try to get host monitor data first (most accurate)
     const hostData = getHostMonitorData();
 
@@ -402,6 +419,7 @@ router.get('/command-center', (_req: Request, res: Response) => {
           },
           docker: hostData.docker,
           capacity: hostData.capacity,
+          dev_sessions: devSessions,
         },
       });
     }
@@ -456,6 +474,7 @@ router.get('/command-center', (_req: Request, res: Response) => {
           current_load: claudeSessions.total,
           available_slots: Math.max(0, 3 - claudeSessions.total),
         },
+        dev_sessions: devSessions,
       },
     });
   } catch (error: unknown) {
