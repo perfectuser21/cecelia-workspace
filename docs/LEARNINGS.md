@@ -118,3 +118,26 @@
 3. 测试覆盖了 15 个场景，包括状态管理、任务推进、stale 检测、focus 集成
 
 **影响程度**: Low - 功能增强，无破坏性变更
+
+---
+
+### [2026-01-30] Organ Unification Phase 1 - 聚合层强化
+
+**任务**: 为 workspace 添加系统状态聚合和审计中间件
+
+**Bug**: 
+1. CI 失败 - `npm ci` 要求 package-lock.json 与 package.json 同步，但我们用 pnpm 安装了 supertest，未更新 package-lock.json
+2. 解决方案：运行 `npm install --package-lock-only` 更新 lock 文件
+
+**技术要点**:
+1. 聚合层模式 - /api/system/status 并行请求 brain、quality、workflows 状态
+2. 带超时的 fetch - 使用 AbortController 设置 5 秒超时，避免慢服务阻塞响应
+3. 服务降级 - catch 块中返回 `{ health: 'unavailable' }` 而非抛异常
+4. 审计中间件 - 异步写入数据库，不阻塞请求响应
+5. 测试使用 vitest + supertest，通过 mockFetch 模拟外部服务
+
+**优化点**:
+1. 项目使用 pnpm，但 CI 使用 npm ci - 需要同时维护两套 lock 文件
+2. L3 建议：可以提取 fetchWithTimeout 为公共模块（当前各文件各自实现）
+
+**影响程度**: Low - 新增功能，无破坏性变更

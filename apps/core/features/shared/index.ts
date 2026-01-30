@@ -10,6 +10,7 @@ export * from './utils/statusHelpers';
 // Hooks
 export * from './hooks/useDataFetch';
 export * from './hooks/usePolling';
+export * from './hooks/useRealtimeVoice';
 
 // Components
 export * from './components/StatusBadge';

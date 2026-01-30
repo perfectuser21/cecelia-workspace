@@ -352,8 +352,8 @@ export function CeceliaChat() {
   if (chatOpen) {
     return (
       <div
-        className="fixed bottom-6 right-6 w-80 flex flex-col bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-slate-700/50 shadow-2xl shadow-purple-500/10 z-50 overflow-hidden"
-        style={{ height: '480px', maxHeight: '480px', minHeight: '480px' }}
+        className="fixed w-80 flex flex-col bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-slate-700/50 shadow-2xl shadow-purple-500/10 z-50 overflow-hidden"
+        style={{ bottom: '24px', right: '24px', height: '480px', maxHeight: '480px', minHeight: '480px' }}
       >
         {/* Top glow line */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-400/50 to-transparent" />
@@ -462,7 +462,8 @@ export function CeceliaChat() {
   return (
     <button
       onClick={() => setChatOpen(true)}
-      className="fixed bottom-6 right-6 p-4 bg-gradient-to-br from-slate-800 via-purple-900/50 to-slate-900 text-white rounded-full shadow-lg shadow-purple-500/20 hover:shadow-xl hover:shadow-purple-500/30 hover:scale-105 transition-all z-50 border border-slate-600/50 group"
+      className="fixed p-4 bg-gradient-to-br from-slate-800 via-purple-900/50 to-slate-900 text-white rounded-full shadow-lg shadow-purple-500/20 hover:shadow-xl hover:shadow-purple-500/30 hover:scale-105 transition-all z-50 border border-slate-600/50 group"
+      style={{ bottom: '24px', right: '24px' }}
     >
       {/* Glow effect */}
       <div className="absolute inset-0 rounded-full bg-purple-500/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
