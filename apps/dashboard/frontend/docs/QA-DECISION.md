@@ -1,25 +1,29 @@
+---
+id: qa-decision-perf-stats
+version: 1.0.0
+created: 2026-01-31
+---
+
 # QA Decision
 
 Decision: NO_RCI
 Priority: P2
 RepoType: Business
 
-Tests:
-  - dod_item: "展开卡片时显示历史记录"
-    method: manual
-    location: manual:验证 UI 展开状态显示历史列表
-  - dod_item: "历史记录包含时间戳、状态、延迟"
-    method: manual
-    location: manual:验证数据字段展示正确
-  - dod_item: "状态有颜色区分"
-    method: manual
-    location: manual:验证健康为绿色异常为红色
-  - dod_item: "npm run build 通过"
-    method: auto
-    location: contract:build-pass
+## Tests
 
-RCI:
-  new: []
-  update: []
+| DoD Item | Method | Location |
+|----------|--------|----------|
+| 卡片展开时显示可用率 | manual | manual:展开 ServiceHealthCard 验证可用率显示 |
+| 卡片展开时显示平均延迟 | manual | manual:展开 ServiceHealthCard 验证平均延迟显示 |
+| 历史记录不足时显示数据不足 | manual | manual:首次加载时验证提示文字 |
+| 代码通过 lint 检查 | auto | npm run lint |
 
-Reason: UI 增强功能，影响范围小，无核心逻辑变更，不需要 RCI
+## RCI
+
+- new: []
+- update: []
+
+## Reason
+
+此功能为 UI 增强，纯展示型功能，无业务逻辑变更。属于 KR2 测试任务，用于验证 N8N 自动调度能力。不涉及关键路径，无需 RCI。

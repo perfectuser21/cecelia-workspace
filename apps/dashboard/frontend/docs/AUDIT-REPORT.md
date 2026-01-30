@@ -1,36 +1,35 @@
-# Audit Report - 性能监控健康检查历史增强
+---
+id: audit-report-perf-stats
+version: 1.0.0
+created: 2026-01-31
+---
 
-## 审计信息
+# Audit Report
 
-- **审计日期**: 2026-01-31
-- **审计范围**: ServiceHealthCard 组件历史记录功能
-- **Decision**: PASS
+Branch: cp-01310013-perf-stats
+Date: 2026-01-31
+Scope: apps/dashboard/frontend/src/components/ServiceHealthCard.tsx
+Target Level: L2
 
-## 变更摘要
+## Summary
 
-### 新增类型
-- `HealthCheckRecord`: 单次健康检查记录类型
-- `ServiceHealthWithHistory`: 带历史记录的服务健康扩展类型
+| Level | Count |
+|-------|-------|
+| L1 | 0 |
+| L2 | 0 |
+| L3 | 0 |
+| L4 | 0 |
 
-### 修改文件
-1. `src/api/system.api.ts` - 添加历史记录类型
-2. `src/components/ServiceHealthCard.tsx` - 展示历史记录 UI
-3. `src/pages/PerformanceMonitoring.tsx` - 维护历史记录 state
+## Decision: PASS
 
-## 安全审计
+## Findings
 
-- [x] 无硬编码凭据
-- [x] 无 XSS 风险
-- [x] 无 SQL 注入风险
-- [x] 类型安全
+None. 代码改动简洁，功能明确：
+- 添加 HealthCheckStats 组件显示可用率和平均延迟
+- 使用 useMemo 优化计算性能
+- 遵循现有组件风格和设计规范
+- 正确处理边界情况（数据不足时显示提示）
 
-## 功能验证
+## Blockers
 
-- [x] npm run build 通过
-- [x] 历史记录在组件展开时正确显示
-- [x] 健康/异常状态有视觉区分
-- [x] 历史记录包含时间戳、状态、延迟
-
-## 结论
-
-代码质量良好，无安全问题，符合 DoD 要求。
+None.
