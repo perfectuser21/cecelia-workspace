@@ -19,6 +19,14 @@ import {
   checkNow,
   startHealthChecks,
 } from './degrade.js';
+import {
+  validateTraceId,
+  validateEvidence,
+  validateMemoryPayload,
+  validateAll,
+  getStats,
+  resetStats,
+} from './assertions.js';
 
 const execAsync = promisify(exec);
 const router = Router();
@@ -383,6 +391,56 @@ router.post('/degrade', (req: Request, res: Response) => {
       error: message,
     });
   }
+});
+
+/**
+ * GET /api/system/assertions
+ * Get assertion statistics
+ */
+router.get('/assertions', (_req: Request, res: Response) => {
+  return res.json({
+    success: true,
+    stats: getStats(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+/**
+ * POST /api/system/assertions/validate
+ * Validate data against assertions
+ */
+router.post('/assertions/validate', (req: Request, res: Response) => {
+  try {
+    const { trace_id, evidence, memory } = req.body;
+
+    const result = validateAll({ trace_id, evidence, memory });
+
+    return res.json({
+      success: true,
+      valid: result.valid,
+      results: result.results,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * POST /api/system/assertions/reset
+ * Reset assertion statistics
+ */
+router.post('/assertions/reset', (_req: Request, res: Response) => {
+  resetStats();
+  return res.json({
+    success: true,
+    stats: getStats(),
+    timestamp: new Date().toISOString(),
+  });
 });
 
 export default router;
