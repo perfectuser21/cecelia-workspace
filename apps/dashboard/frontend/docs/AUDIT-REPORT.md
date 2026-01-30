@@ -1,8 +1,8 @@
 # Audit Report
 
-Branch: cp-01304-health-card-details
+Branch: cp-01303-perf-refresh-interval
 Date: 2026-01-30
-Scope: src/components/ServiceHealthCard.tsx
+Scope: src/pages/PerformanceMonitoring.tsx
 Target Level: L2
 
 ## Summary
@@ -20,20 +20,23 @@ Target Level: L2
 
 ## Changes Made
 
-1. 更新 `ServiceHealthCard.tsx`
-   - 新增 `SERVICE_INFO` 常量：存储服务描述和端点信息
-   - 新增 `formatAbsoluteTime` 函数：格式化绝对时间
-   - 相对时间添加 `title` 属性：hover 显示绝对时间
-   - 卡片添加 hover 效果：`hover:bg-*` 和 `hover:shadow-sm`
-   - 展开详情新增服务描述和端点显示
+1. 更新 `PerformanceMonitoring.tsx`
+   - 添加刷新间隔选择器（10s / 30s / 60s / 暂停）
+   - 新增 `REFRESH_INTERVALS` 常量和 `RefreshInterval` 类型
+   - 新增状态：`refreshInterval`、`showIntervalDropdown`
+   - 新增 refs：`intervalRef`（管理定时器）、`dropdownRef`（点击外部关闭）
+   - 重构 `useEffect` 以支持动态刷新间隔
+   - 添加下拉菜单 UI（Timer/Pause 图标，当前选择高亮）
+   - 新增 `getCurrentIntervalLabel` 辅助函数
 
 2. 导入更新
-   - 新增 `Globe`, `Info` from lucide-react
+   - 新增 `useRef` from react
+   - 新增 `Timer`, `Pause`, `ChevronDown` from lucide-react
 
 ## Risk Assessment
 
 - 改动范围：修改 1 个文件
-- 影响范围：仅 UI 展示增强，不影响数据逻辑
+- 影响范围：仅 UI 交互增强，不影响数据逻辑
 - 风险等级：低
 - 构建验证：通过
 

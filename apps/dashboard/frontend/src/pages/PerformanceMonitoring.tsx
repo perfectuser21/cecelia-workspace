@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Cpu, HardDrive, Clock, AlertTriangle, RefreshCw, Loader2, XCircle, Activity, Server, CheckCircle2, TrendingUp, Timer, Pause, ChevronDown, ChevronUp, Globe, Info } from 'lucide-react';
+import { Cpu, HardDrive, Clock, AlertTriangle, RefreshCw, Loader2, XCircle, Activity, Server, TrendingUp, Timer, Pause, ChevronDown } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { systemApi, SystemMetricsResponse, SystemMetrics, SystemHealthResponse } from '@/api';
+import { ServiceHealthCard } from '@/components';
 
 function formatUptime(seconds: number): string {
   const days = Math.floor(seconds / 86400);
@@ -10,35 +11,6 @@ function formatUptime(seconds: number): string {
   if (days > 0) return `${days}d ${hours}h`;
   if (hours > 0) return `${hours}h ${mins}m`;
   return `${mins}m`;
-}
-
-function formatRelativeTime(isoString: string | null): string {
-  if (!isoString) return '未知';
-  const date = new Date(isoString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-
-  if (diffSec < 0) return '刚刚';
-  if (diffSec < 60) return `${diffSec}秒前`;
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}分钟前`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour}小时前`;
-  const diffDay = Math.floor(diffHour / 24);
-  return `${diffDay}天前`;
-}
-
-function formatAbsoluteTime(isoString: string | null): string {
-  if (!isoString) return '未知';
-  return new Date(isoString).toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
 }
 
 function formatMemory(bytes: number): string {
@@ -87,26 +59,6 @@ const SERVICE_LABELS: Record<string, string> = {
   workspace: 'Workspace',
   quality: 'Quality',
   n8n: 'N8N',
-};
-
-// Service metadata - description and endpoint info
-const SERVICE_INFO: Record<string, { description: string; endpoint: string }> = {
-  brain: {
-    description: 'Brain API 服务，提供决策引擎和状态管理功能',
-    endpoint: '/api/brain',
-  },
-  workspace: {
-    description: '工作区服务，管理项目配置和文件系统',
-    endpoint: '/api/workspace',
-  },
-  quality: {
-    description: '质量监控服务，负责代码审计和自动化测试',
-    endpoint: '/api/quality',
-  },
-  n8n: {
-    description: 'N8N 工作流自动化引擎，处理任务调度',
-    endpoint: 'http://localhost:5679',
-  },
 };
 
 // Refresh interval options
@@ -161,7 +113,7 @@ export default function PerformanceMonitoring() {
     }
   };
 
-  // Fetch data on mount
+  // Fetch data on mount and when interval changes
   useEffect(() => {
     fetchData();
   }, []);
@@ -386,33 +338,13 @@ export default function PerformanceMonitoring() {
           <div className="px-5 py-4">
             <div className="grid grid-cols-4 gap-4">
               {Object.entries(healthData.services).map(([name, service]) => (
-                <div
+                <ServiceHealthCard
                   key={name}
-                  className={`p-3 rounded-lg border ${
-                    service.status === 'healthy'
-                      ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
-                      : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {SERVICE_LABELS[name] || name}
-                    </span>
-                    {service.status === 'healthy' ? (
-                      <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <XCircle className="w-4 h-4 text-red-500" />
-                    )}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
-                    {service.latency_ms !== null ? (
-                      <div>延迟: {service.latency_ms}ms</div>
-                    ) : (
-                      <div className="text-red-500">{service.error || '不可用'}</div>
-                    )}
-                    <div className="text-gray-400">检查: {formatRelativeTime(service.last_check)}</div>
-                  </div>
-                </div>
+                  name={name}
+                  label={SERVICE_LABELS[name] || name}
+                  service={service}
+                  onRefresh={fetchData}
+                />
               ))}
             </div>
             {healthData.degraded && healthData.degraded_reason && (
