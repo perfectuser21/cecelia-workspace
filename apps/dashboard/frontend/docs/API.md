@@ -1,5 +1,7 @@
 # Dashboard Frontend API 文档
 
+> 最后更新: 2026-01-30
+
 本文档描述了 Dashboard Frontend 所有 API 模块及其功能。
 
 ## 目录
