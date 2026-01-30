@@ -4,6 +4,7 @@ import { createSnapshot, getRecentSnapshots, getLatestSnapshot } from './percept
 import { createTask, updateTask, createGoal, updateGoal, triggerN8n, setMemory, batchUpdateTasks } from './actions.js';
 import { getDailyFocus, setDailyFocus, clearDailyFocus, getFocusSummary } from './focus.js';
 import { getTickStatus, enableTick, disableTick, executeTick } from './tick.js';
+import { parseIntent, parseAndCreate, INTENT_TYPES } from './intent.js';
 import pool from '../task-system/db.js';
 import crypto from 'crypto';
 
@@ -580,5 +581,126 @@ router.post('/action/trigger-n8n', async (req, res) => {
 });
 
 // 注意：log-decision 不再对外暴露，由 handleAction 内部自动记录
+
+// ==================== Intent API（KR1 意图识别）====================
+
+/**
+ * POST /api/brain/intent/parse
+ * Parse natural language input and return structured intent
+ *
+ * Request body:
+ *   { input: "我想做一个 GMV Dashboard" }
+ *
+ * Response:
+ *   {
+ *     success: true,
+ *     parsed: {
+ *       originalInput: "...",
+ *       intentType: "create_project",
+ *       confidence: 0.8,
+ *       keywords: ["做一个"],
+ *       projectName: "gmv-dashboard",
+ *       tasks: [...],
+ *       prdDraft: "..."
+ *     }
+ *   }
+ */
+router.post('/intent/parse', async (req, res) => {
+  try {
+    const { input } = req.body;
+
+    if (!input || typeof input !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'input is required and must be a string'
+      });
+    }
+
+    const parsed = await parseIntent(input);
+
+    res.json({
+      success: true,
+      parsed,
+      intent_types: INTENT_TYPES
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to parse intent',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * POST /api/brain/intent/create
+ * Parse intent and create resources (project, tasks) in database
+ *
+ * Request body:
+ *   {
+ *     input: "我想做一个 GMV Dashboard",
+ *     options: {
+ *       createProject: true,
+ *       createTasks: true,
+ *       goalId: null,
+ *       projectId: null
+ *     }
+ *   }
+ *
+ * Response:
+ *   {
+ *     success: true,
+ *     parsed: {...},
+ *     created: {
+ *       project: {...},
+ *       tasks: [...]
+ *     }
+ *   }
+ */
+router.post('/intent/create', async (req, res) => {
+  try {
+    const { input, options = {} } = req.body;
+
+    if (!input || typeof input !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'input is required and must be a string'
+      });
+    }
+
+    const result = await parseAndCreate(input, options);
+
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to parse and create',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * GET /api/brain/intent/types
+ * Get available intent types
+ */
+router.get('/intent/types', (req, res) => {
+  res.json({
+    success: true,
+    types: INTENT_TYPES,
+    description: {
+      create_project: '创建新项目（如：我想做一个 GMV Dashboard）',
+      create_feature: '添加新功能（如：给登录页面加一个忘记密码功能）',
+      fix_bug: '修复 Bug（如：修复购物车页面的价格显示问题）',
+      refactor: '重构代码（如：重构用户模块的代码结构）',
+      explore: '探索/调研（如：帮我看看这个 API 怎么用）',
+      question: '提问（如：为什么这里会报错？）',
+      unknown: '无法识别的意图'
+    }
+  });
+});
 
 export default router;
