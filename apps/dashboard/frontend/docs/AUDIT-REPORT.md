@@ -1,28 +1,36 @@
-# Audit Report - 健康检查历史记录增强
+# Audit Report - 性能监控健康检查历史增强
 
-Decision: PASS
+## 审计信息
 
-## 审计结果
+- **审计日期**: 2026-01-31
+- **审计范围**: ServiceHealthCard 组件历史记录功能
+- **Decision**: PASS
 
-| 检查项 | 状态 | 说明 |
-|--------|------|------|
-| 代码实现 | ✅ | ServiceHealthCard 展开时显示历史记录 |
-| 类型安全 | ✅ | 使用 HealthCheckRecord 类型定义 |
-| 构建通过 | ✅ | npm run build 成功 |
-| UI 一致性 | ✅ | 使用已有颜色标识逻辑 |
+## 变更摘要
 
-## 变更文件
+### 新增类型
+- `HealthCheckRecord`: 单次健康检查记录类型
+- `ServiceHealthWithHistory`: 带历史记录的服务健康扩展类型
 
-- `src/api/system.api.ts` - HealthCheckRecord 类型已存在
-- `src/components/ServiceHealthCard.tsx` - 添加历史记录展示部分
-- `src/pages/PerformanceMonitoring.tsx` - 添加 healthHistory 状态管理
+### 修改文件
+1. `src/api/system.api.ts` - 添加历史记录类型
+2. `src/components/ServiceHealthCard.tsx` - 展示历史记录 UI
+3. `src/pages/PerformanceMonitoring.tsx` - 维护历史记录 state
 
-## 风险评估
+## 安全审计
 
-- 影响范围: 仅 PerformanceMonitoring 页面
-- 向后兼容: 是 (history prop 可选)
-- 性能影响: 低 (最多保留 20 条记录)
+- [x] 无硬编码凭据
+- [x] 无 XSS 风险
+- [x] 无 SQL 注入风险
+- [x] 类型安全
+
+## 功能验证
+
+- [x] npm run build 通过
+- [x] 历史记录在组件展开时正确显示
+- [x] 健康/异常状态有视觉区分
+- [x] 历史记录包含时间戳、状态、延迟
 
 ## 结论
 
-小范围 UI 增强，代码质量良好，构建通过，无安全隐患。
+代码质量良好，无安全问题，符合 DoD 要求。
