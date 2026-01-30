@@ -703,4 +703,129 @@ router.get('/intent/types', (req, res) => {
   });
 });
 
+// ==================== Execution Callback API ====================
+
+/**
+ * POST /api/brain/execution-callback
+ * Webhook endpoint for cecelia-run to report execution completion
+ *
+ * Request body:
+ *   {
+ *     task_id: "uuid",
+ *     run_id: "run-xxx-timestamp",
+ *     checkpoint_id: "cp-xxx",
+ *     status: "AI Done" | "AI Failed",
+ *     result: { ... },  // JSON result from cecelia-run
+ *     pr_url: "https://github.com/...",  // optional
+ *     duration_ms: 123456,
+ *     iterations: 3
+ *   }
+ */
+router.post('/execution-callback', async (req, res) => {
+  try {
+    const {
+      task_id,
+      run_id,
+      checkpoint_id,
+      status,
+      result,
+      pr_url,
+      duration_ms,
+      iterations,
+      stderr
+    } = req.body;
+
+    if (!task_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'task_id is required'
+      });
+    }
+
+    console.log(`[execution-callback] Received callback for task ${task_id}, status: ${status}`);
+
+    // 1. Update task status based on execution result
+    let newStatus;
+    if (status === 'AI Done') {
+      newStatus = 'completed';
+    } else if (status === 'AI Failed') {
+      newStatus = 'failed';
+    } else {
+      newStatus = 'in_progress'; // Unknown status, keep in progress
+    }
+
+    // 2. Build the update payload
+    const lastRunResult = {
+      run_id,
+      checkpoint_id,
+      status,
+      duration_ms,
+      iterations,
+      pr_url: pr_url || null,
+      completed_at: new Date().toISOString(),
+      result_summary: typeof result === 'object' ? result.result : result
+    };
+
+    // 3. Update task in database
+    await pool.query(`
+      UPDATE tasks
+      SET
+        status = $2,
+        payload = COALESCE(payload, '{}'::jsonb) || jsonb_build_object(
+          'last_run_result', $3::jsonb,
+          'run_status', $4,
+          'pr_url', $5
+        ),
+        completed_at = CASE WHEN $2 = 'completed' THEN NOW() ELSE completed_at END
+      WHERE id = $1
+    `, [task_id, newStatus, JSON.stringify(lastRunResult), status, pr_url || null]);
+
+    // 4. Log the execution result
+    await pool.query(`
+      INSERT INTO decision_log (trigger, input_summary, llm_output_json, action_result_json, status)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [
+      'execution-callback',
+      `Task ${task_id} execution completed with status: ${status}`,
+      { task_id, run_id, status, iterations },
+      lastRunResult,
+      status === 'AI Done' ? 'success' : 'failed'
+    ]);
+
+    console.log(`[execution-callback] Task ${task_id} updated to ${newStatus}`);
+
+    res.json({
+      success: true,
+      task_id,
+      new_status: newStatus,
+      message: `Task updated to ${newStatus}`
+    });
+
+  } catch (err) {
+    console.error('[execution-callback] Error:', err.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to process execution callback',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * GET /api/brain/executor/status
+ * Check if cecelia-run executor is available
+ */
+router.get('/executor/status', async (req, res) => {
+  try {
+    const { checkCeceliaRunAvailable } = await import('./executor.js');
+    const status = await checkCeceliaRunAvailable();
+    res.json(status);
+  } catch (err) {
+    res.status(500).json({
+      available: false,
+      error: err.message
+    });
+  }
+});
+
 export default router;
