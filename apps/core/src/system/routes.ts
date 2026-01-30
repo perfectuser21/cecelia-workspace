@@ -62,6 +62,8 @@ import {
   validateSessionId,
   type DevSession,
   type SessionStatus,
+  type SummaryOptions,
+  type VerifyResult,
 } from './dev-session.js';
 
 const execAsync = promisify(exec);
@@ -1163,10 +1165,16 @@ router.post('/dev-session/:sessionId/quality-gates', async (req: Request, res: R
 /**
  * POST /api/system/dev-session/:sessionId/summary
  * Generate and store session summary
+ *
+ * Optional body for anti-regression audit trail:
+ * - trace_id: string - custom trace ID (auto-generated if not provided)
+ * - commit_hash: string - git commit hash (auto-detected if not provided)
+ * - verify_results: VerifyResult[] - verification script results
  */
 router.post('/dev-session/:sessionId/summary', async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
+    const { trace_id, commit_hash, verify_results } = req.body as SummaryOptions;
 
     if (!validateSessionId(sessionId)) {
       return res.status(400).json({
@@ -1175,7 +1183,29 @@ router.post('/dev-session/:sessionId/summary', async (req: Request, res: Respons
       });
     }
 
-    const summary = await generateSessionSummary(sessionId);
+    // Validate verify_results if provided
+    const validatedResults: VerifyResult[] = [];
+    if (verify_results && Array.isArray(verify_results)) {
+      for (const result of verify_results) {
+        if (result.script && typeof result.passed === 'boolean') {
+          validatedResults.push({
+            script: String(result.script),
+            passed: Boolean(result.passed),
+            checks_total: Number(result.checks_total) || 0,
+            checks_passed: Number(result.checks_passed) || 0,
+            executed_at: result.executed_at ? new Date(result.executed_at) : new Date(),
+          });
+        }
+      }
+    }
+
+    const options: SummaryOptions = {
+      trace_id: trace_id ? String(trace_id) : undefined,
+      commit_hash: commit_hash ? String(commit_hash) : undefined,
+      verify_results: validatedResults.length > 0 ? validatedResults : undefined,
+    };
+
+    const summary = await generateSessionSummary(sessionId, options);
 
     if (!summary) {
       return res.status(404).json({
