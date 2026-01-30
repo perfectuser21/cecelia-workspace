@@ -104,7 +104,13 @@ function AppContent() {
     return <FeishuLogin />;
   }
 
+  // Callback for voice navigation - collapse sidebar for full-screen view
+  const handleNavigation = () => {
+    setCollapsed(true);
+  };
+
   return (
+    <CeceliaProvider onNavigate={handleNavigation}>
     <div className={`h-screen overflow-hidden flex flex-col transition-colors ${
       isCore
         ? 'bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400/50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800'
@@ -353,6 +359,7 @@ function AppContent() {
         </Suspense>
       )}
     </div>
+    </CeceliaProvider>
   );
 }
 
@@ -361,9 +368,7 @@ function App() {
     <ThemeProvider>
       <InstanceProvider>
         <AuthProvider>
-          <CeceliaProvider>
-            <AppContent />
-          </CeceliaProvider>
+          <AppContent />
         </AuthProvider>
       </InstanceProvider>
     </ThemeProvider>
