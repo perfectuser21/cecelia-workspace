@@ -48,6 +48,21 @@ import {
   runNightlyPlanner,
   type PlanScope,
 } from './planning.js';
+import {
+  createDevSession,
+  getDevSession,
+  updateDevSession,
+  addSessionStep,
+  completeSessionStep,
+  setQualityGates,
+  generateSessionSummary,
+  queryDevSessions,
+  completeDevSession,
+  generateSessionId,
+  validateSessionId,
+  type DevSession,
+  type SessionStatus,
+} from './dev-session.js';
 
 const execAsync = promisify(exec);
 const router = Router();
@@ -848,6 +863,384 @@ router.post('/plan/nightly', async (_req: Request, res: Response) => {
       error: message,
     });
   }
+});
+
+// ============================================
+// Dev Session API Routes (KR1)
+// ============================================
+
+/**
+ * POST /api/system/dev-session
+ * Create a new dev session
+ */
+router.post('/dev-session', async (req: Request, res: Response) => {
+  try {
+    const { branch, prd_path, project, session_id } = req.body;
+
+    if (!branch || !prd_path || !project) {
+      return res.status(400).json({
+        success: false,
+        error: 'branch, prd_path, and project are required',
+      });
+    }
+
+    // Validate session_id if provided
+    if (session_id && !validateSessionId(session_id)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid session_id format. Expected: dev_YYYYMMDD_HHMMSS_xxxxxx',
+      });
+    }
+
+    const session = await createDevSession({
+      branch,
+      prd_path,
+      project,
+      session_id,
+    });
+
+    return res.status(201).json({
+      success: true,
+      session,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * GET /api/system/dev-session
+ * Query dev sessions with optional filters
+ */
+router.get('/dev-session', async (req: Request, res: Response) => {
+  try {
+    const status = req.query.status as SessionStatus | undefined;
+    const project = req.query.project as string | undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+
+    const sessions = await queryDevSessions({ status, project, limit });
+
+    return res.json({
+      success: true,
+      count: sessions.length,
+      sessions,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * GET /api/system/dev-session/:sessionId
+ * Get a specific dev session by ID
+ */
+router.get('/dev-session/:sessionId', async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+
+    if (!validateSessionId(sessionId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid session_id format. Expected: dev_YYYYMMDD_HHMMSS_xxxxxx',
+      });
+    }
+
+    const session = await getDevSession(sessionId);
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'Dev session not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      session,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * PATCH /api/system/dev-session/:sessionId
+ * Update a dev session
+ */
+router.patch('/dev-session/:sessionId', async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+    const updates = req.body;
+
+    if (!validateSessionId(sessionId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid session_id format. Expected: dev_YYYYMMDD_HHMMSS_xxxxxx',
+      });
+    }
+
+    const session = await updateDevSession(sessionId, updates);
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'Dev session not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      session,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * POST /api/system/dev-session/:sessionId/step
+ * Add a step to a dev session
+ */
+router.post('/dev-session/:sessionId/step', async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+    const { step_number, name, artifacts } = req.body;
+
+    if (!validateSessionId(sessionId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid session_id format. Expected: dev_YYYYMMDD_HHMMSS_xxxxxx',
+      });
+    }
+
+    if (step_number === undefined || !name) {
+      return res.status(400).json({
+        success: false,
+        error: 'step_number and name are required',
+      });
+    }
+
+    const session = await addSessionStep(sessionId, { step_number, name, artifacts });
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'Dev session not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      session,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * POST /api/system/dev-session/:sessionId/step/:stepNumber/complete
+ * Complete a step in a dev session
+ */
+router.post('/dev-session/:sessionId/step/:stepNumber/complete', async (req: Request, res: Response) => {
+  try {
+    const { sessionId, stepNumber } = req.params;
+    const { artifacts } = req.body;
+
+    if (!validateSessionId(sessionId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid session_id format. Expected: dev_YYYYMMDD_HHMMSS_xxxxxx',
+      });
+    }
+
+    const session = await completeSessionStep(sessionId, parseInt(stepNumber, 10), artifacts);
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'Dev session or step not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      session,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * POST /api/system/dev-session/:sessionId/quality-gates
+ * Set quality gate results for a session
+ */
+router.post('/dev-session/:sessionId/quality-gates', async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+    const { qa_decision, audit_pass, gate_file } = req.body;
+
+    if (!validateSessionId(sessionId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid session_id format. Expected: dev_YYYYMMDD_HHMMSS_xxxxxx',
+      });
+    }
+
+    const session = await setQualityGates(sessionId, {
+      qa_decision: Boolean(qa_decision),
+      audit_pass: Boolean(audit_pass),
+      gate_file: Boolean(gate_file),
+    });
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'Dev session not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      session,
+      quality_gates: session.quality_gates,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * POST /api/system/dev-session/:sessionId/summary
+ * Generate and store session summary
+ */
+router.post('/dev-session/:sessionId/summary', async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+
+    if (!validateSessionId(sessionId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid session_id format. Expected: dev_YYYYMMDD_HHMMSS_xxxxxx',
+      });
+    }
+
+    const summary = await generateSessionSummary(sessionId);
+
+    if (!summary) {
+      return res.status(404).json({
+        success: false,
+        error: 'Dev session not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      summary,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * POST /api/system/dev-session/:sessionId/complete
+ * Complete a dev session (with optional PR URL)
+ */
+router.post('/dev-session/:sessionId/complete', async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+    const { status, pr_url } = req.body;
+
+    if (!validateSessionId(sessionId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid session_id format. Expected: dev_YYYYMMDD_HHMMSS_xxxxxx',
+      });
+    }
+
+    if (!status || !['completed', 'failed'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'status must be "completed" or "failed"',
+      });
+    }
+
+    const session = await completeDevSession(sessionId, status, pr_url);
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'Dev session not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      session,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * GET /api/system/dev-session/generate-id
+ * Generate a new session ID (utility endpoint)
+ */
+router.get('/dev-session/generate-id', (_req: Request, res: Response) => {
+  const sessionId = generateSessionId();
+  return res.json({
+    success: true,
+    session_id: sessionId,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 export default router;
