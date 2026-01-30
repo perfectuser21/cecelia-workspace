@@ -1,6 +1,6 @@
 /* global console */
 import pool from '../task-system/db.js';
-import { getLatestSnapshot, getRecentSnapshots } from './perception.js';
+import { getLatestSnapshot } from './perception.js';
 
 /**
  * Get active policy

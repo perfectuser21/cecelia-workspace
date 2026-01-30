@@ -6,7 +6,6 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-// @ts-ignore - db.js is JavaScript without types
 import pool from '../task-system/db.js';
 
 // Configuration

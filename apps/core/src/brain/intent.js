@@ -99,7 +99,7 @@ function classifyIntent(input) {
  * @param {string} intentType - Classified intent type
  * @returns {string} - Extracted project name
  */
-function extractProjectName(input, intentType) {
+function extractProjectName(input, _intentType) {
   // Remove common phrases to get the core topic
   const cleanedInput = input
     .replace(/我想/g, '')
@@ -130,7 +130,7 @@ function extractProjectName(input, intentType) {
  * @param {string} input - Original input
  * @returns {Array<{title: string, description: string, priority: string}>}
  */
-function generateTasks(projectName, intentType, input) {
+function generateTasks(projectName, intentType, _input) {
   const tasks = [];
 
   if (intentType === INTENT_TYPES.CREATE_PROJECT || intentType === INTENT_TYPES.CREATE_FEATURE) {
@@ -253,7 +253,7 @@ ${originalInput}
 
 ## 成功标准
 
-${tasks.map((t, i) => `- [ ] ${t.title}`).join('\n')}
+${tasks.map((t) => `- [ ] ${t.title}`).join('\n')}
 
 ## 任务拆解
 

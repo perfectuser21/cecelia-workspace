@@ -10,8 +10,20 @@ export default tseslint.config(
   {
     files: ['src/**/*.ts'],
     rules: {
-      '@typescript-eslint/no-unused-vars': 'warn',
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
+    files: ['src/**/*.js', 'src/**/__tests__/**/*.js'],
+    languageOptions: {
+      sourceType: 'module',
+      ecmaVersion: 2022,
+    },
+    rules: {
+      'no-undef': 'off',
+      'no-redeclare': 'off',
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   }
 );

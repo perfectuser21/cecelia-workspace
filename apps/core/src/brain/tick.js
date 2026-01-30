@@ -3,7 +3,6 @@
  * Implements automatic task progression through periodic ticks
  */
 
-/* global console */
 import pool from '../task-system/db.js';
 import { getDailyFocus } from './focus.js';
 import { updateTask } from './actions.js';
