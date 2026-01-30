@@ -40,6 +40,12 @@ import {
   CATEGORY_MAP,
   type MemoryLayer,
 } from './memory.js';
+import {
+  generatePlan,
+  getPlanStatus,
+  getPlan,
+  type PlanScope,
+} from './planning.js';
 
 const execAsync = promisify(exec);
 const router = Router();
@@ -680,6 +686,93 @@ router.post('/memory/gc', async (_req: Request, res: Response) => {
     return res.json({
       success: true,
       deleted: deletedCount,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+// ============================================
+// Planning Engine API Routes
+// ============================================
+
+/**
+ * POST /api/system/plan/generate
+ * Generate a daily or weekly plan
+ */
+router.post('/plan/generate', async (req: Request, res: Response) => {
+  try {
+    const scope = (req.body.scope as PlanScope) || 'daily';
+
+    if (!['daily', 'weekly'].includes(scope)) {
+      return res.status(400).json({
+        success: false,
+        error: 'scope must be "daily" or "weekly"',
+      });
+    }
+
+    const plan = await generatePlan(scope);
+
+    return res.status(201).json({
+      success: true,
+      plan,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * GET /api/system/plan/status
+ * Get current plan status and progress
+ */
+router.get('/plan/status', async (_req: Request, res: Response) => {
+  try {
+    const status = await getPlanStatus();
+
+    return res.json({
+      success: true,
+      ...status,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * GET /api/system/plan/:planId
+ * Get a specific plan by ID
+ */
+router.get('/plan/:planId', async (req: Request, res: Response) => {
+  try {
+    const { planId } = req.params;
+    const plan = await getPlan(planId);
+
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        error: 'Plan not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      plan,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
