@@ -2,7 +2,7 @@
 
 Branch: cp-01310013-health-enhance
 Date: 2026-01-31
-Scope: src/pages/PerformanceMonitoring.tsx
+Scope: src/components/ServiceHealthCard.tsx
 Target Level: L2
 
 Summary:
@@ -17,7 +17,9 @@ Findings: []
 
 Blockers: []
 
-Notes:
-- 新增 SLA 统计功能使用 useMemo 优化，避免不必要的重新计算
-- 健康趋势图表使用 AreaChart 提供更好的可视化效果
+## Notes
+
+- 添加健康率（uptime percentage）显示在健康检查历史区域
+- 计算逻辑：健康记录数 / 总记录数 * 100
+- 颜色编码：>=99% 绿色, >=95% 琥珀色, <95% 红色
 - 代码遵循项目现有模式，无安全问题

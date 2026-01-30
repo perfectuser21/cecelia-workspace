@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { CheckCircle2, XCircle, RefreshCw, ChevronDown, ChevronUp, Clock, Globe, Info, History } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { CheckCircle2, XCircle, RefreshCw, ChevronDown, ChevronUp, Clock, Globe, Info, History, BarChart3 } from 'lucide-react';
 import type { ServiceHealth, HealthCheckRecord } from '@/api';
 
 // Service metadata - description and endpoint info
@@ -57,6 +57,81 @@ function formatAbsoluteTime(isoString: string | null): string {
     minute: '2-digit',
     second: '2-digit',
   });
+}
+
+// Health check statistics component
+function HealthCheckStats({ history }: { history: HealthCheckRecord[] }) {
+  const stats = useMemo(() => {
+    if (history.length < 2) {
+      return null;
+    }
+
+    const healthyCount = history.filter(r => r.status === 'healthy').length;
+    const totalCount = history.length;
+    const uptime = (healthyCount / totalCount) * 100;
+
+    const latencies = history
+      .filter(r => r.latency_ms !== null)
+      .map(r => r.latency_ms as number);
+
+    const avgLatency = latencies.length > 0
+      ? latencies.reduce((a, b) => a + b, 0) / latencies.length
+      : null;
+
+    return {
+      uptime: uptime.toFixed(1),
+      avgLatency: avgLatency !== null ? Math.round(avgLatency) : null,
+      totalChecks: totalCount,
+    };
+  }, [history]);
+
+  if (!stats) {
+    return (
+      <div className="mt-3 pt-3 border-t border-gray-200/50 dark:border-gray-700/50">
+        <div className="flex items-center gap-1.5 mb-2">
+          <BarChart3 className="w-3 h-3 text-gray-400" />
+          <span className="text-gray-500 font-medium">统计摘要</span>
+        </div>
+        <div className="text-xs text-gray-400 italic">数据不足（需要至少 2 条记录）</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-200/50 dark:border-gray-700/50">
+      <div className="flex items-center gap-1.5 mb-2">
+        <BarChart3 className="w-3 h-3 text-gray-400" />
+        <span className="text-gray-500 font-medium">统计摘要</span>
+        <span className="text-gray-400 text-xs">（{stats.totalChecks} 次检查）</span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2">
+          <div className="text-xs text-gray-500 mb-0.5">可用率</div>
+          <div className={`text-sm font-semibold ${
+            parseFloat(stats.uptime) >= 99 ? 'text-green-600 dark:text-green-400' :
+            parseFloat(stats.uptime) >= 95 ? 'text-amber-600 dark:text-amber-400' :
+            'text-red-600 dark:text-red-400'
+          }`}>
+            {stats.uptime}%
+          </div>
+        </div>
+        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2">
+          <div className="text-xs text-gray-500 mb-0.5">平均延迟</div>
+          {stats.avgLatency !== null ? (
+            <div className={`text-sm font-semibold ${
+              stats.avgLatency < 100 ? 'text-green-600 dark:text-green-400' :
+              stats.avgLatency < 500 ? 'text-amber-600 dark:text-amber-400' :
+              'text-red-600 dark:text-red-400'
+            }`}>
+              {stats.avgLatency}ms
+            </div>
+          ) : (
+            <div className="text-sm text-gray-400">N/A</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function ServiceHealthCard({ name, label, service, history, onRefresh }: ServiceHealthCardProps) {
@@ -226,6 +301,11 @@ export function ServiceHealthCard({ name, label, service, history, onRefresh }: 
                 <div className="font-medium mb-1">错误详情:</div>
                 <div className="font-mono text-xs break-all">{service.error}</div>
               </div>
+            )}
+
+            {/* Health Check Statistics */}
+            {history && history.length > 0 && (
+              <HealthCheckStats history={history} />
             )}
 
             {/* Health Check History */}
