@@ -1,8 +1,8 @@
 # Audit Report
 
-Branch: D1-api-docs-update
+Branch: cp-api-docs-update
 Date: 2026-01-30
-Scope: docs/API.md (添加 Notification 类型定义)
+Scope: docs/API.md (添加 System API getHealth 和 ServiceHealth 类型)
 Target Level: L2
 
 ## Summary
@@ -18,7 +18,7 @@ Target Level: L2
 
 ## Findings
 
-无发现。本次改动仅为文档日期更新，无代码逻辑变更。
+无发现。本次改动仅为文档更新，补充 System API 中缺失的 `getHealth` 函数和 `ServiceHealth` 类型说明。
 
 ## Blockers
 
