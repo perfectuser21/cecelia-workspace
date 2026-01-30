@@ -30,3 +30,28 @@
   - Nightly Planner 生成任务前应检查 develop 分支的最新状态
   - 或在 /dev 启动时检查目标文件/功能是否已存在
 - **影响程度**: Low（时间浪费，无功能影响）
+
+## 2026-01-30 - Performance Monitor API Refactor
+
+### 问题
+并行执行多个 Cecelia 任务时，在同一 git 目录会发生分支冲突和文件覆盖。
+
+### 解决方案
+使用 git worktree 隔离并行任务：
+```bash
+bash ~/.claude/skills/dev/scripts/worktree-manage.sh create <feature-name>
+```
+
+### Hook 问题
+branch-protect.sh Hook 在 monorepo 子目录检测 PRD/DoD 文件时，使用 `grep -cE "^\.prd\.md$"` 无法匹配完整路径（如 `apps/dashboard/frontend/.prd.md`）。
+
+**Workaround**: 在项目根目录创建 PRD/DoD 的软链接：
+```bash
+ln -sf apps/dashboard/frontend/.prd.md .prd.md
+ln -sf apps/dashboard/frontend/.dod.md .dod.md
+```
+
+### 经验
+1. 并行 Cecelia 任务必须使用 worktree
+2. monorepo 子项目需要在根目录放软链接
+3. API 封装应遵循项目现有规范（如 `xxx.api.ts` + index.ts 导出）
