@@ -36,6 +36,14 @@ export interface QualityGateResult {
   checked_at: Date;
 }
 
+export interface VerifyResult {
+  script: string;
+  passed: boolean;
+  checks_total: number;
+  checks_passed: number;
+  executed_at: Date;
+}
+
 export interface SessionSummary {
   files_modified: string[];
   scripts_executed: string[];
@@ -46,6 +54,10 @@ export interface SessionSummary {
   total_steps: number;
   completed_steps: number;
   duration_ms: number;
+  // KR1 hardening fields - anti-regression audit trail
+  trace_id?: string;
+  commit_hash?: string;
+  verify_results?: VerifyResult[];
 }
 
 export interface DevSession {
@@ -225,9 +237,43 @@ export async function setQualityGates(
 }
 
 /**
+ * Options for summary generation with anti-regression fields
+ */
+export interface SummaryOptions {
+  trace_id?: string;
+  commit_hash?: string;
+  verify_results?: VerifyResult[];
+}
+
+/**
+ * Generate a trace ID for the session
+ */
+function generateTraceId(sessionId: string): string {
+  return `trace_${sessionId}_${Date.now().toString(36)}`;
+}
+
+/**
+ * Get current git commit hash (returns null if not in git repo)
+ */
+async function getGitCommitHash(): Promise<string | null> {
+  try {
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+    const { stdout } = await execAsync('git rev-parse HEAD', { timeout: 5000 });
+    return stdout.trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Generate and store session summary
  */
-export async function generateSessionSummary(sessionId: string): Promise<SessionSummary | null> {
+export async function generateSessionSummary(
+  sessionId: string,
+  options?: SummaryOptions
+): Promise<SessionSummary | null> {
   const session = await getDevSession(sessionId);
   if (!session) {
     return null;
@@ -250,6 +296,11 @@ export async function generateSessionSummary(sessionId: string): Promise<Session
     ? new Date(session.completed_at).getTime() - new Date(session.started_at).getTime()
     : Date.now() - new Date(session.started_at).getTime();
 
+  // Get anti-regression audit trail fields
+  const trace_id = options?.trace_id || generateTraceId(sessionId);
+  const commit_hash = options?.commit_hash || (await getGitCommitHash()) || undefined;
+  const verify_results = options?.verify_results || [];
+
   const summary: SessionSummary = {
     files_modified: Array.from(files_modified),
     scripts_executed: Array.from(scripts_executed),
@@ -263,6 +314,10 @@ export async function generateSessionSummary(sessionId: string): Promise<Session
     total_steps: session.steps.length,
     completed_steps: session.steps.filter(s => s.status === 'completed').length,
     duration_ms,
+    // Anti-regression audit trail
+    trace_id,
+    commit_hash,
+    verify_results,
   };
 
   // Store summary in episodic memory
