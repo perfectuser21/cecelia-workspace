@@ -1,25 +1,22 @@
 # QA Decision
 
 Decision: NO_RCI
-Priority: P2
+Priority: P1
 RepoType: Business
 
 Tests:
-  - dod_item: "展开卡片时显示历史记录"
+  - dod_item: "健康检查历史趋势图表可视化"
     method: manual
-    location: manual:验证 UI 展开状态显示历史列表
-  - dod_item: "历史记录包含时间戳、状态、延迟"
+    location: manual:截图验证图表显示正常
+  - dod_item: "服务可用性统计（SLA 计算）"
     method: manual
-    location: manual:验证数据字段展示正确
-  - dod_item: "状态有颜色区分"
+    location: manual:验证 SLA 百分比计算正确
+  - dod_item: "整体健康历史趋势聚合"
     method: manual
-    location: manual:验证健康为绿色异常为红色
-  - dod_item: "npm run build 通过"
-    method: auto
-    location: contract:build-pass
+    location: manual:验证聚合图表数据正确
 
 RCI:
   new: []
   update: []
 
-Reason: UI 增强功能，影响范围小，无核心逻辑变更，不需要 RCI
+Reason: 前端 UI 增强功能，主要是可视化展示，需要手动验证图表正确性，无回归契约需求
