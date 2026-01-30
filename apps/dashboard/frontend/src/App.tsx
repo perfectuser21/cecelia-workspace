@@ -5,7 +5,7 @@
  * 添加新页面只需修改配置文件，无需改动这里
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, lazy, Suspense } from 'react';
 import { Route, Link, useLocation } from 'react-router-dom';
 import { LogOut, PanelLeftClose, PanelLeft, Sun, Moon, Monitor, Circle } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
@@ -16,6 +16,10 @@ import DynamicRouter from './components/DynamicRouter';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { InstanceProvider, useInstance } from './contexts/InstanceContext';
+import { CeceliaProvider } from './contexts/CeceliaContext';
+
+// Lazy load CeceliaChat for Core instance only
+const CeceliaChat = lazy(() => import('../../../core/features/shared/components/CeceliaChat'));
 // 只有登录页需要静态导入
 import FeishuLogin from './pages/FeishuLogin';
 import './App.css';
@@ -101,7 +105,7 @@ function AppContent() {
   }
 
   return (
-    <div className={`min-h-screen transition-colors ${
+    <div className={`h-screen overflow-hidden flex flex-col transition-colors ${
       isCore
         ? 'bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400/50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800'
         : 'bg-gradient-to-br from-slate-50 to-blue-50/30 dark:from-slate-900 dark:to-slate-800'
@@ -333,14 +337,21 @@ function AppContent() {
       )}
 
       {/* 主内容区域 - 配置驱动路由 */}
-      <main className={isAuthenticated ? `${collapsed ? 'ml-16' : 'ml-64'} pt-16 transition-all duration-300` : ""}>
-        <div className={isAuthenticated ? "p-8" : ""}>
+      <main className={isAuthenticated ? `flex-1 overflow-auto ${collapsed ? 'ml-16' : 'ml-64'} pt-16 transition-all duration-300` : "flex-1 overflow-auto"}>
+        <div key={location.pathname} className={isAuthenticated ? "p-8 page-fade-in" : ""}>
           <DynamicRouter>
             {/* 登录页面（静态路由） */}
             <Route path="/login" element={<FeishuLogin />} />
           </DynamicRouter>
         </div>
       </main>
+
+      {/* Global Cecelia Chat - Core instance only */}
+      {isCore && isAuthenticated && (
+        <Suspense fallback={null}>
+          <CeceliaChat />
+        </Suspense>
+      )}
     </div>
   );
 }
@@ -350,7 +361,9 @@ function App() {
     <ThemeProvider>
       <InstanceProvider>
         <AuthProvider>
-          <AppContent />
+          <CeceliaProvider>
+            <AppContent />
+          </CeceliaProvider>
         </AuthProvider>
       </InstanceProvider>
     </ThemeProvider>
