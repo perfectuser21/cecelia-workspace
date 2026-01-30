@@ -109,7 +109,11 @@ const CeceliaContext = createContext<CeceliaContextType | undefined>(undefined);
 
 // ============ Frontend Tools ============
 
-const createFrontendTools = (navigate: (path: string) => void, showToast: (path: string) => void): FrontendTool[] => [
+const createFrontendTools = (
+  navigate: (path: string) => void,
+  showToast: (path: string) => void,
+  onNavigate?: (path: string) => void
+): FrontendTool[] => [
   {
     name: 'get_current_page',
     description: 'Get information about what page the user is currently viewing',
@@ -132,6 +136,8 @@ const createFrontendTools = (navigate: (path: string) => void, showToast: (path:
       console.log('[Cecelia] Executing navigate_to:', path);
       // Show navigation toast
       showToast(path);
+      // Call onNavigate callback (e.g., to collapse sidebar)
+      onNavigate?.(path);
       // Use the navigate function directly (passed to createFrontendTools)
       navigate(path);
       console.log('[Cecelia] Navigation executed');
@@ -213,7 +219,12 @@ const createFrontendTools = (navigate: (path: string) => void, showToast: (path:
 
 // ============ Provider ============
 
-export function CeceliaProvider({ children }: { children: ReactNode }) {
+interface CeceliaProviderProps {
+  children: ReactNode;
+  onNavigate?: (path: string) => void;  // Called when navigation occurs (for sidebar collapse etc.)
+}
+
+export function CeceliaProvider({ children, onNavigate }: CeceliaProviderProps) {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -235,10 +246,10 @@ export function CeceliaProvider({ children }: { children: ReactNode }) {
   const showNavigationToast = useCallback((path: string) => {
     const displayName = PAGE_DISPLAY_NAMES[path] || path;
     setNavToast({ visible: true, destination: displayName, path });
-    // Auto-hide after 2 seconds
+    // Auto-hide after 2.5 seconds (matches progress bar animation)
     setTimeout(() => {
       setNavToast(prev => ({ ...prev, visible: false }));
-    }, 2000);
+    }, 2500);
   }, []);
 
   const generateId = useCallback(() => {
@@ -281,7 +292,7 @@ export function CeceliaProvider({ children }: { children: ReactNode }) {
   }, [navigate]);
 
   // Frontend tools
-  const frontendTools = useMemo(() => createFrontendTools(navigate, showNavigationToast), [navigate, showNavigationToast]);
+  const frontendTools = useMemo(() => createFrontendTools(navigate, showNavigationToast, onNavigate), [navigate, showNavigationToast, onNavigate]);
 
   // Execute frontend tool
   const executeFrontendTool = useCallback(async (toolName: string, args: Record<string, any>): Promise<string> => {
@@ -437,52 +448,60 @@ export function CeceliaProvider({ children }: { children: ReactNode }) {
     <CeceliaContext.Provider value={value}>
       {children}
 
-      {/* Navigation Toast - Bottom right, near Cecelia button */}
+      {/* Navigation Toast - Full width banner at top */}
       <div
-        className={`fixed bottom-24 right-6 z-[100] transition-all duration-400 ease-out ${
+        className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ease-out ${
           navToast.visible
-            ? 'opacity-100 translate-x-0'
-            : 'opacity-0 translate-x-8 pointer-events-none'
+            ? 'opacity-100 translate-y-0'
+            : 'opacity-0 -translate-y-full pointer-events-none'
         }`}
       >
-        <div className="relative">
-          {/* Glow effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-violet-500/40 via-purple-500/40 to-indigo-500/40 blur-lg rounded-2xl scale-110" />
+        {/* Background glow */}
+        <div className="absolute inset-0 bg-gradient-to-r from-violet-600/90 via-purple-600/90 to-indigo-600/90 backdrop-blur-lg" />
 
-          {/* Main toast */}
-          <div className="relative flex items-center gap-3 px-5 py-3 bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-violet-500/40 shadow-2xl shadow-violet-500/30">
-            {/* Animated icon */}
-            <div className="relative">
-              <div className="absolute inset-0 bg-violet-500/60 rounded-full blur animate-pulse" />
-              <div className="relative p-2 bg-gradient-to-br from-violet-500 to-purple-600 rounded-full">
-                <Navigation className="w-4 h-4 text-white" />
-              </div>
-            </div>
+        {/* Animated glow overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-violet-400/0 via-white/20 to-violet-400/0 animate-pulse" />
 
-            {/* Text content */}
-            <div className="flex flex-col">
-              <span className="text-[10px] text-slate-500 uppercase tracking-wider">Navigating</span>
-              <span className="text-sm font-semibold text-white">{navToast.destination}</span>
-            </div>
-
-            {/* Progress bar animation */}
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-800 rounded-b-2xl overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-violet-500 via-purple-500 to-indigo-500"
-                style={{
-                  animation: 'progress 2s ease-out forwards',
-                }}
-              />
+        {/* Content */}
+        <div className="relative flex items-center justify-center gap-4 px-6 py-4">
+          {/* Animated icon */}
+          <div className="relative">
+            <div className="absolute inset-0 bg-white/30 rounded-full blur-md animate-ping" />
+            <div className="relative p-2.5 bg-white/20 backdrop-blur rounded-full border border-white/30">
+              <Navigation className="w-5 h-5 text-white" />
             </div>
           </div>
+
+          {/* Text content */}
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-white/80 font-medium">正在前往</span>
+            <span className="text-lg font-bold text-white tracking-wide">{navToast.destination}</span>
+            <Sparkles className="w-5 h-5 text-white/80 animate-pulse" />
+          </div>
+        </div>
+
+        {/* Progress bar at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+          <div
+            className="h-full bg-white/80"
+            style={{
+              animation: 'progress 2.5s ease-out forwards',
+            }}
+          />
         </div>
       </div>
 
-      {/* CSS for progress animation */}
+      {/* CSS for animations */}
       <style>{`
         @keyframes progress {
           0% { width: 0%; }
           100% { width: 100%; }
+        }
+        @keyframes ping {
+          75%, 100% {
+            transform: scale(2);
+            opacity: 0;
+          }
         }
       `}</style>
     </CeceliaContext.Provider>
