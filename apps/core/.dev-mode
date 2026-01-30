@@ -1,5 +1,5 @@
 dev
-branch: cp-tick-cecelia-integration
-prd: .prd-tick-cecelia-integration.md
-started: 2026-01-31T12:00:00+08:00
+branch: cp-trd-decomposer
+prd: .prd-trd-decomposer.md
+started: 2026-01-31T14:00:00+08:00
 tasks_created: true

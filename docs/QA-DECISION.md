@@ -6,22 +6,20 @@ RepoType: Business
 
 ## Summary
 
-KR2 测试任务 3 - 性能监控增强。为现有的性能监控页面添加磁盘 I/O 和网络吞吐量指标。
+Projects 列表页面（`ProjectsDashboard.tsx`）已经存在并功能完善。
+此任务是 Nightly Planner 自动生成，验证现有功能正常工作即可。
 
 ## Tests
 
-| dod_item | method | location |
-|----------|--------|----------|
-| 磁盘 I/O 指标显示 | manual | manual:检查页面显示磁盘读写速度 |
-| 网络吞吐量指标显示 | manual | manual:检查页面显示网络流量 |
-| 构建成功 | auto | npm run build |
-| 类型检查通过 | auto | npx tsc --noEmit |
+- dod_item: "Projects 列表页面存在"
+  method: manual
+  location: manual:访问 /projects 确认页面正常加载
 
 ## RCI
 
-- new: []
-- update: []
+new: []
+update: []
 
 ## Reason
 
-业务类型项目的 UI 增强，使用 Mock 数据展示新指标，无需添加回归契约。手动验证 UI 效果即可。
+现有功能已完善，无需新增回归契约。此为验证性任务。
