@@ -12,6 +12,23 @@ function formatUptime(seconds: number): string {
   return `${mins}m`;
 }
 
+function formatRelativeTime(isoString: string | null): string {
+  if (!isoString) return '未知';
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+
+  if (diffSec < 0) return '刚刚';
+  if (diffSec < 60) return `${diffSec}秒前`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}分钟前`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}小时前`;
+  const diffDay = Math.floor(diffHour / 24);
+  return `${diffDay}天前`;
+}
+
 function formatMemory(bytes: number): string {
   const gb = bytes / (1024 * 1024 * 1024);
   return `${gb.toFixed(1)} GB`;
@@ -263,12 +280,13 @@ export default function PerformanceMonitoring() {
                       <XCircle className="w-4 h-4 text-red-500" />
                     )}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
                     {service.latency_ms !== null ? (
-                      <span>延迟: {service.latency_ms}ms</span>
+                      <div>延迟: {service.latency_ms}ms</div>
                     ) : (
-                      <span className="text-red-500">{service.error || '不可用'}</span>
+                      <div className="text-red-500">{service.error || '不可用'}</div>
                     )}
+                    <div className="text-gray-400">检查: {formatRelativeTime(service.last_check)}</div>
                   </div>
                 </div>
               ))}

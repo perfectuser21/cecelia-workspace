@@ -1,8 +1,8 @@
 # Audit Report
 
-Branch: cp-01302325-api-exports
+Branch: cp-01302331-health-enhance
 Date: 2026-01-30
-Scope: src/api/index.ts
+Scope: src/pages/PerformanceMonitoring.tsx
 Target Level: L2
 
 ## Summary
@@ -18,13 +18,22 @@ Target Level: L2
 
 **PASS**
 
-## Findings
+## Changes Made
 
-无问题发现。代码变更简洁，功能明确：
-1. 添加 contents.api 模块导出
-2. 添加 ai-employees.api 模块导出
-3. 保持与现有导出风格一致
-4. Build 成功验证无编译错误
+1. 添加 `formatRelativeTime` 函数（15-30行）
+   - 将 ISO 时间字符串转换为相对时间格式（如"10秒前"）
+   - 处理 null 输入返回"未知"
+   - 处理未来时间返回"刚刚"
+
+2. 更新服务健康卡片显示
+   - 添加最后检查时间显示
+   - 使用 `formatRelativeTime` 格式化 `service.last_check`
+
+## Risk Assessment
+
+- 改动范围：单文件，约 20 行
+- 影响范围：仅 UI 显示，不影响数据逻辑
+- 风险等级：低
 
 ## Blockers
 
