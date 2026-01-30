@@ -1,8 +1,8 @@
 # Audit Report
 
-Branch: cp-01302331-health-enhance
+Branch: cp-01304-health-card-details
 Date: 2026-01-30
-Scope: src/pages/PerformanceMonitoring.tsx
+Scope: src/components/ServiceHealthCard.tsx
 Target Level: L2
 
 ## Summary
@@ -20,20 +20,22 @@ Target Level: L2
 
 ## Changes Made
 
-1. 添加 `formatRelativeTime` 函数（15-30行）
-   - 将 ISO 时间字符串转换为相对时间格式（如"10秒前"）
-   - 处理 null 输入返回"未知"
-   - 处理未来时间返回"刚刚"
+1. 更新 `ServiceHealthCard.tsx`
+   - 新增 `SERVICE_INFO` 常量：存储服务描述和端点信息
+   - 新增 `formatAbsoluteTime` 函数：格式化绝对时间
+   - 相对时间添加 `title` 属性：hover 显示绝对时间
+   - 卡片添加 hover 效果：`hover:bg-*` 和 `hover:shadow-sm`
+   - 展开详情新增服务描述和端点显示
 
-2. 更新服务健康卡片显示
-   - 添加最后检查时间显示
-   - 使用 `formatRelativeTime` 格式化 `service.last_check`
+2. 导入更新
+   - 新增 `Globe`, `Info` from lucide-react
 
 ## Risk Assessment
 
-- 改动范围：单文件，约 20 行
-- 影响范围：仅 UI 显示，不影响数据逻辑
+- 改动范围：修改 1 个文件
+- 影响范围：仅 UI 展示增强，不影响数据逻辑
 - 风险等级：低
+- 构建验证：通过
 
 ## Blockers
 
