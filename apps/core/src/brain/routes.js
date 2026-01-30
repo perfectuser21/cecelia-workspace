@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 import { Router } from 'express';
 import { getSystemStatus, getRecentDecisions, getWorkingMemory, getActivePolicy, getTopTasks } from './orchestrator.js';
 import { createSnapshot, getRecentSnapshots, getLatestSnapshot } from './perception.js';
@@ -732,8 +733,7 @@ router.post('/execution-callback', async (req, res) => {
       result,
       pr_url,
       duration_ms,
-      iterations,
-      stderr
+      iterations
     } = req.body;
 
     if (!task_id) {
