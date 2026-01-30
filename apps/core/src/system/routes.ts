@@ -18,6 +18,7 @@ import {
   setDegraded,
   checkNow,
   startHealthChecks,
+  getHealthStatus,
 } from './degrade.js';
 import {
   validateTraceId,
@@ -288,13 +289,23 @@ router.get('/status', async (_req: Request, res: Response) => {
 
 /**
  * GET /api/system/health
- * Quick health check for load balancers
+ * Enhanced health check with multi-service aggregation
+ *
+ * Returns:
+ * - overall: healthy | degraded | unhealthy
+ * - services: status and latency for each service (brain, workspace, quality, n8n)
+ * - degraded: whether system is in degraded mode
  */
 router.get('/health', (_req: Request, res: Response) => {
+  const healthStatus = getHealthStatus();
+
   return res.json({
     success: true,
-    status: 'healthy',
+    status: healthStatus.overall,
     service: 'cecelia-workspace',
+    services: healthStatus.services,
+    degraded: healthStatus.degraded,
+    degraded_reason: healthStatus.degraded_reason,
     timestamp: new Date().toISOString(),
   });
 });
