@@ -1228,6 +1228,103 @@ router.post('/dev-session/:sessionId/summary', async (req: Request, res: Respons
   }
 });
 
+// ============================================
+// Live Dashboard API (KR3)
+// ============================================
+
+/**
+ * GET /api/system/live
+ * Aggregated live status for dashboard - single call gets all data
+ *
+ * Returns:
+ * - health: workspace, brain, quality, n8n status
+ * - tasks: recent 20 tasks
+ * - dev_sessions: recent 10 dev sessions
+ * - governance: dlq_count, degrade_status, assertions
+ * - plan: last_plan_id, next_run_time, committed_count
+ */
+router.get('/live', async (_req: Request, res: Response) => {
+  try {
+    // Fetch all data in parallel for speed
+    const [brain, quality, n8n, devSessions, planStatus, assertions, degradeState] = await Promise.all([
+      getBrainStatus(),
+      getQualityStatus(),
+      getWorkflowsStatus(),
+      queryDevSessions({ limit: 10 }),
+      getPlanStatus(),
+      Promise.resolve(getStats()),
+      Promise.resolve(getDegradeState()),
+    ]);
+
+    // Get tasks from local task API
+    let tasks: any[] = [];
+    try {
+      const tasksResponse = await fetch('http://localhost:5212/api/tasks/tasks?limit=20');
+      const tasksData = await tasksResponse.json() as { tasks?: any[] };
+      tasks = (tasksData.tasks || []).slice(0, 20);
+    } catch {
+      // Tasks API may be unavailable
+    }
+
+    // Get DLQ count
+    let dlqCount = 0;
+    try {
+      const { stdout } = await execAsync(`bash ${DLQ_SCRIPT} status`);
+      const dlqStatus = JSON.parse(stdout);
+      dlqCount = (dlqStatus.memory?.count || 0) + (dlqStatus.evidence?.count || 0);
+    } catch {
+      // DLQ script may fail
+    }
+
+    // Determine overall workspace health
+    const healths = [brain.health, quality.health, n8n.health];
+    let workspaceHealth: 'ok' | 'degraded' | 'unavailable' = 'ok';
+    if (healths.includes('unavailable')) {
+      workspaceHealth = healths.every(h => h === 'unavailable') ? 'unavailable' : 'degraded';
+    } else if (healths.includes('degraded') || degradeState.degraded) {
+      workspaceHealth = 'degraded';
+    }
+
+    const liveData = {
+      health: {
+        workspace: workspaceHealth,
+        brain: brain.health,
+        quality: quality.health,
+        n8n: n8n.health,
+      },
+      tasks,
+      dev_sessions: devSessions,
+      governance: {
+        dlq_count: dlqCount,
+        degrade_status: degradeState.degraded ? 'degraded' : 'normal',
+        degrade_reason: degradeState.reason || null,
+        assertions: {
+          passed: assertions.passed,
+          failed: assertions.failed,
+        },
+      },
+      plan: {
+        last_plan_id: planStatus.plan?.plan_id || null,
+        scope: planStatus.plan?.scope || null,
+        next_run_time: null, // Nightly planner runs at 6 AM
+        committed_count: planStatus.progress.completed || 0,
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    return res.json({
+      success: true,
+      data: liveData,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
 /**
  * POST /api/system/dev-session/:sessionId/complete
  * Complete a dev session (with optional PR URL)
