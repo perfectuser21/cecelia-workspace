@@ -1,5 +1,4 @@
 dev
-branch: cp-trd-decomposer
-prd: .prd-trd-decomposer.md
-started: 2026-01-31T14:00:00+08:00
-tasks_created: true
+branch: cp-goal-comparison
+prd: .prd-goal-comparison.md
+started: 2026-01-31T01:15:00+00:00
