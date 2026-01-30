@@ -15,6 +15,7 @@
 - [Video Editor API](#video-editor-api)
 - [Scraping API](#scraping-api)
 - [AI Employees API](#ai-employees-api)
+- [System API](#system-api)
 
 ---
 
@@ -653,10 +654,63 @@ interface DepartmentWithStats extends Department {
 
 ---
 
+## System API
+
+**文件**: `src/api/system.api.ts`
+
+系统性能监控指标。
+
+### 类型定义
+
+#### SystemMetrics
+
+```typescript
+interface SystemMetrics {
+  cpuUsage: number;
+  memoryUsage: number;
+  memoryTotal: number;
+  memoryUsed: number;
+  avgResponseTime: number;
+  errorRate: number;
+  activeConnections: number;
+  uptime: number;
+}
+```
+
+#### MetricHistory
+
+```typescript
+interface MetricHistory {
+  timestamp: string;
+  cpuUsage: number;
+  memoryUsage: number;
+  responseTime: number;
+}
+```
+
+#### SystemMetricsResponse
+
+```typescript
+interface SystemMetricsResponse {
+  current: SystemMetrics;
+  history: MetricHistory[];
+}
+```
+
+### API 函数
+
+| 函数 | 说明 | 参数 | 返回值 |
+|-----|------|------|--------|
+| `getMetrics()` | 获取系统性能指标 | 无 | `SystemMetricsResponse` |
+
+返回当前系统的 CPU 使用率、内存使用率、平均响应时间、错误率、活跃连接数和运行时间，以及历史趋势数据。
+
+---
+
 ## 使用示例
 
 ```typescript
-import { accountsApi, metricsApi, publishApi } from '@/api';
+import { accountsApi, metricsApi, publishApi, systemApi } from '@/api';
 
 // 获取账号列表
 const accounts = await accountsApi.getAccounts();

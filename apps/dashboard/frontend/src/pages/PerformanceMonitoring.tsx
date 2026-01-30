@@ -1,28 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Cpu, HardDrive, Clock, AlertTriangle, RefreshCw, Loader2, XCircle, Activity } from 'lucide-react';
-
-interface SystemMetrics {
-  cpuUsage: number;
-  memoryUsage: number;
-  memoryTotal: number;
-  memoryUsed: number;
-  avgResponseTime: number;
-  errorRate: number;
-  activeConnections: number;
-  uptime: number;
-}
-
-interface MetricHistory {
-  timestamp: string;
-  cpuUsage: number;
-  memoryUsage: number;
-  responseTime: number;
-}
-
-interface ApiResponse {
-  current: SystemMetrics;
-  history: MetricHistory[];
-}
+import { systemApi, SystemMetricsResponse, SystemMetrics } from '@/api';
 
 function formatUptime(seconds: number): string {
   const days = Math.floor(seconds / 86400);
@@ -50,8 +28,31 @@ function getBarColor(value: number, thresholds: { warn: number; danger: number }
   return 'bg-green-500';
 }
 
+// Mock data when API unavailable
+function getMockData(): SystemMetricsResponse {
+  const now = Date.now();
+  return {
+    current: {
+      cpuUsage: 35 + Math.random() * 20,
+      memoryUsage: 62 + Math.random() * 10,
+      memoryTotal: 8 * 1024 * 1024 * 1024,
+      memoryUsed: 5 * 1024 * 1024 * 1024,
+      avgResponseTime: 120 + Math.random() * 80,
+      errorRate: 0.1 + Math.random() * 0.5,
+      activeConnections: 12 + Math.floor(Math.random() * 8),
+      uptime: 86400 * 3 + 3600 * 7,
+    },
+    history: Array.from({ length: 10 }, (_, i) => ({
+      timestamp: new Date(now - (9 - i) * 30000).toISOString(),
+      cpuUsage: 30 + Math.random() * 25,
+      memoryUsage: 60 + Math.random() * 15,
+      responseTime: 100 + Math.random() * 100,
+    })),
+  };
+}
+
 export default function PerformanceMonitoring() {
-  const [data, setData] = useState<ApiResponse | null>(null);
+  const [data, setData] = useState<SystemMetricsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lastUpdate, setLastUpdate] = useState('');
@@ -60,14 +61,8 @@ export default function PerformanceMonitoring() {
     try {
       setLoading(true);
       // Try to fetch from system metrics API
-      const res = await fetch('/api/v1/system/metrics');
-      if (!res.ok) {
-        // If API not available, use mock data for demo
-        setData(getMockData());
-      } else {
-        const json = await res.json();
-        setData(json);
-      }
+      const response = await systemApi.getMetrics();
+      setData(response);
       setError('');
       setLastUpdate(new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
     } catch {
@@ -86,7 +81,7 @@ export default function PerformanceMonitoring() {
     return () => clearInterval(t);
   }, []);
 
-  const metrics = data?.current || {
+  const metrics: SystemMetrics = data?.current || {
     cpuUsage: 0,
     memoryUsage: 0,
     memoryTotal: 0,
@@ -250,27 +245,4 @@ export default function PerformanceMonitoring() {
       )}
     </div>
   );
-}
-
-// Mock data when API unavailable
-function getMockData(): ApiResponse {
-  const now = Date.now();
-  return {
-    current: {
-      cpuUsage: 35 + Math.random() * 20,
-      memoryUsage: 62 + Math.random() * 10,
-      memoryTotal: 8 * 1024 * 1024 * 1024,
-      memoryUsed: 5 * 1024 * 1024 * 1024,
-      avgResponseTime: 120 + Math.random() * 80,
-      errorRate: 0.1 + Math.random() * 0.5,
-      activeConnections: 12 + Math.floor(Math.random() * 8),
-      uptime: 86400 * 3 + 3600 * 7,
-    },
-    history: Array.from({ length: 10 }, (_, i) => ({
-      timestamp: new Date(now - (9 - i) * 30000).toISOString(),
-      cpuUsage: 30 + Math.random() * 25,
-      memoryUsage: 60 + Math.random() * 15,
-      responseTime: 100 + Math.random() * 100,
-    })),
-  };
 }
