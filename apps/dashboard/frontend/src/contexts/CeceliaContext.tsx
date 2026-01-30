@@ -448,7 +448,7 @@ export function CeceliaProvider({ children, onNavigate }: CeceliaProviderProps) 
     <CeceliaContext.Provider value={value}>
       {children}
 
-      {/* Navigation Toast - Sci-fi slate themed, bottom-right */}
+      {/* Navigation Toast - Sci-fi purple-slate themed, bottom-right */}
       <div
         className={`fixed bottom-24 right-6 z-[100] transition-all duration-500 ease-out ${
           navToast.visible
@@ -457,43 +457,53 @@ export function CeceliaProvider({ children, onNavigate }: CeceliaProviderProps) 
         }`}
       >
         <div className="relative">
-          {/* Outer glow */}
-          <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 via-slate-400/20 to-cyan-500/20 rounded-2xl blur-lg" />
+          {/* Outer glow - purple accent */}
+          <div className="absolute -inset-2 bg-gradient-to-r from-purple-500/30 via-slate-500/20 to-purple-500/30 rounded-2xl blur-xl animate-pulse" />
 
           {/* Main card */}
-          <div className="relative bg-slate-900/95 backdrop-blur-xl rounded-xl border border-slate-600/50 overflow-hidden min-w-[240px]">
-            {/* Scanning line effect */}
+          <div className="relative bg-slate-900/95 backdrop-blur-xl rounded-xl border border-slate-600/50 overflow-hidden min-w-[260px]">
+            {/* Scanning line effect - purple tint */}
             <div
-              className="absolute inset-0 bg-gradient-to-b from-cyan-400/10 via-transparent to-transparent"
+              className="absolute inset-0 bg-gradient-to-b from-purple-400/15 via-transparent to-transparent"
               style={{ animation: 'scanLine 2s ease-in-out infinite' }}
             />
 
-            {/* Top border glow */}
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent" />
+            {/* Top border glow - purple */}
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-400/70 to-transparent" />
+
+            {/* Side accent lines */}
+            <div className="absolute left-0 top-0 bottom-0 w-px bg-gradient-to-b from-purple-500/50 via-slate-600/30 to-transparent" />
+            <div className="absolute right-0 top-0 bottom-0 w-px bg-gradient-to-b from-purple-500/50 via-slate-600/30 to-transparent" />
 
             {/* Content */}
             <div className="relative px-5 py-4">
               <div className="flex items-center gap-4">
-                {/* Icon with glow */}
+                {/* Icon with enhanced glow */}
                 <div className="relative">
-                  <div className="absolute inset-0 bg-cyan-400/30 rounded-lg blur-md" />
-                  <div className="relative p-2.5 bg-slate-800 rounded-lg border border-slate-600/50">
-                    <Navigation className="w-5 h-5 text-cyan-400" />
+                  <div className="absolute inset-0 bg-purple-500/40 rounded-lg blur-lg" />
+                  <div className="absolute inset-0 bg-purple-400/20 rounded-lg blur-sm animate-pulse" />
+                  <div className="relative p-2.5 bg-gradient-to-br from-slate-700 via-purple-900/30 to-slate-800 rounded-lg border border-purple-500/30">
+                    <Navigation className="w-5 h-5 text-purple-300" />
                   </div>
                 </div>
 
                 {/* Text */}
                 <div className="flex flex-col">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-widest font-medium">NAVIGATING</span>
+                  <span className="text-[10px] text-purple-400/70 uppercase tracking-widest font-medium">NAVIGATING</span>
                   <span className="text-base font-semibold text-slate-100 tracking-wide">{navToast.destination}</span>
+                </div>
+
+                {/* Sparkle indicator */}
+                <div className="ml-auto">
+                  <Sparkles className="w-4 h-4 text-purple-400/60 animate-pulse" />
                 </div>
               </div>
             </div>
 
-            {/* Bottom progress bar */}
-            <div className="h-0.5 bg-slate-800">
+            {/* Bottom progress bar - purple gradient */}
+            <div className="h-1 bg-slate-800/80">
               <div
-                className="h-full bg-gradient-to-r from-cyan-500 via-cyan-400 to-cyan-500"
+                className="h-full bg-gradient-to-r from-purple-600 via-purple-400 to-purple-600 shadow-lg shadow-purple-500/50"
                 style={{ animation: 'progress 2.5s ease-out forwards' }}
               />
             </div>
