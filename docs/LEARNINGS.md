@@ -165,3 +165,22 @@
 3. 测试使用集成测试（调用实际 API）而非 mock，验证更真实
 
 **影响程度**: Low - 新增功能模块，无破坏性变更
+
+### [2026-01-31] Projects List Page Verification
+
+**任务**: 验证 Projects 列表页面功能完善（Nightly Planner 自动生成任务）
+
+**Bug**: 无
+
+**技术要点**:
+1. Nightly Planner 自动生成的任务可能是验证性任务，无需新增代码
+2. 已有功能验证：ProjectsDashboard.tsx 和 ProjectDetail.tsx 功能完善
+3. API 端点 `/api/tasks/projects` 正常返回数据
+
+**优化点**:
+1. 流程顺畅，验证性任务处理得当
+2. Nightly Planner 生成的 PRD 较简略，可考虑添加更多上下文
+
+**影响程度**: N/A - 验证性任务，无代码变更
+
+---
