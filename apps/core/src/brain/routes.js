@@ -8,6 +8,7 @@ import { getTickStatus, enableTick, disableTick, executeTick } from './tick.js';
 import { parseIntent, parseAndCreate, INTENT_TYPES } from './intent.js';
 import pool from '../task-system/db.js';
 import { decomposeTRD, getTRDProgress, listTRDs } from './decomposer.js';
+import { compareGoalProgress, generateDecision, executeDecision, getDecisionHistory, rollbackDecision } from './decision.js';
 import crypto from 'crypto';
 
 const router = Router();
@@ -908,6 +909,117 @@ router.get('/trds', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to list TRDs',
+      details: err.message
+    });
+  }
+});
+
+
+/**
+ * POST /api/brain/goal/compare
+ * Compare goal progress against expected progress
+ */
+router.post('/goal/compare', async (req, res) => {
+  try {
+    const { goal_id } = req.body;
+    const report = await compareGoalProgress(goal_id || null);
+
+    res.json({
+      success: true,
+      ...report
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to compare goal progress',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * POST /api/brain/decide
+ * Generate decision based on current state
+ */
+router.post('/decide', async (req, res) => {
+  try {
+    const context = req.body.context || {};
+    const decision = await generateDecision(context);
+
+    res.json({
+      success: true,
+      ...decision
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate decision',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * POST /api/brain/decision/:id/execute
+ * Execute a pending decision
+ */
+router.post('/decision/:id/execute', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await executeDecision(id);
+
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    res.status(err.message.includes('not found') ? 404 : 500).json({
+      success: false,
+      error: 'Failed to execute decision',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * POST /api/brain/decision/:id/rollback
+ * Rollback an executed decision
+ */
+router.post('/decision/:id/rollback', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await rollbackDecision(id);
+
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    res.status(err.message.includes('not found') ? 404 : 500).json({
+      success: false,
+      error: 'Failed to rollback decision',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * GET /api/brain/decisions
+ * Get decision history
+ */
+router.get('/decisions', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 20;
+    const decisions = await getDecisionHistory(limit);
+
+    res.json({
+      success: true,
+      decisions
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get decision history',
       details: err.message
     });
   }
