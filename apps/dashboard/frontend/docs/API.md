@@ -172,6 +172,21 @@ interface DashboardMetrics {
 
 ### 类型定义
 
+#### Notification
+
+```typescript
+interface Notification {
+  id: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  category: 'login' | 'collection' | 'workflow' | 'system';
+  title: string;
+  message: string;
+  data?: any;
+  isRead: boolean;
+  createdAt: string;
+}
+```
+
 #### SystemSettings
 
 ```typescript
