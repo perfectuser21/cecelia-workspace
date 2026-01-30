@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Cpu, HardDrive, Clock, AlertTriangle, RefreshCw, Loader2, XCircle, Activity } from 'lucide-react';
-import { systemApi, SystemMetricsResponse, SystemMetrics } from '@/api';
+import { Cpu, HardDrive, Clock, AlertTriangle, RefreshCw, Loader2, XCircle, Activity, Server, CheckCircle2 } from 'lucide-react';
+import { systemApi, SystemMetricsResponse, SystemMetrics, SystemHealthResponse, ServiceHealth } from '@/api';
 
 function formatUptime(seconds: number): string {
   const days = Math.floor(seconds / 86400);
@@ -51,8 +51,17 @@ function getMockData(): SystemMetricsResponse {
   };
 }
 
+// Service name labels
+const SERVICE_LABELS: Record<string, string> = {
+  brain: 'Brain',
+  workspace: 'Workspace',
+  quality: 'Quality',
+  n8n: 'N8N',
+};
+
 export default function PerformanceMonitoring() {
   const [data, setData] = useState<SystemMetricsResponse | null>(null);
+  const [healthData, setHealthData] = useState<SystemHealthResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lastUpdate, setLastUpdate] = useState('');
@@ -60,9 +69,22 @@ export default function PerformanceMonitoring() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Try to fetch from system metrics API
-      const response = await systemApi.getMetrics();
-      setData(response);
+      // Fetch both metrics and health in parallel
+      const [metricsResponse, healthResponse] = await Promise.allSettled([
+        systemApi.getMetrics(),
+        systemApi.getHealth(),
+      ]);
+
+      if (metricsResponse.status === 'fulfilled') {
+        setData(metricsResponse.value);
+      } else {
+        setData(getMockData());
+      }
+
+      if (healthResponse.status === 'fulfilled') {
+        setHealthData(healthResponse.value);
+      }
+
       setError('');
       setLastUpdate(new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
     } catch {
@@ -190,6 +212,78 @@ export default function PerformanceMonitoring() {
         </div>
       </div>
 
+      {/* Service Health Status */}
+      {healthData && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden mb-4">
+          <div className="px-5 py-4 border-b border-gray-50 dark:border-gray-700/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-purple-50 dark:bg-purple-900/20">
+                  <Server className="w-5 h-5 text-purple-500" />
+                </div>
+                <div>
+                  <div className="font-medium text-gray-900 dark:text-white">服务健康状态</div>
+                  <div className="text-xs text-gray-500 mt-0.5">多服务聚合健康检查</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className={`w-2.5 h-2.5 rounded-full ${
+                  healthData.status === 'healthy' ? 'bg-green-500' :
+                  healthData.status === 'degraded' ? 'bg-amber-500' : 'bg-red-500'
+                } animate-pulse`} />
+                <span className={`text-sm font-medium ${
+                  healthData.status === 'healthy' ? 'text-green-500' :
+                  healthData.status === 'degraded' ? 'text-amber-500' : 'text-red-500'
+                }`}>
+                  {healthData.status === 'healthy' ? '健康' :
+                   healthData.status === 'degraded' ? '降级' : '异常'}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="px-5 py-4">
+            <div className="grid grid-cols-4 gap-4">
+              {Object.entries(healthData.services).map(([name, service]) => (
+                <div
+                  key={name}
+                  className={`p-3 rounded-lg border ${
+                    service.status === 'healthy'
+                      ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
+                      : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {SERVICE_LABELS[name] || name}
+                    </span>
+                    {service.status === 'healthy' ? (
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-red-500" />
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {service.latency_ms !== null ? (
+                      <span>延迟: {service.latency_ms}ms</span>
+                    ) : (
+                      <span className="text-red-500">{service.error || '不可用'}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {healthData.degraded && healthData.degraded_reason && (
+              <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span className="text-sm font-medium">降级原因: {healthData.degraded_reason}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* System Status */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-50 dark:border-gray-700/50">
@@ -216,8 +310,20 @@ export default function PerformanceMonitoring() {
             <div>
               <div className="text-xs text-gray-500 mb-1">状态</div>
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-lg font-semibold text-green-500">正常</span>
+                <div className={`w-2 h-2 rounded-full ${
+                  healthData?.status === 'healthy' ? 'bg-green-500' :
+                  healthData?.status === 'degraded' ? 'bg-amber-500' :
+                  healthData?.status === 'unhealthy' ? 'bg-red-500' : 'bg-green-500'
+                } animate-pulse`} />
+                <span className={`text-lg font-semibold ${
+                  healthData?.status === 'healthy' ? 'text-green-500' :
+                  healthData?.status === 'degraded' ? 'text-amber-500' :
+                  healthData?.status === 'unhealthy' ? 'text-red-500' : 'text-green-500'
+                }`}>
+                  {healthData?.status === 'healthy' ? '正常' :
+                   healthData?.status === 'degraded' ? '降级' :
+                   healthData?.status === 'unhealthy' ? '异常' : '正常'}
+                </span>
               </div>
             </div>
           </div>
