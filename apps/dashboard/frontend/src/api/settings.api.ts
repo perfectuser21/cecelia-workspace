@@ -114,17 +114,24 @@ export const settingsApi = {
     return response.data.count;
   },
 
-  // Get system health
+  // Get system health (multi-service aggregated)
   getSystemHealth: async () => {
     const response = await apiClient.get<{
-      status: 'healthy' | 'degraded' | 'down';
-      components: {
-        database: 'up' | 'down';
-        collector: 'up' | 'down';
+      success: boolean;
+      status: 'healthy' | 'degraded' | 'unhealthy';
+      service: string;
+      services: {
+        [key: string]: {
+          status: 'healthy' | 'unhealthy';
+          latency_ms: number | null;
+          last_check: string | null;
+          error: string | null;
+        };
       };
-      uptime: number;
-      version: string;
-    }>('/v1/health');
+      degraded: boolean;
+      degraded_reason: string | null;
+      timestamp: string;
+    }>('/system/health');
     return response.data;
   },
 };
