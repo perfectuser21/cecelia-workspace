@@ -1,4 +1,4 @@
-# QA Decision - Organ Unification Phase 1
+# QA Decision - Phase 5.1 Memory Schema
 
 Decision: NO_RCI
 Priority: P1
@@ -8,10 +8,10 @@ RepoType: Business
 
 | DoD Item | Method | Location |
 |----------|--------|----------|
-| `/api/system/status` 聚合 brain + quality + workflows | auto | tests/system-status.test.ts |
-| `/api/panorama/full` 返回完整系统全景 | auto | tests/panorama-full.test.ts |
-| 请求日志记录到 decision_log 表 | manual | manual:curl + psql 验证 |
-| 服务降级时返回 unavailable 状态 | auto | tests/system-status.test.ts |
+| 定义 MemoryEntry 表结构 | manual | manual: SQL migration verification |
+| POST /api/brain/memory 带验证 | auto | tests/memory.test.ts |
+| GET /api/brain/memory 过滤查询 | auto | tests/memory.test.ts |
+| 兼容旧 set-memory action | auto | tests/memory.test.ts |
 
 ## RCI
 
@@ -20,4 +20,4 @@ update: []
 
 ## Reason
 
-Phase 1 是聚合层强化，新增 2 个聚合端点 + 1 个中间件。无回归风险（新增功能），不需要 RCI。测试覆盖新端点响应格式和服务降级逻辑。
+Memory Schema 是新功能，不涉及现有核心路径的回归。属于 Phase 5 智能层基座，优先级 P1。API 兼容性通过测试保证，无需纳入全量回归契约。

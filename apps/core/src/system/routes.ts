@@ -27,12 +27,30 @@ import {
   getStats,
   resetStats,
 } from './assertions.js';
+import {
+  initMemoryTable,
+  writeMemory,
+  readMemory,
+  queryMemory,
+  deleteMemory,
+  cleanupExpiredMemory,
+  getMemoryStats,
+  validateMemoryEntry,
+  MEMORY_LAYERS,
+  CATEGORY_MAP,
+  type MemoryLayer,
+} from './memory.js';
 
 const execAsync = promisify(exec);
 const router = Router();
 
 // Start health checks on module load
 startHealthChecks();
+
+// Initialize memory table on module load
+initMemoryTable().catch(err => {
+  console.error('Failed to initialize memory table:', err);
+});
 
 // ES module compatibility for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -441,6 +459,236 @@ router.post('/assertions/reset', (_req: Request, res: Response) => {
     stats: getStats(),
     timestamp: new Date().toISOString(),
   });
+});
+
+// ============================================
+// Memory API Routes
+// ============================================
+
+/**
+ * GET /api/system/memory
+ * Query memory entries with optional filters
+ */
+router.get('/memory', async (req: Request, res: Response) => {
+  try {
+    const layer = req.query.layer as MemoryLayer | undefined;
+    const category = req.query.category as string | undefined;
+    const keys = req.query.keys ? (req.query.keys as string).split(',') : undefined;
+    const includeExpired = req.query.includeExpired === 'true';
+
+    // Validate layer if provided
+    if (layer && !MEMORY_LAYERS.includes(layer)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid layer. Must be one of: ${MEMORY_LAYERS.join(', ')}`,
+      });
+    }
+
+    const entries = await queryMemory({ layer, category, keys, includeExpired });
+
+    return res.json({
+      success: true,
+      count: entries.length,
+      entries,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * GET /api/system/memory/stats
+ * Get memory statistics
+ */
+router.get('/memory/stats', async (_req: Request, res: Response) => {
+  try {
+    const stats = await getMemoryStats();
+
+    return res.json({
+      success: true,
+      stats,
+      schema: {
+        layers: MEMORY_LAYERS,
+        categories: CATEGORY_MAP,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * GET /api/system/memory/:key
+ * Read a single memory entry by key
+ */
+router.get('/memory/:key', async (req: Request, res: Response) => {
+  try {
+    const { key } = req.params;
+    const entry = await readMemory(key);
+
+    if (!entry) {
+      return res.status(404).json({
+        success: false,
+        error: 'Memory entry not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      entry,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * POST /api/system/memory
+ * Write a memory entry (with validation)
+ */
+router.post('/memory', async (req: Request, res: Response) => {
+  try {
+    const { layer, category, key, value, expires_at, task_id, session_id, source, confidence } = req.body;
+
+    // Validate input
+    const validation = validateMemoryEntry({ layer, category, key, value, source });
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors: validation.errors,
+      });
+    }
+
+    const entry = await writeMemory({
+      layer,
+      category,
+      key,
+      value,
+      expires_at,
+      task_id,
+      session_id,
+      source,
+      confidence,
+    });
+
+    return res.status(201).json({
+      success: true,
+      entry,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * POST /api/system/memory/batch
+ * Read multiple memory entries by keys
+ */
+router.post('/memory/batch', async (req: Request, res: Response) => {
+  try {
+    const { keys } = req.body;
+
+    if (!Array.isArray(keys) || keys.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'keys must be a non-empty array',
+      });
+    }
+
+    const entries = await queryMemory({ keys });
+
+    // Create a map for easy lookup
+    const entriesMap: Record<string, any> = {};
+    for (const entry of entries) {
+      entriesMap[entry.key] = entry;
+    }
+
+    return res.json({
+      success: true,
+      count: entries.length,
+      entries: entriesMap,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/system/memory/:key
+ * Delete a memory entry
+ */
+router.delete('/memory/:key', async (req: Request, res: Response) => {
+  try {
+    const { key } = req.params;
+    const deleted = await deleteMemory(key);
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        error: 'Memory entry not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      deleted: key,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+/**
+ * POST /api/system/memory/gc
+ * Clean up expired memory entries
+ */
+router.post('/memory/gc', async (_req: Request, res: Response) => {
+  try {
+    const deletedCount = await cleanupExpiredMemory();
+
+    return res.json({
+      success: true,
+      deleted: deletedCount,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
 });
 
 export default router;
