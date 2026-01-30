@@ -1,14 +1,22 @@
-# Audit Report: 修复登录后循环跳转问题
+# Audit Report
 
-## Decision: PASS ✅
+Branch: cp-api-docs-update
+Date: 2026-01-30
+Scope: docs/API.md
+Target Level: L2
 
-## L1: 阻塞性问题 ✅
-- [x] TypeScript 编译通过
-- [x] 修改逻辑正确
+## Summary
+- L1: 0
+- L2: 0
+- L3: 0
+- L4: 0
 
-## 代码审查
-**修改**: 将 `navigate(redirect)` 改为 `window.location.href = redirect`
+## Decision: PASS
 
-**原因**: login() 使用 setState 是异步的，navigate() 立即执行会导致跳转时状态未更新
+## Findings
 
-**结果**: PASS
+无代码变更，仅新增文档文件。
+
+## Blockers
+
+无
