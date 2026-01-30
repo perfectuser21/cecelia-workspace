@@ -1,45 +1,28 @@
-# Audit Report
+# Audit Report - 健康检查历史记录增强
 
-Branch: cp-01310445-health-history
-Date: 2026-01-31
-Scope: src/components/ServiceHealthCard.tsx, src/api/system.api.ts
-Target Level: L2
+Decision: PASS
 
-## Summary
+## 审计结果
 
-| Level | Count |
-|-------|-------|
-| L1    | 0     |
-| L2    | 0     |
-| L3    | 0     |
-| L4    | 0     |
+| 检查项 | 状态 | 说明 |
+|--------|------|------|
+| 代码实现 | ✅ | ServiceHealthCard 展开时显示历史记录 |
+| 类型安全 | ✅ | 使用 HealthCheckRecord 类型定义 |
+| 构建通过 | ✅ | npm run build 成功 |
+| UI 一致性 | ✅ | 使用已有颜色标识逻辑 |
 
-## Decision: PASS
+## 变更文件
 
-## Findings
+- `src/api/system.api.ts` - HealthCheckRecord 类型已存在
+- `src/components/ServiceHealthCard.tsx` - 添加历史记录展示部分
+- `src/pages/PerformanceMonitoring.tsx` - 添加 healthHistory 状态管理
 
-无问题发现。
+## 风险评估
 
-## Details
+- 影响范围: 仅 PerformanceMonitoring 页面
+- 向后兼容: 是 (history prop 可选)
+- 性能影响: 低 (最多保留 20 条记录)
 
-### 代码变更审查
+## 结论
 
-1. **ServiceHealthCard.tsx**
-   - 添加了 `history` prop 支持
-   - 添加了 `HealthCheckRecord` 类型导入
-   - 添加了历史记录 UI 显示
-   - 代码风格一致，无安全问题
-
-2. **system.api.ts**
-   - 添加了 `HealthCheckRecord` 接口定义
-   - 添加了 `ServiceHealthWithHistory` 扩展接口
-   - 类型定义正确，无问题
-
-### 构建验证
-
-- `npm run build` 通过
-- TypeScript 类型检查通过
-
-## Blockers
-
-无阻塞项。
+小范围 UI 增强，代码质量良好，构建通过，无安全隐患。
