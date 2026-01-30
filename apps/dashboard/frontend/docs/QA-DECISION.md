@@ -6,11 +6,11 @@ RepoType: Business
 
 ## Tests
 
-| DoD Item | Method | Location |
+| dod_item | method | location |
 |----------|--------|----------|
-| index.ts 导出 contents.api | manual | manual:检查导出语句存在且无编译错误 |
-| index.ts 导出 ai-employees.api | manual | manual:检查导出语句存在且无编译错误 |
-| 代码通过 CI | auto | contract:CI-lint-build |
+| 服务卡片显示最后检查时间 | manual | manual:目视检查页面显示 |
+| 延迟显示正确 | manual | manual:目视检查延迟数值 |
+| 代码通过 lint 和类型检查 | auto | npm run lint && npm run typecheck |
 
 ## RCI
 
@@ -19,4 +19,4 @@ RepoType: Business
 
 ## Reason
 
-简单的模块导出补全，不涉及功能逻辑变更，无需纳入回归契约。通过 lint 和 build 即可验证正确性。
+低风险 UI 改动（单文件、无 API 变更、无数据模型变更），RISK SCORE = 0，无需纳入回归契约。
