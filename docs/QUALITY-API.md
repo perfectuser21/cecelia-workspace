@@ -22,7 +22,7 @@ Cecelia Quality 是独立的质量保障系统，专注于 QA 任务执行、证
 
 ### 只读端点（无鉴权）
 
-#### 健康检查
+#### 健康检查（基础）
 
 ```bash
 GET /api/health
@@ -34,6 +34,75 @@ GET /api/health
   "status": "ok"
 }
 ```
+
+#### 健康检查（多服务聚合）
+
+通过 Workspace 访问增强版健康检查，返回所有服务的状态和延迟信息。
+
+```bash
+GET /api/system/health
+```
+
+返回:
+```json
+{
+  "success": true,
+  "status": "healthy",
+  "service": "cecelia-workspace",
+  "services": {
+    "brain": {
+      "status": "healthy",
+      "latency_ms": 45,
+      "last_check": "2026-01-30T10:00:00.000Z",
+      "error": null
+    },
+    "workspace": {
+      "status": "healthy",
+      "latency_ms": 12,
+      "last_check": "2026-01-30T10:00:00.000Z",
+      "error": null
+    },
+    "quality": {
+      "status": "healthy",
+      "latency_ms": 28,
+      "last_check": "2026-01-30T10:00:00.000Z",
+      "error": null
+    },
+    "n8n": {
+      "status": "unhealthy",
+      "latency_ms": 5000,
+      "last_check": "2026-01-30T10:00:00.000Z",
+      "error": "Connection timeout"
+    }
+  },
+  "degraded": false,
+  "degraded_reason": null,
+  "timestamp": "2026-01-30T10:00:00.000Z"
+}
+```
+
+**字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `status` | string | 整体状态：`healthy`（所有服务正常）、`degraded`（部分服务异常）、`unhealthy`（所有服务异常） |
+| `service` | string | 服务名称（固定为 `cecelia-workspace`） |
+| `services` | object | 各服务详细状态 |
+| `services.*.status` | string | 单个服务状态：`healthy` 或 `unhealthy` |
+| `services.*.latency_ms` | number\|null | 健康检查延迟（毫秒） |
+| `services.*.last_check` | string\|null | 最后检查时间（ISO 8601） |
+| `services.*.error` | string\|null | 错误信息（服务异常时） |
+| `degraded` | boolean | 是否处于降级模式（Brain 服务不可用时为 true） |
+| `degraded_reason` | string\|null | 降级原因 |
+
+**监控的服务：**
+
+| 服务 | 端点 | 说明 |
+|------|------|------|
+| brain | `http://localhost:5220/api/brain/tick/status` | 语义大脑服务 |
+| workspace | `http://localhost:5212/api/system/health` | Workspace 自身（循环检测） |
+| quality | `http://localhost:5681/api/state` | QA 质量服务 |
+| n8n | `http://localhost:5679/healthz` | N8N 工作流服务 |
 
 #### 系统状态
 

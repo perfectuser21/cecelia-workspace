@@ -1,23 +1,16 @@
-# QA Decision - KR1: Headless /dev Session with Memory Summary
+# QA Decision
 
 Decision: NO_RCI
-Priority: P1
-RepoType: Engine
+Priority: P2
+RepoType: Business
 
-## Tests
+Tests:
+  - dod_item: "更新健康检查 API 文档以反映新的多服务聚合响应格式"
+    method: manual
+    location: manual:查看 docs/QUALITY-API.md 中健康检查端点文档是否匹配 routes.ts 实现
 
-| DoD Item | Method | Location |
-|----------|--------|----------|
-| 能生成一个 Dev Session | auto | apps/core/src/system/__tests__/dev-session.test.ts |
-| 能自动通过 Quality Gate | auto | apps/core/src/system/__tests__/dev-session.test.ts |
-| 能自动形成一个 Memory Summary | auto | apps/core/src/system/__tests__/dev-session.test.ts |
-| verify-dev-session.sh 输出 KR1 PASS | manual | scripts/verify-dev-session.sh |
+RCI:
+  new: []
+  update: []
 
-## RCI
-
-new: []
-update: []
-
-## Reason
-
-KR1 是内部开发工具功能，用于追踪无头 /dev 执行。属于 Platform Feature (F-CECELIA)，不直接影响业务功能，暂不需要 RCI。功能验收通过 verify-dev-session.sh 脚本验证。
+Reason: 纯文档更新任务，无代码变更，不需要回归契约。手动验证文档内容与实际 API 响应格式匹配即可。
