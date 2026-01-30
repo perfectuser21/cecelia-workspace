@@ -203,6 +203,22 @@ if [[ -n "$CREATED_SESSION_ID" ]]; then
         log_fail "Summary 生成失败: $SUMMARY_RESPONSE"
     fi
 
+    # Complete the session (mark as completed)
+    COMPLETE_RESPONSE=$(curl -s -X POST "${CORE_API}/api/system/dev-session/${CREATED_SESSION_ID}/complete" \
+        -H "Content-Type: application/json" \
+        -d '{"status": "completed"}' 2>/dev/null || echo '{"success":false}')
+
+    if echo "$COMPLETE_RESPONSE" | jq -e '.success == true' >/dev/null 2>&1; then
+        FINAL_STATUS=$(echo "$COMPLETE_RESPONSE" | jq -r '.session.status')
+        if [[ "$FINAL_STATUS" == "completed" ]]; then
+            log_pass "Session 标记为 completed"
+        else
+            log_fail "Session 状态不是 completed: $FINAL_STATUS"
+        fi
+    else
+        log_fail "Session complete 失败: $COMPLETE_RESPONSE"
+    fi
+
     # Check summary in memory
     SUMMARY_MEMORY=$(curl -s "${CORE_API}/api/system/memory?layer=episodic&category=event" 2>/dev/null || echo '{"entries":[]}')
     SUMMARY_COUNT=$(echo "$SUMMARY_MEMORY" | jq '[.entries[] | select(.key | startswith("summary_"))] | length' 2>/dev/null || echo "0")
