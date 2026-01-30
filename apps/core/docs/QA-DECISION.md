@@ -1,4 +1,4 @@
-# QA Decision - TRD 分解器
+# QA Decision - Goal Comparison (Stage 3)
 
 Decision: NO_RCI
 Priority: P1
@@ -8,9 +8,11 @@ RepoType: Engine
 
 | DoD Item | Method | Location |
 |----------|--------|----------|
-| TRD 分解 API | manual | manual:调用 decompose API 验证返回 |
-| 任务依赖关系 | manual | manual:检查 depends_on 字段 |
-| 进度追踪 API | manual | manual:调用 progress API 验证 |
+| Goal Compare API | manual | manual:调用 compare API 验证返回 |
+| Decide API | manual | manual:调用 decide API 验证 |
+| Execute Decision API | manual | manual:调用 execute API 验证 |
+| Decision History API | manual | manual:调用 decisions API 验证 |
+| Tick Integration | manual | manual:检查 tick 日志 |
 
 ## RCI
 
@@ -19,38 +21,34 @@ RepoType: Engine
 
 ## Reason
 
-1. **Engine 类型项目**：Brain API 核心功能
-2. **API 测试为主**：验证分解逻辑和数据存储
-3. **手动验证**：首次实现，需观察分解结果质量
+1. **Engine 类型项目**：Brain API 决策引擎
+2. **API 测试为主**：验证决策生成和执行
+3. **手动验证**：首次实现，需观察决策质量
 
 ## 测试计划
 
 ### 手动验证步骤
 
-1. **AC1 验证 - TRD 分解**：
+1. **AC1 验证 - Goal Compare**：
    ```bash
-   # 调用分解 API
-   curl -X POST http://localhost:5212/api/brain/trd/decompose \
+   curl -X POST http://localhost:5212/api/brain/goal/compare \
      -H "Content-Type: application/json" \
-     -d '{
-       "trd_content": "# 测试 TRD\n\n## 阶段1\n- 任务A\n- 任务B\n\n## 阶段2\n- 任务C"
-     }'
-
-   # 验证返回包含 milestones 和 tasks
+     -d '{}'
    ```
 
-2. **AC2 验证 - 依赖关系**：
+2. **AC2 验证 - Decide**：
    ```bash
-   # 检查创建的 tasks
-   curl http://localhost:5212/api/brain/tasks
-
-   # 验证 depends_on 字段正确设置
+   curl -X POST http://localhost:5212/api/brain/decide \
+     -H "Content-Type: application/json" \
+     -d '{"context": {"trigger": "manual"}}'
    ```
 
-3. **AC3 验证 - 进度追踪**：
+3. **AC3 验证 - Execute**：
    ```bash
-   # 调用进度 API
-   curl http://localhost:5212/api/brain/trd/<trd_id>/progress
+   curl -X POST http://localhost:5212/api/brain/decision/<id>/execute
+   ```
 
-   # 验证返回正确的进度百分比
+4. **AC4 验证 - Decision History**：
+   ```bash
+   curl http://localhost:5212/api/brain/decisions
    ```

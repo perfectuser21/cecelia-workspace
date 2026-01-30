@@ -1,8 +1,8 @@
 # Audit Report
 
-Branch: cp-trd-decomposer
+Branch: cp-goal-comparison
 Date: 2026-01-31
-Scope: src/brain/decomposer.js, src/brain/routes.js, migrations/002_trd_tables.sql
+Scope: src/brain/decision.js, src/brain/routes.js, migrations/003_decisions_table.sql
 Target Level: L2
 
 ## Summary
@@ -18,28 +18,29 @@ Target Level: L2
 
 ## Changes Reviewed
 
-### decomposer.js (New)
-- TRD decomposition module with parsing and task generation
-- `parseTRDSections()`: Parses markdown headers and list items
-- `extractMilestones()`: Groups sections into milestones by level-2 headers
-- `generatePRD()`: Creates PRD content from milestone
-- `createTasksFromPRD()`: Generates tasks with dependencies
-- `establishDependencies()`: Links tasks across milestones
-- `decomposeTRD()`: Main function - stores TRD and creates tasks in DB
-- `getTRDProgress()`: Queries task completion status
-- `listTRDs()`: Lists all TRD decompositions with progress
+### decision.js (New)
+- Decision engine module with goal comparison and decision generation
+- `calculateExpectedProgress()`: Calculates expected progress based on time elapsed
+- `getBlockedTasks()`: Identifies tasks blocked for too long
+- `generateRecommendations()`: Creates recommendations based on goal status
+- `compareGoalProgress()`: Main comparison function - compares actual vs expected progress
+- `generateDecision()`: Generates decisions with actions based on current state
+- `executeDecision()`: Executes pending decisions (reprioritize, escalate, retry, skip)
+- `getDecisionHistory()`: Returns decision history
+- `rollbackDecision()`: Marks executed decision as rolled back
 
 ### routes.js (Modified)
-- Added import for decomposer functions
-- Added `POST /api/brain/trd/decompose` endpoint
-- Added `GET /api/brain/trd/:id/progress` endpoint
-- Added `GET /api/brain/trds` endpoint
+- Added import for decision functions
+- Added `POST /api/brain/goal/compare` endpoint
+- Added `POST /api/brain/decide` endpoint
+- Added `POST /api/brain/decision/:id/execute` endpoint
+- Added `POST /api/brain/decision/:id/rollback` endpoint
+- Added `GET /api/brain/decisions` endpoint
 - All endpoints have proper error handling and validation
 
-### migrations/002_trd_tables.sql (New)
-- Creates `trd_decompositions` table (avoids conflict with existing `trds`)
-- Creates `trd_decomposition_tasks` relation table
-- Adds indexes for trd_id, task_id, project_id, goal_id
+### migrations/003_decisions_table.sql (New)
+- Creates `decisions` table (id, trigger, context, actions, confidence, status, timestamps)
+- Adds indexes for status, trigger, and created_at
 
 ## Findings
 
@@ -53,6 +54,6 @@ Target Level: L2
 
 - Build passes successfully
 - Database migration executed without errors
-- Uses new table names to avoid conflict with existing schema
 - Proper error handling in all API endpoints
 - Input validation for required fields
+- Confidence scoring for decision quality
