@@ -1,5 +1,5 @@
 dev
-branch: cp-kr2-performance-monitor
+branch: cp-01302240-perf-monitor-api
 prd: .prd.md
-started: 2026-01-30T22:20:13+08:00
+started: 2026-01-30T22:40:00+08:00
 tasks_created: true
