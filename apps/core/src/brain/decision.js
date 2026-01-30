@@ -44,8 +44,8 @@ function getBlockedTasks(tasks) {
   const blocked = [];
 
   for (const task of tasks) {
-    if (task.status === 'in_progress' && task.updated_at) {
-      const hours = (now - new Date(task.updated_at)) / (1000 * 60 * 60);
+    if (task.status === 'in_progress' && task.started_at) {
+      const hours = (now - new Date(task.started_at)) / (1000 * 60 * 60);
       if (hours > STALE_THRESHOLD_HOURS) {
         blocked.push(task.id);
       }
@@ -112,7 +112,7 @@ export async function compareGoalProgress(goalId = null) {
   for (const row of goalsResult.rows) {
     // Get tasks for this goal to check for blocked ones
     const tasksResult = await pool.query(`
-      SELECT id, status, updated_at
+      SELECT id, status, started_at
       FROM tasks
       WHERE goal_id = $1 AND status = 'in_progress'
     `, [row.id]);
@@ -244,7 +244,7 @@ export async function generateDecision(context = {}) {
     SELECT id, title, goal_id
     FROM tasks
     WHERE status = 'failed'
-    ORDER BY updated_at DESC
+    ORDER BY created_at DESC
     LIMIT 5
   `);
 
@@ -324,7 +324,7 @@ export async function executeDecision(decisionId) {
       switch (action.type) {
         case 'reprioritize':
           await pool.query(
-            'UPDATE tasks SET priority = $1, updated_at = NOW() WHERE id = $2',
+            'UPDATE tasks SET priority = $1 WHERE id = $2',
             [action.new_priority || 'P1', action.target_id]
           );
           result = { success: true, action: 'reprioritized' };
@@ -334,28 +334,27 @@ export async function executeDecision(decisionId) {
           // Mark task as needing attention
           await pool.query(`
             UPDATE tasks
-            SET payload = COALESCE(payload, '{}'::jsonb) || '{"needs_attention": true}'::jsonb,
-                updated_at = NOW()
+            SET payload = COALESCE(payload, '{}'::jsonb) || '{"needs_attention": true}'::jsonb
             WHERE id = $1
           `, [action.target_id]);
           result = { success: true, action: 'escalated' };
           break;
 
         case 'retry':
-          // Reset task to pending
+          // Reset task to queued for retry
           await pool.query(
-            'UPDATE tasks SET status = $1, updated_at = NOW() WHERE id = $2',
-            ['pending', action.target_id]
+            'UPDATE tasks SET status = $1 WHERE id = $2',
+            ['queued', action.target_id]
           );
-          result = { success: true, action: 'reset_to_pending' };
+          result = { success: true, action: 'reset_to_queued' };
           break;
 
         case 'skip':
           await pool.query(
-            'UPDATE tasks SET status = $1, updated_at = NOW() WHERE id = $2',
-            ['skipped', action.target_id]
+            'UPDATE tasks SET status = $1 WHERE id = $2',
+            ['cancelled', action.target_id]
           );
-          result = { success: true, action: 'skipped' };
+          result = { success: true, action: 'cancelled' };
           break;
 
         default:
