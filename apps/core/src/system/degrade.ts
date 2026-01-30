@@ -48,7 +48,7 @@ const QUALITY_API = process.env.QUALITY_API || 'http://localhost:5681';
 const N8N_API = process.env.N8N_BACKEND || 'http://localhost:5679';
 
 // Global state
-let state: DegradeState = {
+const state: DegradeState = {
   degraded: false,
   reason: null,
   enteredAt: null,
