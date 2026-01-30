@@ -15,7 +15,7 @@ const router = Router();
 // Service endpoints
 const BRAIN_API = process.env.BRAIN_API || 'http://localhost:5220';
 const QUALITY_API = process.env.QUALITY_API || 'http://localhost:5681';
-const N8N_API = process.env.N8N_BACKEND || 'http://localhost:5678';
+const N8N_API = process.env.N8N_BACKEND || 'http://localhost:5679';
 
 // Cache configuration
 const CACHE_TTL_MS = 30000; // 30 seconds
@@ -49,26 +49,35 @@ async function fetchWithTimeout(url: string, timeoutMs: number = 5000): Promise<
  */
 async function getBrainStatus(): Promise<ServiceStatus> {
   try {
-    // Get focus summary
-    const focusData = await fetchWithTimeout(`${BRAIN_API}/api/brain/focus/summary`);
-
-    // Get tick status
+    // Get tick status first (more reliable)
     const tickData = await fetchWithTimeout(`${BRAIN_API}/api/brain/tick/status`);
 
-    // Get task counts from workspace's own task system
-    const tasksResponse = await fetch('http://localhost:5212/api/tasks/tasks');
-    const tasksData = await tasksResponse.json() as { tasks?: any[] };
+    // Get focus summary (may fail due to UUID bug, handle gracefully)
+    let focusData: any = null;
+    try {
+      focusData = await fetchWithTimeout(`${BRAIN_API}/api/brain/focus/summary`);
+    } catch {
+      // Focus endpoint has known bug, continue without it
+    }
 
-    const tasks = tasksData.tasks || [];
-    const taskCounts = {
-      p0: tasks.filter((t: any) => t.priority === 'P0' && t.status !== 'completed').length,
-      p1: tasks.filter((t: any) => t.priority === 'P1' && t.status !== 'completed').length,
-      p2: tasks.filter((t: any) => t.priority === 'P2' && t.status !== 'completed').length,
-    };
+    // Get task counts from workspace's own task system
+    let taskCounts = { p0: 0, p1: 0, p2: 0 };
+    try {
+      const tasksResponse = await fetch('http://localhost:5212/api/tasks/tasks');
+      const tasksData = await tasksResponse.json() as { tasks?: any[] };
+      const tasks = tasksData.tasks || [];
+      taskCounts = {
+        p0: tasks.filter((t: any) => t.priority === 'P0' && t.status !== 'completed').length,
+        p1: tasks.filter((t: any) => t.priority === 'P1' && t.status !== 'completed').length,
+        p2: tasks.filter((t: any) => t.priority === 'P2' && t.status !== 'completed').length,
+      };
+    } catch {
+      // Task endpoint may be unavailable
+    }
 
     return {
       health: 'ok',
-      focus: focusData.focus || null,
+      focus: focusData?.focus || null,
       tick: {
         enabled: tickData.enabled || false,
         lastTick: tickData.last_tick || null,

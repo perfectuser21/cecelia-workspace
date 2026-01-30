@@ -833,7 +833,7 @@ router.get('/full', async (_req: Request, res: Response) => {
   try {
     const BRAIN_API = process.env.BRAIN_API || 'http://localhost:5220';
     const QUALITY_API = process.env.QUALITY_API || 'http://localhost:5681';
-    const N8N_API = process.env.N8N_BACKEND || 'http://localhost:5678';
+    const N8N_API = process.env.N8N_BACKEND || 'http://localhost:5679';
 
     // Fetch VPS data
     const vpsData = getHostMonitorData() || {
@@ -846,7 +846,7 @@ router.get('/full', async (_req: Request, res: Response) => {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
-      const response = await fetch(`${BRAIN_API}/api/brain/status`, { signal: controller.signal });
+      const response = await fetch(`${BRAIN_API}/health`, { signal: controller.signal });
       clearTimeout(timeout);
       if (response.ok) {
         brainData = await response.json();
@@ -899,7 +899,7 @@ router.get('/full', async (_req: Request, res: Response) => {
       },
       {
         name: 'n8n',
-        port: 5678,
+        port: 5679,
         status: 'unknown', // Would need health check
         endpoint: N8N_API,
       },
