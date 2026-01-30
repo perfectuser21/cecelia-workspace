@@ -594,7 +594,52 @@ interface TriggerResult {
 
 AI 员工管理，聚合 N8N 执行数据按员工视角展示。
 
-### 类型定义
+### 内部类型定义
+
+以下类型用于从 N8N API 获取数据并转换为员工视角（不导出）：
+
+#### N8nExecution
+
+```typescript
+interface N8nExecution {
+  id: string;
+  workflowId: string;
+  workflowName?: string;
+  status: 'success' | 'error' | 'waiting' | 'running' | 'crashed';
+  startedAt: string;
+  stoppedAt?: string;
+}
+```
+
+#### TodayStats
+
+```typescript
+interface TodayStats {
+  running: number;
+  success: number;
+  error: number;
+  total: number;
+}
+```
+
+#### LiveStatusOverview
+
+```typescript
+interface LiveStatusOverview {
+  todayStats: TodayStats;
+  runningExecutions: Array<{
+    id: string;
+    workflowId: string;
+    workflowName: string;
+    startedAt: string;
+    duration: number;
+  }>;
+  recentCompleted: N8nExecution[];
+  timestamp: number;
+}
+```
+
+### 导出类型定义
 
 #### EmployeeTaskStats
 
