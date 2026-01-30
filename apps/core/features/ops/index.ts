@@ -111,23 +111,29 @@ const manifest: FeatureManifest = {
       component: 'PlannerOverview',
       navItem: { label: 'Command Center', icon: 'Monitor', order: 2 },
     },
+    // Live Dashboard (KR3)
+    {
+      path: '/ops/live',
+      component: 'LiveDashboard',
+      navItem: { label: 'Live', icon: 'Activity', order: 3 },
+    },
     // Work Planning
     {
       path: '/ops/planning',
       component: 'PlanningDashboard',
-      navItem: { label: '工作规划', icon: 'Calendar', order: 3 },
+      navItem: { label: '工作规划', icon: 'Calendar', order: 4 },
     },
     // Task Scheduler
     {
       path: '/ops/scheduler',
       component: 'Scheduler',
-      navItem: { label: '任务调度', icon: 'Brain', order: 4 },
+      navItem: { label: '任务调度', icon: 'Brain', order: 5 },
     },
     // Roadmap View
     {
       path: '/ops/roadmap',
       component: 'RoadmapView',
-      navItem: { label: 'Roadmap', icon: 'Map', order: 5 },
+      navItem: { label: 'Roadmap', icon: 'Map', order: 6 },
     },
   ],
 
@@ -162,6 +168,8 @@ const manifest: FeatureManifest = {
     FeatureDashboard: () => import('../shared/pages/FeatureDashboard'),
     // Task Intelligence (Planner)
     PlannerOverview: () => import('../planner/pages/PlannerOverview'),
+    // Live Dashboard (KR3)
+    LiveDashboard: () => import('./pages/LiveDashboard'),
     // Work Planning
     PlanningDashboard: () => import('../planner/pages/PlanningDashboard'),
     // Task Scheduler
