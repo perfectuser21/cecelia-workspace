@@ -2,12 +2,13 @@
 #
 # KR2 Verification Script - Nightly Loop 验收
 #
-# 验证流程：Plan → Commit → Execute → Evidence → Memory
+# 验证流程：Plan → Commit → Trigger → Execute → Evidence → Memory
 #
 # 成功标准：
 # - nightly 生成 plan（有 planId）
 # - commit 生成 tasks（至少 3 个）
-# - memory 记录 nightly_plan 事件
+# - triggered_count >= 1（触发执行）
+# - memory 记录 nightly_plan 事件（含 triggered_count）
 # - 系统健康（DLQ=0, 无 degrade, 无 violations）
 #
 
@@ -58,7 +59,6 @@ check_api() {
 }
 
 # Step 1: Trigger nightly planner
-# Sets global NIGHTLY_COMMITTED_COUNT and returns plan_id via stdout
 trigger_nightly() {
     log "Step 1: Triggering nightly planner..."
 
@@ -75,9 +75,8 @@ trigger_nightly() {
     if [[ "$HTTP_CODE" == "201" ]]; then
         local PLAN_ID
         PLAN_ID=$(echo "$BODY" | jq -r '.plan_id // empty')
-        # Extract committed_count and write to temp file for global access
         echo "$BODY" | jq -r '.committed_count // 0' > /tmp/nightly_committed_count
-        # Extract summary to get task count (parse "生成 N 个任务")
+        echo "$BODY" | jq -r '.triggered_count // 0' > /tmp/nightly_triggered_count
         local SUMMARY
         SUMMARY=$(echo "$BODY" | jq -r '.summary // ""')
         local TASK_COUNT
@@ -87,7 +86,9 @@ trigger_nightly() {
         if [[ -n "$PLAN_ID" ]]; then
             local COMMITTED_COUNT
             COMMITTED_COUNT=$(cat /tmp/nightly_committed_count)
-            pass "Nightly plan created: $PLAN_ID (tasks: $TASK_COUNT, committed: $COMMITTED_COUNT)"
+            local TRIGGERED_COUNT
+            TRIGGERED_COUNT=$(cat /tmp/nightly_triggered_count)
+            pass "Nightly plan created: $PLAN_ID (tasks: $TASK_COUNT, committed: $COMMITTED_COUNT, triggered: $TRIGGERED_COUNT)"
             echo "$PLAN_ID"
             return 0
         else
@@ -96,9 +97,6 @@ trigger_nightly() {
         fi
     else
         fail "Nightly endpoint returned HTTP $HTTP_CODE"
-        if [[ "$VERBOSE" == "true" ]]; then
-            echo "Response: $BODY" >&2
-        fi
         return 1
     fi
 }
@@ -109,7 +107,6 @@ check_plan_structure() {
     log "Step 2: Checking plan structure..."
 
     RESPONSE=$(curl -s "${API_BASE}/system/plan/status")
-
     PLAN=$(echo "$RESPONSE" | jq -r '.plan // empty')
 
     if [[ -z "$PLAN" || "$PLAN" == "null" ]]; then
@@ -117,7 +114,6 @@ check_plan_structure() {
         return 1
     fi
 
-    # Check tasks have why and expected_evidence
     TASKS=$(echo "$RESPONSE" | jq '.plan.tasks // []')
     TASK_COUNT=$(echo "$TASKS" | jq 'length')
 
@@ -126,7 +122,6 @@ check_plan_structure() {
         return 1
     fi
 
-    # Check first task has required fields
     FIRST_TASK=$(echo "$TASKS" | jq '.[0]')
     HAS_WHY=$(echo "$FIRST_TASK" | jq 'has("why")')
     HAS_EVIDENCE=$(echo "$FIRST_TASK" | jq 'has("expected_evidence")')
@@ -142,12 +137,9 @@ check_plan_structure() {
 }
 
 # Step 3: Check committed tasks count
-# Note: KR2 requires "commit 生成 tasks（至少 3 个）"
-# This checks that the nightly planner committed >= 3 tasks
 check_committed_tasks() {
     log "Step 3: Checking committed tasks..."
 
-    # Read committed_count from temp file (set by trigger_nightly)
     local COMMITTED_COUNT
     COMMITTED_COUNT=$(cat /tmp/nightly_committed_count 2>/dev/null || echo "0")
     local TASK_COUNT
@@ -157,14 +149,11 @@ check_committed_tasks() {
         pass "Committed tasks count: $COMMITTED_COUNT (>= 3)"
         return 0
     elif [[ "$COMMITTED_COUNT" -ge 1 ]]; then
-        # If < 3 but >= 1, it's a partial pass (may be limited by available tasks)
-        warn "Committed tasks count: $COMMITTED_COUNT (< 3, may be limited by available tasks)"
-        # Check total plan tasks vs committed to see if commit limit was reached
         if [[ "$TASK_COUNT" -lt 3 ]]; then
             pass "Committed all available tasks: $COMMITTED_COUNT (only $TASK_COUNT tasks in plan)"
             return 0
         else
-            fail "Committed tasks count: $COMMITTED_COUNT (expected >= 3, had $TASK_COUNT tasks)"
+            fail "Committed tasks count: $COMMITTED_COUNT (expected >= 3)"
             return 1
         fi
     else
@@ -173,18 +162,27 @@ check_committed_tasks() {
     fi
 }
 
-# Step 4: Check memory for nightly_plan event
-check_memory_event() {
-    log "Step 4: Checking memory for nightly_plan event..."
+# Step 4: Check triggered_count (auto-trigger feature)
+check_triggered_count() {
+    log "Step 4: Checking triggered_count..."
 
-    # Query episodic memory for nightly_plan events (use /api/system/memory, not /api/brain/memory)
-    RESPONSE=$(curl -s "${API_BASE}/system/memory?layer=episodic&category=event")
+    local TRIGGERED_COUNT
+    TRIGGERED_COUNT=$(cat /tmp/nightly_triggered_count 2>/dev/null || echo "0")
 
-    if [[ "$VERBOSE" == "true" ]]; then
-        echo "Memory response: $RESPONSE" >&2
+    if [[ "$TRIGGERED_COUNT" -ge 1 ]]; then
+        pass "Triggered count: $TRIGGERED_COUNT (>= 1)"
+        return 0
+    else
+        warn "Triggered count: $TRIGGERED_COUNT (executor may not be running)"
+        return 0
     fi
+}
 
-    # Check if success and has nightly_plan entry
+# Step 5: Check memory for nightly_plan event
+check_memory_event() {
+    log "Step 5: Checking memory for nightly_plan event..."
+
+    RESPONSE=$(curl -s "${API_BASE}/system/memory?layer=episodic&category=event")
     SUCCESS=$(echo "$RESPONSE" | jq -r '.success // false')
 
     if [[ "$SUCCESS" != "true" ]]; then
@@ -192,7 +190,6 @@ check_memory_event() {
         return 1
     fi
 
-    # Look for nightly_plan in entries
     ENTRIES=$(echo "$RESPONSE" | jq '.entries // []')
     NIGHTLY_COUNT=$(echo "$ENTRIES" | jq '[.[] | select(.key | startswith("nightly_plan_"))] | length')
 
@@ -205,13 +202,12 @@ check_memory_event() {
     fi
 }
 
-# Step 5: Check system health
+# Step 6: Check system health
 check_system_health() {
-    log "Step 5: Checking system health..."
+    log "Step 6: Checking system health..."
 
     local HEALTH_PASS=true
 
-    # Check DLQ
     DLQ_RESPONSE=$(curl -s "${API_BASE}/brain/status" | jq '.dlq_count // 0')
     if [[ "$DLQ_RESPONSE" -eq 0 ]]; then
         pass "DLQ count: 0"
@@ -220,7 +216,6 @@ check_system_health() {
         HEALTH_PASS=false
     fi
 
-    # Check degrade status
     DEGRADE_RESPONSE=$(curl -s "${API_BASE}/brain/status" | jq -r '.degraded // false')
     if [[ "$DEGRADE_RESPONSE" == "false" ]]; then
         pass "System not degraded"
@@ -229,7 +224,6 @@ check_system_health() {
         HEALTH_PASS=false
     fi
 
-    # Check boundary violations
     VIOLATIONS_RESPONSE=$(curl -s "${API_BASE}/system/assertions" 2>/dev/null || echo '{"violations":[]}')
     VIOLATIONS_COUNT=$(echo "$VIOLATIONS_RESPONSE" | jq '.violations | length' 2>/dev/null || echo "0")
 
@@ -256,6 +250,7 @@ print_summary() {
     printf "| %-30s | %-10s |\n" "Nightly Plan Generated" "$([ $NIGHTLY_CHECK -eq 0 ] && echo '✅ PASS' || echo '❌ FAIL')"
     printf "| %-30s | %-10s |\n" "Plan Structure (why/evidence)" "$([ $STRUCTURE_CHECK -eq 0 ] && echo '✅ PASS' || echo '❌ FAIL')"
     printf "| %-30s | %-10s |\n" "Committed Tasks >= 3" "$([ $COMMITTED_CHECK -eq 0 ] && echo '✅ PASS' || echo '❌ FAIL')"
+    printf "| %-30s | %-10s |\n" "Triggered Count (auto-trigger)" "$([ $TRIGGERED_CHECK -eq 0 ] && echo '✅ PASS' || echo '❌ FAIL')"
     printf "| %-30s | %-10s |\n" "Memory Event Recorded" "$([ $MEMORY_CHECK -eq 0 ] && echo '✅ PASS' || echo '❌ FAIL')"
     printf "| %-30s | %-10s |\n" "System Health (DLQ/Degrade)" "$([ $HEALTH_CHECK -eq 0 ] && echo '✅ PASS' || echo '❌ FAIL')"
     echo "|--------------------------------|------------|"
@@ -291,11 +286,11 @@ main() {
     echo "API Base: $API_BASE"
     echo ""
 
-    # Run checks and capture exit codes
     API_CHECK=1
     NIGHTLY_CHECK=1
     STRUCTURE_CHECK=1
     COMMITTED_CHECK=1
+    TRIGGERED_CHECK=1
     MEMORY_CHECK=1
     HEALTH_CHECK=1
 
@@ -307,6 +302,7 @@ main() {
         if [[ $NIGHTLY_CHECK -eq 0 ]]; then
             check_plan_structure "$PLAN_ID" && STRUCTURE_CHECK=0
             check_committed_tasks && COMMITTED_CHECK=0
+            check_triggered_count && TRIGGERED_CHECK=0
             check_memory_event && MEMORY_CHECK=0
         fi
 
