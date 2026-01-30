@@ -1,8 +1,8 @@
 # Audit Report
 
-Branch: cp-kr2-api-docs-update
+Branch: D1-api-docs-update
 Date: 2026-01-30
-Scope: docs/API.md
+Scope: docs/API.md (添加 Notification 类型定义)
 Target Level: L2
 
 ## Summary

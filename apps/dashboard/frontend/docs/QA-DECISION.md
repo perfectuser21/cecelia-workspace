@@ -1,34 +1,22 @@
-# QA Decision: API 文档更新
+# QA Decision
 
-## Decision: NO_RCI
-## Priority: P2
-## RepoType: Business
+Decision: NO_RCI
+Priority: P1
+RepoType: Business
 
-## 问题分类
-- **类型**: Documentation
-- **影响范围**: docs/API.md
-- **风险等级**: Low
+## Tests
 
-## 测试策略
+| DoD Item | Method | Location |
+|----------|--------|----------|
+| 服务健康状态组件能正确渲染 | auto | tests/components/ServiceHealthCard.test.tsx |
+| 健康状态 API 调用正常 | auto | tests/api/health.test.ts |
+| 状态颜色根据 healthy/unhealthy 正确显示 | manual | manual:目视验证 UI 颜色 |
 
-### 测试需求
-| DoD 条目 | 方式 | 位置 |
-|---------|------|------|
-| API 文档与代码一致 | manual | 对比 docs/API.md 和 src/api/*.ts |
-| 构建无错误 | auto | npm run build |
+## RCI
 
-### Tests
-- dod_item: "API 文档记录了所有 API 模块"
-  method: manual
-  location: manual:检查 docs/API.md 包含所有 src/api/*.ts 模块
-
-- dod_item: "代码构建无错误"
-  method: auto
-  location: npm run build
-
-### RCI
 - new: []
 - update: []
 
 ## Reason
-这是文档维护任务，确保 API 文档与代码保持同步。无代码逻辑变更，不需要回归契约。
+
+新增前端展示组件，不涉及核心业务逻辑变更，无需新增 RCI。现有后端健康检查 API 已稳定，前端仅调用展示。
