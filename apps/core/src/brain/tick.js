@@ -7,6 +7,7 @@
 import pool from '../task-system/db.js';
 import { getDailyFocus } from './focus.js';
 import { updateTask } from './actions.js';
+import { triggerCeceliaRun, checkCeceliaRunAvailable } from './executor.js';
 
 // Tick configuration
 const TICK_INTERVAL_MINUTES = 30;
@@ -209,6 +210,7 @@ async function executeTick() {
   if (inProgress.length === 0 && queued.length > 0) {
     const nextTask = queued[0];
 
+    // First, update task status to in_progress
     const updateResult = await updateTask({
       task_id: nextTask.id,
       status: 'in_progress'
@@ -227,6 +229,44 @@ async function executeTick() {
         title: nextTask.title,
         status: 'in_progress'
       });
+
+      // Then, trigger cecelia-run for execution
+      const ceceliaAvailable = await checkCeceliaRunAvailable();
+      if (ceceliaAvailable.available) {
+        // Get full task data for execution
+        const fullTaskResult = await pool.query(
+          'SELECT * FROM tasks WHERE id = $1',
+          [nextTask.id]
+        );
+
+        if (fullTaskResult.rows.length > 0) {
+          const fullTask = fullTaskResult.rows[0];
+          const execResult = await triggerCeceliaRun(fullTask);
+
+          await logTickDecision(
+            'tick',
+            `Triggered cecelia-run for task: ${nextTask.title}`,
+            { action: 'trigger-cecelia', task_id: nextTask.id, run_id: execResult.runId },
+            execResult
+          );
+
+          actionsTaken.push({
+            action: 'trigger-cecelia',
+            task_id: nextTask.id,
+            title: nextTask.title,
+            run_id: execResult.runId,
+            success: execResult.success
+          });
+        }
+      } else {
+        // cecelia-run not available, just log
+        await logTickDecision(
+          'tick',
+          `cecelia-run not available, task status updated only`,
+          { action: 'no-executor', task_id: nextTask.id, reason: ceceliaAvailable.error },
+          { success: true, warning: 'cecelia-run not available' }
+        );
+      }
     }
   } else if (inProgress.length > 0) {
     // Log that we're waiting for in-progress tasks
