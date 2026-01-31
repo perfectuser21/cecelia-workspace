@@ -939,6 +939,101 @@ router.post('/parse-intent', async (req, res) => {
 });
 
 /**
+ * POST /api/intent/recognize
+ * KR1: Clean intent recognition endpoint with standardized response format
+ * This is the primary endpoint specified in the PRD
+ *
+ * Request body:
+ *   {
+ *     text: "实现用户登录接口",
+ *     context: { currentProject: "my-project" },  // optional
+ *     confidenceThreshold: 0.4  // optional
+ *   }
+ *
+ * Response:
+ *   {
+ *     success: true,
+ *     result: {
+ *       intent: "create_task",
+ *       confidence: 0.85,
+ *       confidenceLevel: "high",
+ *       entities: { title: "实现用户登录接口", priority: "P1" },
+ *       originalInput: "实现用户登录接口",
+ *       requiresConfirmation: false,
+ *       explanation: "Recognized as task creation with high confidence"
+ *     },
+ *     suggestedAction: {
+ *       action: "create-task",
+ *       params: { title: "实现用户登录接口", priority: "P1" },
+ *       confidence: 0.85
+ *     }
+ *   }
+ */
+router.post('/intent/recognize', async (req, res) => {
+  try {
+    const { text, context, confidenceThreshold = 0.4 } = req.body;
+
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'text is required and must be a string'
+      });
+    }
+
+    // Parse the intent using existing infrastructure
+    const parsed = await parseIntent(text);
+
+    // Determine if confirmation is required (low confidence or ambiguous intent)
+    const requiresConfirmation = parsed.confidence < 0.7 || parsed.intentType === INTENT_TYPES.UNKNOWN;
+
+    // Generate human-readable explanation
+    let explanation = '';
+    if (parsed.confidence >= 0.7) {
+      explanation = `Recognized as ${parsed.intentType} with high confidence`;
+    } else if (parsed.confidence >= 0.4) {
+      explanation = `Possibly ${parsed.intentType}, but confidence is medium - please confirm`;
+    } else {
+      explanation = `Unable to confidently recognize intent - confidence below threshold`;
+    }
+
+    // Build result object matching PRD specification
+    const result = {
+      intent: parsed.intentType,
+      confidence: parsed.confidence,
+      confidenceLevel: parsed.confidenceLevel,
+      entities: parsed.entities || {},
+      originalInput: text,
+      keywords: parsed.keywords,
+      matchedPhrases: parsed.matchedPhrases,
+      requiresConfirmation,
+      explanation
+    };
+
+    // Build suggested action if applicable
+    let suggestedAction = null;
+    if (parsed.suggestedAction && parsed.confidence >= confidenceThreshold) {
+      suggestedAction = {
+        action: parsed.suggestedAction.action,
+        params: parsed.suggestedAction.params,
+        confidence: parsed.confidence
+      };
+    }
+
+    res.json({
+      success: true,
+      result,
+      suggestedAction
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to recognize intent',
+      details: err.message
+    });
+  }
+});
+
+/**
  * POST /api/brain/intent-to-tasks
  * Convert intent directly to tasks in database
  *
