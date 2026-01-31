@@ -8,6 +8,7 @@ import { getDailyFocus } from './focus.js';
 import { updateTask } from './actions.js';
 import { triggerCeceliaRun, checkCeceliaRunAvailable } from './executor.js';
 import { compareGoalProgress, generateDecision, executeDecision } from './decision.js';
+import { planNextTask } from './planner.js';
 
 // Tick configuration
 const TICK_INTERVAL_MINUTES = 5;
@@ -563,7 +564,29 @@ async function executeTick() {
     });
   }
 
-  // 6. Dispatch next task
+  // 6. Planning: if no queued tasks, invoke planner
+  if (queued.length === 0) {
+    try {
+      const planned = await planNextTask();
+      if (planned.planned) {
+        actionsTaken.push({
+          action: 'plan',
+          task_id: planned.task.id,
+          title: planned.task.title
+        });
+      } else if (planned.reason === 'needs_planning') {
+        actionsTaken.push({
+          action: 'needs_planning',
+          kr: planned.kr,
+          project: planned.project
+        });
+      }
+    } catch (planErr) {
+      console.error('[tick-loop] Planner error:', planErr.message);
+    }
+  }
+
+  // 7. Dispatch next task
   const dispatchResult = await dispatchNextTask(allGoalIds);
   actionsTaken.push(...dispatchResult.actions);
 
@@ -576,7 +599,7 @@ async function executeTick() {
     );
   }
 
-  // 7. Update tick state
+  // 8. Update tick state
   await pool.query(`
     INSERT INTO working_memory (key, value_json, updated_at)
     VALUES ($1, $2, NOW())
