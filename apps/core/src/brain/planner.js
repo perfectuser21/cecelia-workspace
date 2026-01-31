@@ -9,7 +9,7 @@ import pool from '../task-system/db.js';
 import { getDailyFocus } from './focus.js';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
-import { generatePrdFromGoalKR, validatePrd } from './templates.js';
+import { generatePrdFromGoalKR, generateTrdFromGoalKR, validatePrd, validateTrd } from './templates.js';
 
 /**
  * Get global state for planning decisions
@@ -446,6 +446,32 @@ function generateTaskPRD(taskTitle, taskDescription, kr, project) {
 }
 
 /**
+ * V3: Generate a standard TRD file for an auto-generated task.
+ * Returns the absolute path to the generated TRD file.
+ */
+function generateTaskTRD(taskTitle, taskDescription, kr, project) {
+  if (!existsSync(PRD_DIR)) {
+    mkdirSync(PRD_DIR, { recursive: true });
+  }
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const slug = taskTitle.replace(/[^a-zA-Z0-9\u4e00-\u9fff]+/g, '-').slice(0, 60);
+  const trdPath = join(PRD_DIR, `trd-${slug}-${timestamp}.md`);
+
+  const trdContent = generateTrdFromGoalKR({
+    title: taskTitle,
+    description: taskDescription,
+    kr,
+    project
+  });
+
+  const validation = validateTrd(trdContent);
+
+  writeFileSync(trdPath, trdContent, 'utf-8');
+  return { path: trdPath, validation };
+}
+
+/**
  * Main entry point - called each tick.
  */
 async function planNextTask() {
@@ -630,5 +656,6 @@ export {
   autoGenerateTask,
   generateTaskFromKR,
   generateTaskPRD,
+  generateTaskTRD,
   KR_STRATEGIES
 };

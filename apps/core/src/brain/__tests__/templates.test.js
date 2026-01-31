@@ -14,13 +14,12 @@ import {
   generatePrdFromTask,
   generatePrdFromGoalKR,
   generateTrdFromGoal,
+  generateTrdFromGoalKR,
   validatePrd,
   validateTrd,
   getTemplate,
   listTemplates,
   getCurrentDate,
-  validatePrd,
-  validateTrd,
   prdToJson,
   trdToJson,
   extractSection
@@ -925,6 +924,71 @@ vitest
       expect(result.sections.technical_background).toContain('JWT');
       expect(result.sections.architecture_design).toContain('微服务');
       expect(result.sections.test_strategy).toContain('vitest');
+    });
+  });
+
+  describe('generateTrdFromGoalKR', () => {
+    it('generates TRD with KR context', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Brain System v2',
+        description: 'Upgrade brain system',
+        kr: { title: 'KR2', progress: 50, priority: 'P0' },
+        project: { name: 'cecelia-workspace', repo_path: '/home/xx/dev/cecelia-workspace' }
+      });
+      expect(trd).toContain('# TRD - Brain System v2');
+      expect(trd).toContain('KR2');
+      expect(trd).toContain('50%');
+      expect(trd).toContain('P0');
+      expect(trd).toContain('cecelia-workspace');
+    });
+
+    it('passes validateTrd', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Test Feature',
+        kr: { title: 'KR1', progress: 0, priority: 'P1' }
+      });
+      const result = validateTrd(trd);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('includes milestones when provided', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Multi-phase Project',
+        milestones: [
+          { title: 'Phase 1: Design', description: 'Architecture design' },
+          { title: 'Phase 2: Implement', description: 'Code implementation' }
+        ]
+      });
+      expect(trd).toContain('Phase 1: Design');
+      expect(trd).toContain('Phase 2: Implement');
+      expect(trd).toContain('Architecture design');
+    });
+
+    it('degrades gracefully without KR', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Simple TRD',
+        description: 'A basic description'
+      });
+      expect(trd).toContain('# TRD - Simple TRD');
+      expect(trd).toContain('A basic description');
+      expect(trd).not.toContain('KR:');
+      const result = validateTrd(trd);
+      expect(result.valid).toBe(true);
+    });
+
+    it('includes frontmatter with auto-generated id', () => {
+      const trd = generateTrdFromGoalKR({ title: 'My Feature' });
+      expect(trd).toContain('id: trd-auto-my-feature');
+      expect(trd).toContain('version: 1.0.0');
+    });
+
+    it('includes project repo path in tech stack', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Test',
+        project: { name: 'my-project', repo_path: '/path/to/repo' }
+      });
+      expect(trd).toContain('/path/to/repo');
     });
   });
 });

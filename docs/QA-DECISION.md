@@ -1,34 +1,28 @@
----
-id: qa-decision-planner-strategy-refresh
-version: 1.0.0
-created: 2026-01-31
-updated: 2026-01-31
-changelog:
-  - 1.0.0: 初始版本
----
-
 # QA Decision
 
 Decision: NO_RCI
-Priority: P1
-RepoType: Engine
+Priority: P0
+RepoType: Business
 
 Tests:
-  - dod_item: "prd_trd_generation.tasks 包含 4 个新任务标题"
+  - dod_item: "generateTrdFromGoalKR 生成含 KR 上下文的 TRD"
     method: auto
-    location: apps/core/src/brain/__tests__/planner.test.js
-  - dod_item: "每个 KR_STRATEGIES 策略有 progressWeight === tasks.length"
+    location: apps/core/src/brain/__tests__/templates.test.js
+  - dod_item: "生成的 TRD 通过 validateTrd 验证"
     method: auto
-    location: apps/core/src/brain/__tests__/planner.test.js
-  - dod_item: "generateNextTask 在策略耗尽时执行 UPDATE goals SET progress"
+    location: apps/core/src/brain/__tests__/templates.test.js
+  - dod_item: "API route 支持 KR 参数"
     method: auto
-    location: apps/core/src/brain/__tests__/planner.test.js
-  - dod_item: "现有测试全部通过"
+    location: apps/core/src/brain/__tests__/templates.test.js
+  - dod_item: "generateTaskTRD 写入文件并返回正确结构"
     method: auto
-    location: apps/core/src/brain/__tests__/planner.test.js
+    location: apps/core/src/brain/__tests__/templates.test.js
+  - dod_item: "所有现有测试继续通过"
+    method: auto
+    location: npm test
 
 RCI:
   new: []
   update: []
 
-Reason: Planner 内部逻辑改进，不涉及核心 Hook/Gate/CI 流程，通过单元测试覆盖。
+Reason: 新增模板引擎函数，纯业务逻辑扩展，不涉及核心 Hook/Gate/CI 流程，API 是扩展现有参数不是新增端点，无需 RCI
