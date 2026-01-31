@@ -8,7 +8,7 @@ import { getTickStatus, enableTick, disableTick, executeTick, runTickSafe } from
 import { parseIntent, parseAndCreate, INTENT_TYPES, INTENT_ACTION_MAP, extractEntities, classifyIntent, getSuggestedAction } from './intent.js';
 import pool from '../task-system/db.js';
 import { decomposeTRD, getTRDProgress, listTRDs } from './decomposer.js';
-import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, PRD_TYPE_MAP, validatePrd, validateTrd, prdToJson, trdToJson } from './templates.js';
+import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, validatePrd, validateTrd, prdToJson, trdToJson, PRD_TYPE_MAP } from './templates.js';
 import { compareGoalProgress, generateDecision, executeDecision, getDecisionHistory, rollbackDecision } from './decision.js';
 import { planNextTask, getPlanStatus, handlePlanInput } from './planner.js';
 import { ensureEventsTable, queryEvents, getEventCounts } from './event-bus.js';
@@ -1336,15 +1336,17 @@ router.post('/generate/trd', async (req, res) => {
 
 /**
  * POST /api/brain/validate/prd
- * Validate PRD content quality
+ * Validate PRD content against standardization rules
  */
 router.post('/validate/prd', (req, res) => {
   try {
-    const { prd_content } = req.body;
-    if (!prd_content) {
-      return res.status(400).json({ success: false, error: 'prd_content is required' });
+    const { content } = req.body;
+
+    if (!content) {
+      return res.status(400).json({ success: false, error: 'content is required' });
     }
-    const result = validatePrd(prd_content);
+
+    const result = validatePrd(content);
     res.json({ success: true, ...result });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Validation failed', details: err.message });
@@ -1353,15 +1355,17 @@ router.post('/validate/prd', (req, res) => {
 
 /**
  * POST /api/brain/validate/trd
- * Validate TRD content quality
+ * Validate TRD content against standardization rules
  */
 router.post('/validate/trd', (req, res) => {
   try {
-    const { trd_content } = req.body;
-    if (!trd_content) {
-      return res.status(400).json({ success: false, error: 'trd_content is required' });
+    const { content } = req.body;
+
+    if (!content) {
+      return res.status(400).json({ success: false, error: 'content is required' });
     }
-    const result = validateTrd(trd_content);
+
+    const result = validateTrd(content);
     res.json({ success: true, ...result });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Validation failed', details: err.message });

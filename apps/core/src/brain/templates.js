@@ -543,64 +543,111 @@ function extractSection(content, header) {
 }
 
 /**
- * Validate PRD content quality
+ * Validate PRD content quality (structure + content checks)
  * @param {string} prdContent - PRD markdown content
- * @returns {{ valid: boolean, errors: string[] }}
+ * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
  */
 function validatePrd(prdContent) {
   const errors = [];
+  const warnings = [];
 
-  const requiredSections = PRD_TEMPLATE.sections.filter(s => s.required);
-  for (const section of requiredSections) {
-    const content = extractSection(prdContent, section.title);
-    if (content === null) {
-      errors.push(`Missing required section: ${section.title}`);
+  if (!prdContent || typeof prdContent !== 'string') {
+    return { valid: false, errors: ['PRD content is empty or not a string'], warnings: [] };
+  }
+
+  // Structure checks
+  const requiredFields = [
+    { pattern: /##\s*需求来源|##\s*背景|需求来源\s*[:：]|\*\*需求来源\*\*/, label: '需求来源' },
+    { pattern: /##\s*功能描述|功能描述\s*[:：]|\*\*功能描述\*\*|##\s*功能需求/, label: '功能描述' },
+    { pattern: /##\s*成功标准|成功标准\s*[:：]|\*\*成功标准\*\*|##\s*验收标准/, label: '成功标准' }
+  ];
+
+  for (const field of requiredFields) {
+    if (!field.pattern.test(prdContent)) {
+      errors.push(`Missing required field: ${field.label}`);
     }
   }
 
+  if (!/##\s*非目标|非目标\s*[:：]|\*\*非目标\*\*/.test(prdContent)) {
+    warnings.push('Missing recommended field: 非目标');
+  }
+
+  if (!/##\s*涉及文件|涉及文件\s*[:：]|\*\*涉及文件\*\*/.test(prdContent)) {
+    warnings.push('Missing recommended field: 涉及文件');
+  }
+
+  // Content quality - objectives bullet points
   const objectives = extractSection(prdContent, '目标');
   if (objectives !== null && !/^[-*]\s/m.test(objectives)) {
-    errors.push('目标 section must contain at least 1 bullet point');
+    warnings.push('目标 section should contain at least 1 bullet point');
   }
 
-  const funcReq = extractSection(prdContent, '功能需求');
+  // Content quality - functional requirements length
+  const funcReq = extractSection(prdContent, '功能需求') || extractSection(prdContent, '功能描述');
   if (funcReq !== null && funcReq.length < 50) {
-    errors.push('功能需求 section must be at least 50 characters');
+    warnings.push('功能需求 section should be at least 50 characters');
   }
 
-  const criteria = extractSection(prdContent, '验收标准');
-  if (criteria !== null) {
-    const bullets = criteria.split('\n').filter(line => /^[-*]\s|\[.\]/.test(line.trim()));
+  // Content quality - acceptance criteria
+  const successMatch = prdContent.match(/(?:##\s*(?:成功标准|验收标准)|\*\*成功标准\*\*)([\s\S]*?)(?=\n##|\n\*\*[^*]|\n---|\n$)/);
+  if (successMatch) {
+    const section = successMatch[1];
+    if (!/[-*]\s|^\d+\./m.test(section)) {
+      warnings.push('成功标准 section has no list items');
+    }
+    const bullets = section.split('\n').filter(line => /^[-*]\s|\[.\]/.test(line.trim()));
     for (const bullet of bullets) {
       const hasVerb = ACTION_VERBS.some(verb => bullet.includes(verb));
       if (!hasVerb) {
-        errors.push(`Acceptance criterion lacks action verb: "${bullet.trim().slice(0, 60)}"`);
+        warnings.push(`Acceptance criterion lacks action verb: "${bullet.trim().slice(0, 60)}"`);
       }
     }
   }
 
-  return { valid: errors.length === 0, errors };
+  return { valid: errors.length === 0, errors, warnings };
 }
 
 /**
- * Validate TRD content quality
+ * Validate TRD content quality (structure + content checks)
  * @param {string} trdContent - TRD markdown content
- * @returns {{ valid: boolean, errors: string[] }}
+ * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
  */
 function validateTrd(trdContent) {
   const errors = [];
+  const warnings = [];
 
-  const requiredHeaders = ['技术背景', '架构设计', '测试策略'];
-  for (const header of requiredHeaders) {
-    const content = extractSection(trdContent, header);
-    if (content === null) {
-      errors.push(`Missing required section: ${header}`);
-    } else if (content.trim().length === 0) {
-      errors.push(`Section is empty: ${header}`);
+  if (!trdContent || typeof trdContent !== 'string') {
+    return { valid: false, errors: ['TRD content is empty or not a string'], warnings: [] };
+  }
+
+  const requiredSections = [
+    { pattern: /##\s*技术背景/, label: '技术背景' },
+    { pattern: /##\s*架构设计/, label: '架构设计' },
+    { pattern: /##\s*API\s*设计/, label: 'API 设计' },
+    { pattern: /##\s*数据模型/, label: '数据模型' },
+    { pattern: /##\s*测试策略/, label: '测试策略' }
+  ];
+
+  for (const section of requiredSections) {
+    if (!section.pattern.test(trdContent)) {
+      errors.push(`Missing required section: ${section.label}`);
     }
   }
 
-  return { valid: errors.length === 0, errors };
+  // Content non-empty checks for key sections
+  const keyHeaders = ['技术背景', '架构设计', '测试策略'];
+  for (const header of keyHeaders) {
+    const content = extractSection(trdContent, header);
+    if (content !== null && content.trim().length === 0) {
+      warnings.push(`Section is empty: ${header}`);
+    }
+  }
+
+  if (!/##\s*实施计划/.test(trdContent)) {
+    warnings.push('Missing recommended section: 实施计划');
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
 }
 
 /**
@@ -671,11 +718,11 @@ export {
   generatePrdFromTask,
   generatePrdFromGoalKR,
   generateTrdFromGoal,
+  validatePrd,
+  validateTrd,
   getTemplate,
   listTemplates,
   getCurrentDate,
-  validatePrd,
-  validateTrd,
   prdToJson,
   trdToJson,
   extractSection

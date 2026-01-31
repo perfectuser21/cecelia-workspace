@@ -1,5 +1,5 @@
 ---
-id: audit-report-planner-v3
+id: audit-report-kr2-standardization
 version: 1.0.0
 created: 2026-01-31
 updated: 2026-01-31
@@ -7,16 +7,18 @@ changelog:
   - 1.0.0: 初始版本
 ---
 
-# Audit Report - Planner V3
+# Audit Report - PRD/TRD Validation
 
 Decision: PASS
 L1 Issues: 0
 L2 Issues: 0
-L3 Issues: 5 (non-blocking)
+L3 Issues: 0
 
 ## Files Audited
-- apps/core/dist/brain/planner.js
-- apps/core/dist/brain/__tests__/planner.test.js
+- apps/core/src/brain/templates.js (validatePrd, validateTrd)
+- apps/core/src/brain/planner.js (generateTaskPRD integration)
+- apps/core/src/brain/routes.js (validate endpoints)
+- apps/core/src/brain/__tests__/templates.test.js
 
 ## Summary
-V3 升级通过审计。零阻塞性和功能性问题。代码使用参数化 SQL 查询，无注入风险。错误处理完善，策略模式可扩展。
+Pure additive change: two validation functions + two API endpoints. No existing behavior modified. Regex-based field detection is safe (no ReDoS risk, patterns are simple alternations). 73 tests pass.

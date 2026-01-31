@@ -9,7 +9,7 @@ import pool from '../task-system/db.js';
 import { getDailyFocus } from './focus.js';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
-import { generatePrdFromGoalKR } from './templates.js';
+import { generatePrdFromGoalKR, validatePrd } from './templates.js';
 
 /**
  * Get global state for planning decisions
@@ -213,8 +213,11 @@ async function autoGenerateTask(kr, project, state, options = {}) {
 
   // Generate PRD file for the task
   let prdPath = null;
+  let prdValidation = null;
   try {
-    prdPath = generateTaskPRD(taskCandidate.title, taskCandidate.description, kr, project);
+    const prdResult = generateTaskPRD(taskCandidate.title, taskCandidate.description, kr, project);
+    prdPath = prdResult.path;
+    prdValidation = prdResult.validation;
   } catch (err) {
     console.error('Failed to generate PRD:', err);
   }
@@ -229,7 +232,7 @@ async function autoGenerateTask(kr, project, state, options = {}) {
       project_id: project.id,
       _generated: true,
       _strategy: 'v3_decompose',
-      payload: { prd_path: prdPath, auto_generated: true, kr_progress: kr.progress, kr_gap: gap }
+      payload: { prd_path: prdPath, prd_validation: prdValidation, auto_generated: true, kr_progress: kr.progress, kr_gap: gap }
     };
   }
 
@@ -242,7 +245,7 @@ async function autoGenerateTask(kr, project, state, options = {}) {
     priority,
     project.id,
     kr.id,
-    JSON.stringify({ auto_generated: true, prd_path: prdPath, kr_progress: kr.progress, kr_gap: gap })
+    JSON.stringify({ auto_generated: true, prd_path: prdPath, prd_validation: prdValidation, kr_progress: kr.progress, kr_gap: gap })
   ]);
 
   return insertResult.rows[0];
@@ -414,8 +417,10 @@ function generateTaskPRD(taskTitle, taskDescription, kr, project) {
     project
   });
 
+  const validation = validatePrd(prdContent);
+
   writeFileSync(prdPath, prdContent, 'utf-8');
-  return prdPath;
+  return { path: prdPath, validation };
 }
 
 /**
