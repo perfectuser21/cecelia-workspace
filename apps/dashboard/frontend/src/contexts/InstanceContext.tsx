@@ -78,7 +78,8 @@ export async function loadCoreConfig(): Promise<CoreDynamicConfig | null> {
 // 检测是否为 Core 实例
 function isCoreInstance(): boolean {
   const hostname = window.location.hostname;
-  return hostname.startsWith('core.') || hostname.includes('core');
+  const port = window.location.port;
+  return hostname.startsWith('core.') || hostname.includes('core') || port === '5212';
 }
 
 interface InstanceContextType {
