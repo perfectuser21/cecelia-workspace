@@ -16,7 +16,9 @@ import {
   generateTrdFromGoal,
   getTemplate,
   listTemplates,
-  getCurrentDate
+  getCurrentDate,
+  validatePrd,
+  validateTrd
 } from '../templates.js';
 
 describe('Templates Module', () => {
@@ -503,6 +505,130 @@ describe('Templates Module', () => {
 
       expect(prd).toContain('## 功能描述');
       expect(prd).toContain('Fallback test');
+    });
+  });
+
+  describe('validatePrd', () => {
+    it('returns valid for complete PRD', () => {
+      const content = `# PRD - Test
+## 背景
+Some background
+## 目标
+Some objectives
+## 功能需求
+Features
+## 非功能需求
+NFRs
+## 验收标准
+Criteria
+## 里程碑
+Milestones`;
+
+      const result = validatePrd(content);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([]);
+    });
+
+    it('returns errors for missing required sections', () => {
+      const content = `# PRD - Test
+## 背景
+Some background`;
+
+      const result = validatePrd(content);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Missing required section: 目标');
+      expect(result.errors).toContain('Missing required section: 功能需求');
+      expect(result.errors).toContain('Missing required section: 验收标准');
+    });
+
+    it('returns warnings for missing optional sections', () => {
+      const content = `# PRD - Test
+## 背景
+bg
+## 目标
+obj
+## 功能需求
+feat
+## 验收标准
+ac`;
+
+      const result = validatePrd(content);
+      expect(result.valid).toBe(true);
+      expect(result.warnings).toContain('Missing optional section: 非功能需求');
+      expect(result.warnings).toContain('Missing optional section: 里程碑');
+    });
+
+    it('returns error for empty content', () => {
+      const result = validatePrd('');
+      expect(result.valid).toBe(false);
+      expect(result.errors[0]).toBe('Content is empty or not a string');
+    });
+
+    it('returns error for non-string content', () => {
+      const result = validatePrd(null);
+      expect(result.valid).toBe(false);
+    });
+
+    it('validates rendered PRD as valid', () => {
+      const prd = renderPrd({
+        projectName: 'test',
+        intentType: 'create_project',
+        tasks: [{ title: 'Task 1', description: 'Desc', priority: 'P0' }],
+        originalInput: 'test input',
+        entities: {}
+      });
+      const result = validatePrd(prd);
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  describe('validateTrd', () => {
+    it('returns valid for complete TRD', () => {
+      const content = `# TRD - Test
+## 技术背景
+bg
+## 架构设计
+arch
+## API 设计
+api
+## 数据模型
+data
+## 测试策略
+test`;
+
+      const result = validateTrd(content);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([]);
+    });
+
+    it('returns errors for missing required sections', () => {
+      const content = `# TRD - Test
+## 技术背景
+bg`;
+
+      const result = validateTrd(content);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Missing required section: 架构设计');
+      expect(result.errors).toContain('Missing required section: API 设计');
+      expect(result.errors).toContain('Missing required section: 数据模型');
+      expect(result.errors).toContain('Missing required section: 测试策略');
+    });
+
+    it('returns error for empty content', () => {
+      const result = validateTrd('');
+      expect(result.valid).toBe(false);
+    });
+
+    it('validates rendered TRD as valid', () => {
+      const trd = renderTrd({
+        projectName: 'test',
+        intentType: 'create_project',
+        tasks: [{ title: 'Task 1', description: 'Desc', priority: 'P0' }],
+        originalInput: 'test input',
+        entities: {}
+      });
+      const result = validateTrd(trd);
+      expect(result.valid).toBe(true);
     });
   });
 

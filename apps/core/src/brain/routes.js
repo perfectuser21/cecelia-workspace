@@ -8,7 +8,7 @@ import { getTickStatus, enableTick, disableTick, executeTick, runTickSafe } from
 import { parseIntent, parseAndCreate, INTENT_TYPES, INTENT_ACTION_MAP, extractEntities, classifyIntent, getSuggestedAction } from './intent.js';
 import pool from '../task-system/db.js';
 import { decomposeTRD, getTRDProgress, listTRDs } from './decomposer.js';
-import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, PRD_TYPE_MAP } from './templates.js';
+import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, PRD_TYPE_MAP, validatePrd, validateTrd } from './templates.js';
 import { compareGoalProgress, generateDecision, executeDecision, getDecisionHistory, rollbackDecision } from './decision.js';
 import { planNextTask, getPlanStatus, handlePlanInput } from './planner.js';
 import { ensureEventsTable, queryEvents, getEventCounts } from './event-bus.js';
@@ -1318,6 +1318,44 @@ router.post('/generate/trd', async (req, res) => {
       details: err.message
     });
   }
+});
+
+// ==================== Validate API ====================
+
+/**
+ * POST /api/brain/validate/prd
+ * Validate PRD content against standard template
+ */
+router.post('/validate/prd', (req, res) => {
+  const { content } = req.body;
+
+  if (!content || typeof content !== 'string') {
+    return res.status(400).json({
+      success: false,
+      error: 'content is required and must be a string'
+    });
+  }
+
+  const result = validatePrd(content);
+  res.json({ success: true, ...result });
+});
+
+/**
+ * POST /api/brain/validate/trd
+ * Validate TRD content against standard template
+ */
+router.post('/validate/trd', (req, res) => {
+  const { content } = req.body;
+
+  if (!content || typeof content !== 'string') {
+    return res.status(400).json({
+      success: false,
+      error: 'content is required and must be a string'
+    });
+  }
+
+  const result = validateTrd(content);
+  res.json({ success: true, ...result });
 });
 
 // ==================== TRD API ====================

@@ -506,6 +506,69 @@ function generatePrdFromGoalKR(params) {
 }
 
 /**
+ * Validate PRD content against the standard template
+ * @param {string} content - PRD markdown content
+ * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
+ */
+function validatePrd(content) {
+  if (!content || typeof content !== 'string') {
+    return { valid: false, errors: ['Content is empty or not a string'], warnings: [] };
+  }
+
+  const errors = [];
+  const warnings = [];
+
+  for (const section of PRD_TEMPLATE.sections) {
+    const pattern = new RegExp(`#+ .*${escapeRegex(section.title)}`, 'i');
+    if (!pattern.test(content)) {
+      if (section.required) {
+        errors.push(`Missing required section: ${section.title}`);
+      } else {
+        warnings.push(`Missing optional section: ${section.title}`);
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
+/**
+ * Validate TRD content against the standard template
+ * @param {string} content - TRD markdown content
+ * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
+ */
+function validateTrd(content) {
+  if (!content || typeof content !== 'string') {
+    return { valid: false, errors: ['Content is empty or not a string'], warnings: [] };
+  }
+
+  const errors = [];
+  const warnings = [];
+
+  for (const section of TRD_TEMPLATE.sections) {
+    const pattern = new RegExp(`#+ .*${escapeRegex(section.title)}`, 'i');
+    if (!pattern.test(content)) {
+      if (section.required) {
+        errors.push(`Missing required section: ${section.title}`);
+      } else {
+        warnings.push(`Missing optional section: ${section.title}`);
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
+/**
+ * Escape special regex characters in a string
+ * @param {string} str
+ * @returns {string}
+ */
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Get template by name
  * @param {string} templateName - Template name ('prd' or 'trd')
  * @returns {Object|null} Template object
@@ -541,5 +604,7 @@ export {
   generateTrdFromGoal,
   getTemplate,
   listTemplates,
-  getCurrentDate
+  getCurrentDate,
+  validatePrd,
+  validateTrd
 };
