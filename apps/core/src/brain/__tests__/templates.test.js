@@ -7,15 +7,83 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   PRD_TEMPLATE,
   TRD_TEMPLATE,
+  PRD_TYPE_MAP,
   generateFrontmatter,
   renderPrd,
   renderTrd,
+  generatePrdFromTask,
   getTemplate,
   listTemplates,
   getCurrentDate
 } from '../templates.js';
 
 describe('Templates Module', () => {
+  describe('PRD_TYPE_MAP', () => {
+    it('maps feature, bugfix, refactor to intent types', () => {
+      expect(PRD_TYPE_MAP.feature).toBe('create_feature');
+      expect(PRD_TYPE_MAP.bugfix).toBe('fix_bug');
+      expect(PRD_TYPE_MAP.refactor).toBe('refactor');
+    });
+
+    it('has exactly 3 types', () => {
+      expect(Object.keys(PRD_TYPE_MAP)).toHaveLength(3);
+    });
+  });
+
+  describe('generatePrdFromTask', () => {
+    it('generates PRD with title only', () => {
+      const prd = generatePrdFromTask({ title: 'Add login page' });
+
+      expect(prd).toContain('# PRD - Add login page');
+      expect(prd).toContain('Add login page');
+    });
+
+    it('generates PRD with title and description', () => {
+      const prd = generatePrdFromTask({
+        title: 'User Auth',
+        description: 'Implement user authentication with JWT'
+      });
+
+      expect(prd).toContain('# PRD - User Auth');
+      expect(prd).toContain('Implement user authentication with JWT');
+    });
+
+    it('defaults to feature type', () => {
+      const prd = generatePrdFromTask({ title: 'New Feature' });
+
+      expect(prd).toContain('添加');
+    });
+
+    it('uses bugfix type correctly', () => {
+      const prd = generatePrdFromTask({ title: 'Fix crash', type: 'bugfix' });
+
+      expect(prd).toContain('修复');
+    });
+
+    it('uses refactor type correctly', () => {
+      const prd = generatePrdFromTask({ title: 'Clean up code', type: 'refactor' });
+
+      expect(prd).toContain('重构和优化');
+    });
+
+    it('uses title as originalInput when description is missing', () => {
+      const prd = generatePrdFromTask({ title: 'My Task' });
+
+      expect(prd).toContain('## 背景');
+      expect(prd).toContain('My Task');
+    });
+
+    it('passes rendering options through', () => {
+      const prd = generatePrdFromTask(
+        { title: 'Test' },
+        { includeFrontmatter: false }
+      );
+
+      expect(prd).not.toMatch(/^---/);
+      expect(prd).toMatch(/^# PRD/);
+    });
+  });
+
   describe('PRD_TEMPLATE structure', () => {
     it('has correct name', () => {
       expect(PRD_TEMPLATE.name).toBe('prd');
