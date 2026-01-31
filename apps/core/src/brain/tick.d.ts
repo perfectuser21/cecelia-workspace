@@ -1,0 +1,21 @@
+export function getTickStatus(): Promise<{
+  enabled: boolean;
+  loop_running: boolean;
+  interval_minutes: number;
+  loop_interval_ms: number;
+  last_tick: string | null;
+  next_tick: string | null;
+  actions_today: number;
+  tick_running: boolean;
+}>;
+export function enableTick(): Promise<{ success: boolean; enabled: boolean; loop_running: boolean }>;
+export function disableTick(): Promise<{ success: boolean; enabled: boolean; loop_running: boolean }>;
+export function executeTick(): Promise<Record<string, unknown>>;
+export function runTickSafe(source?: string, tickFn?: () => Promise<unknown>): Promise<Record<string, unknown>>;
+export function startTickLoop(): boolean;
+export function stopTickLoop(): boolean;
+export function initTickLoop(): Promise<void>;
+export function isStale(task: { status: string; started_at?: string }): boolean;
+export const TICK_INTERVAL_MINUTES: number;
+export const TICK_LOOP_INTERVAL_MS: number;
+export const TICK_TIMEOUT_MS: number;
