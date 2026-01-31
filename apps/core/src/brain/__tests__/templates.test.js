@@ -16,7 +16,8 @@ import {
   generateTrdFromGoal,
   getTemplate,
   listTemplates,
-  getCurrentDate
+  getCurrentDate,
+  validatePrd
 } from '../templates.js';
 
 describe('Templates Module', () => {
@@ -553,6 +554,91 @@ describe('Templates Module', () => {
       expect(trd).toContain('### 现有技术栈');
       expect(trd).toContain('CREATE TABLE user_service');
       expect(trd).toContain('- user 模块');
+    });
+  });
+
+  describe('validatePrd', () => {
+    const validPrd = `---
+id: prd-test
+version: 1.0.0
+created: 2026-01-31
+updated: 2026-01-31
+changelog:
+  - 1.0.0: 初始版本
+---
+
+# PRD - Test Feature
+
+## 背景
+
+Some background info
+
+## 目标
+
+Build a feature
+
+## 功能需求
+
+### 1. Feature A
+
+Do something
+
+## 验收标准
+
+- [ ] Feature A works
+- [ ] Tests pass
+`;
+
+    it('returns valid for a complete PRD', () => {
+      const result = validatePrd(validPrd);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('returns error for empty content', () => {
+      const result = validatePrd('');
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('PRD content is empty');
+    });
+
+    it('returns error for null content', () => {
+      const result = validatePrd(null);
+      expect(result.valid).toBe(false);
+    });
+
+    it('returns warning when frontmatter is missing', () => {
+      const nofm = `# PRD - Test\n\n## 背景\n\ninfo\n\n## 目标\n\ngoal\n\n## 功能需求\n\nreqs\n\n## 验收标准\n\n- [ ] done\n`;
+      const result = validatePrd(nofm);
+      expect(result.valid).toBe(true);
+      expect(result.warnings.some(w => w.includes('frontmatter'))).toBe(true);
+    });
+
+    it('returns errors for missing required sections', () => {
+      const partial = `---\nid: test\nversion: 1.0.0\ncreated: 2026-01-31\n---\n\n# PRD\n\n## 背景\n\ninfo\n`;
+      const result = validatePrd(partial);
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.includes('目标'))).toBe(true);
+      expect(result.errors.some(e => e.includes('验收标准'))).toBe(true);
+    });
+
+    it('returns error when acceptance criteria is 待定义', () => {
+      const undefinedAc = `---\nid: test\nversion: 1.0.0\ncreated: 2026-01-31\n---\n\n# PRD\n\n## 背景\n\ninfo\n\n## 目标\n\ngoal\n\n## 功能需求\n\nreqs\n\n## 验收标准\n\n待定义。\n`;
+      const result = validatePrd(undefinedAc);
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.includes('待定义'))).toBe(true);
+    });
+
+    it('returns warnings for missing frontmatter fields', () => {
+      const partialFm = `---\nid: test\n---\n\n# PRD\n\n## 背景\n\ninfo\n\n## 目标\n\ngoal\n\n## 功能需求\n\nreqs\n\n## 验收标准\n\n- [ ] done\n`;
+      const result = validatePrd(partialFm);
+      expect(result.warnings.some(w => w.includes('version'))).toBe(true);
+      expect(result.warnings.some(w => w.includes('created'))).toBe(true);
+    });
+
+    it('accepts PRD with 成功标准 instead of 验收标准', () => {
+      const altPrd = `---\nid: test\nversion: 1.0.0\ncreated: 2026-01-31\n---\n\n# PRD\n\n## 背景\n\ninfo\n\n## 目标\n\ngoal\n\n## 功能描述\n\nreqs\n\n## 成功标准\n\n- [ ] done\n`;
+      const result = validatePrd(altPrd);
+      expect(result.valid).toBe(true);
     });
   });
 });

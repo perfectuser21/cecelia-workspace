@@ -8,7 +8,7 @@ import { getTickStatus, enableTick, disableTick, executeTick, runTickSafe } from
 import { parseIntent, parseAndCreate, INTENT_TYPES, INTENT_ACTION_MAP, extractEntities, classifyIntent, getSuggestedAction } from './intent.js';
 import pool from '../task-system/db.js';
 import { decomposeTRD, getTRDProgress, listTRDs } from './decomposer.js';
-import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, PRD_TYPE_MAP } from './templates.js';
+import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, validatePrd, PRD_TYPE_MAP } from './templates.js';
 import { compareGoalProgress, generateDecision, executeDecision, getDecisionHistory, rollbackDecision } from './decision.js';
 import { planNextTask, getPlanStatus, handlePlanInput } from './planner.js';
 import { ensureEventsTable, queryEvents, getEventCounts } from './event-bus.js';
@@ -1195,6 +1195,30 @@ router.get('/executor/status', async (req, res) => {
       available: false,
       error: err.message
     });
+  }
+});
+
+// ==================== Validate API ====================
+
+/**
+ * POST /api/brain/validate/prd
+ * Validate PRD content against template standards
+ */
+router.post('/validate/prd', async (req, res) => {
+  try {
+    const { content } = req.body;
+
+    if (!content) {
+      return res.status(400).json({
+        success: false,
+        error: 'content is required'
+      });
+    }
+
+    const result = validatePrd(content);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

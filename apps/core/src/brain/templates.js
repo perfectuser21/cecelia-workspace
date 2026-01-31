@@ -506,6 +506,58 @@ function generatePrdFromGoalKR(params) {
 }
 
 /**
+ * Validate PRD content against template standards
+ * @param {string} content - PRD markdown content
+ * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
+ */
+function validatePrd(content) {
+  const errors = [];
+  const warnings = [];
+
+  if (!content || typeof content !== 'string' || content.trim().length === 0) {
+    return { valid: false, errors: ['PRD content is empty'], warnings: [] };
+  }
+
+  // Check frontmatter
+  const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!frontmatterMatch) {
+    warnings.push('Missing frontmatter (id, version, created)');
+  } else {
+    const fm = frontmatterMatch[1];
+    if (!fm.includes('id:')) warnings.push('Frontmatter missing "id" field');
+    if (!fm.includes('version:')) warnings.push('Frontmatter missing "version" field');
+    if (!fm.includes('created:')) warnings.push('Frontmatter missing "created" field');
+  }
+
+  // Check required sections
+  const requiredSections = PRD_TEMPLATE.sections.filter(s => s.required);
+  const sectionPatterns = {
+    background: /##\s*(背景|Background)/i,
+    objectives: /##\s*(目标|Objectives)/i,
+    functional_requirements: /##\s*(功能需求|功能描述|Functional Requirements)/i,
+    acceptance_criteria: /##\s*(验收标准|成功标准|Acceptance Criteria)/i
+  };
+
+  for (const section of requiredSections) {
+    const pattern = sectionPatterns[section.id];
+    if (pattern && !pattern.test(content)) {
+      errors.push(`Missing required section: ${section.title} (${section.id})`);
+    }
+  }
+
+  // Check acceptance criteria quality
+  const acMatch = content.match(/##\s*(验收标准|成功标准|Acceptance Criteria)\s*\n([\s\S]*?)(?=\n##\s|\n---|\Z|$)/i);
+  if (acMatch) {
+    const acContent = acMatch[2].trim();
+    if (acContent.length === 0 || acContent === '待定义。' || acContent === '待定义') {
+      errors.push('Acceptance criteria is empty or undefined (待定义)');
+    }
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
+/**
  * Get template by name
  * @param {string} templateName - Template name ('prd' or 'trd')
  * @returns {Object|null} Template object
@@ -539,6 +591,7 @@ export {
   generatePrdFromTask,
   generatePrdFromGoalKR,
   generateTrdFromGoal,
+  validatePrd,
   getTemplate,
   listTemplates,
   getCurrentDate
