@@ -14,6 +14,7 @@ import {
   generatePrdFromTask,
   generatePrdFromGoalKR,
   generateTrdFromGoal,
+  generateTrdFromGoalKR,
   validatePrd,
   validateTrd,
   getTemplate,
@@ -925,6 +926,64 @@ vitest
       expect(result.sections.technical_background).toContain('JWT');
       expect(result.sections.architecture_design).toContain('微服务');
       expect(result.sections.test_strategy).toContain('vitest');
+    });
+  });
+
+  describe('generateTrdFromGoalKR', () => {
+    it('generates valid TRD with title only', () => {
+      const trd = generateTrdFromGoalKR({ title: 'Test Feature' });
+      expect(trd).toContain('# TRD - Test Feature');
+      expect(trd).toContain('## 技术背景');
+      expect(trd).toContain('## 架构设计');
+      expect(trd).toContain('## API 设计');
+      expect(trd).toContain('## 数据模型');
+      expect(trd).toContain('## 测试策略');
+      const validation = validateTrd(trd);
+      expect(validation.valid).toBe(true);
+    });
+
+    it('injects KR context into technical background', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Test',
+        kr: { title: 'KR2', progress: 50, priority: 'P1' }
+      });
+      expect(trd).toContain('KR: KR2 (progress: 50%, priority: P1)');
+    });
+
+    it('injects project context', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Test',
+        project: { name: 'test-project', repo_path: '/home/xx/dev/test' }
+      });
+      expect(trd).toContain('Project: /home/xx/dev/test');
+    });
+
+    it('generates TRD with all params including milestones', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Full Feature',
+        description: 'A complete feature',
+        kr: { title: 'KR1', progress: 20, priority: 'P0' },
+        project: { name: 'my-proj', repo_path: '/repo' },
+        milestones: [
+          { title: 'Phase 1', description: 'Setup' },
+          { title: 'Phase 2' }
+        ]
+      });
+      expect(trd).toContain('KR: KR1 (progress: 20%, priority: P0)');
+      expect(trd).toContain('Project: /repo');
+      expect(trd).toContain('**Phase 1**');
+      expect(trd).toContain('**Phase 2**');
+      expect(trd).toContain('Setup');
+      const validation = validateTrd(trd);
+      expect(validation.valid).toBe(true);
+    });
+
+    it('uses default plan when no milestones provided', () => {
+      const trd = generateTrdFromGoalKR({ title: 'Simple' });
+      expect(trd).toContain('需求分析');
+      expect(trd).toContain('技术设计');
+      expect(trd).toContain('编码实现');
+      expect(trd).toContain('测试验证');
     });
   });
 });
