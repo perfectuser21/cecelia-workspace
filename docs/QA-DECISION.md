@@ -1,8 +1,8 @@
 ---
-id: qa-decision-planner-strategy-refresh
+id: qa-decision-cecelia-conversation-api
 version: 1.0.0
-created: 2026-01-31
-updated: 2026-01-31
+created: 2026-02-01
+updated: 2026-02-01
 changelog:
   - 1.0.0: 初始版本
 ---
@@ -11,24 +11,36 @@ changelog:
 
 Decision: NO_RCI
 Priority: P1
-RepoType: Engine
+RepoType: Business
 
 Tests:
-  - dod_item: "prd_trd_generation.tasks 包含 4 个新任务标题"
+  - dod_item: "POST /api/cecelia/chat 接收消息并返回回复"
     method: auto
-    location: apps/core/src/brain/__tests__/planner.test.js
-  - dod_item: "每个 KR_STRATEGIES 策略有 progressWeight === tasks.length"
+    location: tests/api/cecelia-chat.test.ts
+  - dod_item: "能识别'创建任务'意图并创建任务记录"
     method: auto
-    location: apps/core/src/brain/__tests__/planner.test.js
-  - dod_item: "generateNextTask 在策略耗尽时执行 UPDATE goals SET progress"
+    location: tests/api/cecelia-chat.test.ts
+  - dod_item: "能识别'查询状态'意图并返回系统状态"
     method: auto
-    location: apps/core/src/brain/__tests__/planner.test.js
-  - dod_item: "现有测试全部通过"
+    location: tests/api/cecelia-chat.test.ts
+  - dod_item: "返回的 reply 是自然语言（非 JSON 格式）"
     method: auto
-    location: apps/core/src/brain/__tests__/planner.test.js
+    location: tests/api/cecelia-chat.test.ts
+  - dod_item: "意图不明确时返回澄清问题"
+    method: auto
+    location: tests/api/cecelia-chat.test.ts
+  - dod_item: "集成测试覆盖：创建任务、查询状态、意图不明确三种场景"
+    method: auto
+    location: tests/api/cecelia-chat.test.ts
+  - dod_item: "测试验证回复格式为自然语言字符串"
+    method: auto
+    location: tests/api/cecelia-chat.test.ts
+  - dod_item: "npm run qa 通过"
+    method: auto
+    location: tests/api/cecelia-chat.test.ts
 
 RCI:
   new: []
   update: []
 
-Reason: Planner 内部逻辑改进，不涉及核心 Hook/Gate/CI 流程，通过单元测试覆盖。
+Reason: Business API 功能，不涉及核心 Engine（Hook/Gate/CI），已有完整自动化测试覆盖所有场景，无需 RCI
