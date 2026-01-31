@@ -37,8 +37,8 @@ describe('Tick Dispatch constants', () => {
   it('DISPATCH_COOLDOWN_MS is 60 seconds', () => {
     expect(DISPATCH_COOLDOWN_MS).toBe(60 * 1000);
   });
-  it('MAX_CONCURRENT_TASKS is 1', () => {
-    expect(MAX_CONCURRENT_TASKS).toBe(1);
+  it('MAX_CONCURRENT_TASKS defaults to 3', () => {
+    expect(MAX_CONCURRENT_TASKS).toBe(3);
   });
 });
 
@@ -109,7 +109,7 @@ describe('dispatchNextTask', () => {
   });
 
   it('returns max_concurrent_reached when at capacity', async () => {
-    pool.query.mockResolvedValueOnce({ rows: [{ count: '1' }] }); // active count
+    pool.query.mockResolvedValueOnce({ rows: [{ count: '3' }] }); // active count >= MAX_CONCURRENT (3)
 
     const result = await dispatchNextTask(goalIds);
     expect(result.dispatched).toBe(false);
@@ -225,7 +225,7 @@ describe('getTickStatus includes dispatch fields', () => {
     expect(status).toHaveProperty('last_dispatch');
     expect(status).toHaveProperty('max_concurrent');
     expect(status).toHaveProperty('dispatch_timeout_minutes');
-    expect(status.max_concurrent).toBe(1);
+    expect(status.max_concurrent).toBe(3); // default from env CECELIA_MAX_CONCURRENT || 3
     expect(status.dispatch_timeout_minutes).toBe(30);
     expect(status.last_dispatch).toBeNull();
   });

@@ -214,8 +214,8 @@ export async function generateDecision(context = {}) {
       confidence = Math.min(confidence, 0.85);
     }
 
-    // Handle behind goals
-    if (goal.status === 'behind') {
+    // Handle at_risk and behind goals (deviation < -10%)
+    if (goal.status === 'behind' || goal.status === 'at_risk') {
       // Find pending high-priority tasks to reprioritize
       const pendingTasksResult = await pool.query(`
         SELECT id, title, priority
@@ -231,8 +231,8 @@ export async function generateDecision(context = {}) {
             type: 'reprioritize',
             target_id: task.id,
             target_type: 'task',
-            new_priority: 'P1',
-            reason: `Goal "${goal.title}" is behind schedule`
+            new_priority: goal.status === 'behind' ? 'P0' : 'P1',
+            reason: `Goal "${goal.title}" is ${goal.status === 'behind' ? 'significantly behind' : 'at risk'}`
           });
         }
       }

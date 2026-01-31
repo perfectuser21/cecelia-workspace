@@ -17,7 +17,7 @@ const TICK_TIMEOUT_MS = 60 * 1000; // 60 seconds max execution time
 const STALE_THRESHOLD_HOURS = 24; // Tasks in_progress for more than 24h are stale
 const DISPATCH_TIMEOUT_MINUTES = 30; // Auto-fail dispatched tasks after 30 min
 const DISPATCH_COOLDOWN_MS = 60 * 1000; // 1 minute cooldown after dispatch
-const MAX_CONCURRENT_TASKS = 1; // Max concurrent cecelia-run executions
+const MAX_CONCURRENT_TASKS = parseInt(process.env.CECELIA_MAX_CONCURRENT || '3', 10); // Max concurrent cecelia-run executions
 const AUTO_EXECUTE_CONFIDENCE = 0.8; // Auto-execute decisions with confidence >= this
 
 // Working memory keys
