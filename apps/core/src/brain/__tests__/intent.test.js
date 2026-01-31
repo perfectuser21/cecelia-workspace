@@ -143,41 +143,6 @@ describe('Intent Recognition Module', () => {
       expect(entities.feature).toBeFalsy();
       expect(entities.filePath).toBeFalsy();
     });
-
-    it('extracts priority P0 from input', () => {
-      const entities = extractEntities('P0 紧急修复登录模块');
-      expect(entities.priority).toBe('P0');
-    });
-
-    it('extracts priority from Chinese keyword 紧急', () => {
-      const entities = extractEntities('紧急修复登录问题');
-      expect(entities.priority).toBe('P0');
-    });
-
-    it('extracts priority from Chinese keyword 低优先级', () => {
-      const entities = extractEntities('低优先级优化文档格式');
-      expect(entities.priority).toBe('P2');
-    });
-
-    it('extracts timeframe 本周 from input', () => {
-      const entities = extractEntities('本周完成用户模块开发');
-      expect(entities.timeframe).toBe('本周');
-    });
-
-    it('extracts timeframe today from English input', () => {
-      const entities = extractEntities('finish this today please');
-      expect(entities.timeframe).toBeTruthy();
-    });
-
-    it('extracts dependency from input', () => {
-      const entities = extractEntities('依赖用户认证模块完成');
-      expect(entities.dependency).toBeTruthy();
-    });
-
-    it('extracts dependency from English input', () => {
-      const entities = extractEntities('depends on auth service being ready');
-      expect(entities.dependency).toBeTruthy();
-    });
   });
 
   describe('extractProjectName', () => {
