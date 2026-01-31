@@ -529,6 +529,32 @@ function listTemplates() {
   ];
 }
 
+/**
+ * Validate a PRD markdown string for required sections
+ * @param {string} prdContent - PRD markdown content
+ * @returns {{valid: boolean, errors: string[]}} Validation result
+ */
+function validatePrd(prdContent) {
+  const errors = [];
+
+  if (!prdContent || typeof prdContent !== 'string' || prdContent.trim().length === 0) {
+    return { valid: false, errors: ['PRD content is empty'] };
+  }
+
+  const requiredSections = PRD_TEMPLATE.sections
+    .filter(s => s.required)
+    .map(s => ({ id: s.id, title: s.title }));
+
+  for (const section of requiredSections) {
+    const pattern = new RegExp(`^##\\s+${section.title}`, 'm');
+    if (!pattern.test(prdContent)) {
+      errors.push(`Missing required section: ${section.title} (${section.id})`);
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
 export {
   PRD_TEMPLATE,
   TRD_TEMPLATE,
@@ -541,5 +567,6 @@ export {
   generateTrdFromGoal,
   getTemplate,
   listTemplates,
-  getCurrentDate
+  getCurrentDate,
+  validatePrd
 };

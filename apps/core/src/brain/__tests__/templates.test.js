@@ -16,7 +16,8 @@ import {
   generateTrdFromGoal,
   getTemplate,
   listTemplates,
-  getCurrentDate
+  getCurrentDate,
+  validatePrd
 } from '../templates.js';
 
 describe('Templates Module', () => {
@@ -553,6 +554,40 @@ describe('Templates Module', () => {
       expect(trd).toContain('### 现有技术栈');
       expect(trd).toContain('CREATE TABLE user_service');
       expect(trd).toContain('- user 模块');
+    });
+  });
+
+  describe('validatePrd', () => {
+    it('should return valid for a complete PRD', () => {
+      const prd = renderPrd({
+        projectName: 'test',
+        intentType: 'create_feature',
+        tasks: [{ title: 'Task 1', description: 'Desc' }],
+        originalInput: 'Test input',
+        entities: {}
+      });
+      const result = validatePrd(prd);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([]);
+    });
+
+    it('should return errors for missing required sections', () => {
+      const incompletePrd = '# PRD - Test\n\n## 背景\n\nSome background\n';
+      const result = validatePrd(incompletePrd);
+      expect(result.valid).toBe(false);
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(result.errors.some(e => e.includes('目标'))).toBe(true);
+    });
+
+    it('should return error for empty content', () => {
+      const result = validatePrd('');
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('PRD content is empty');
+    });
+
+    it('should return error for null/undefined content', () => {
+      expect(validatePrd(null).valid).toBe(false);
+      expect(validatePrd(undefined).valid).toBe(false);
     });
   });
 });

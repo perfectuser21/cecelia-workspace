@@ -9,6 +9,7 @@
 
 import pool from '../task-system/db.js';
 import crypto from 'crypto';
+import { renderPrd } from './templates.js';
 
 /**
  * Parse TRD content and extract section structure
@@ -96,23 +97,23 @@ export function extractMilestones(sections) {
 }
 
 /**
- * Generate a PRD from a milestone
+ * Generate a PRD from a milestone using the standard template system
  */
 export function generatePRD(milestone, index) {
-  const prdContent = `# PRD: ${milestone.title}
+  const tasks = milestone.items.map(item => ({
+    title: item,
+    description: item
+  }));
 
-## Background
+  const parsedIntent = {
+    projectName: milestone.title,
+    intentType: 'create_feature',
+    tasks,
+    originalInput: `Auto-generated from TRD milestone ${index + 1}: ${milestone.title}`,
+    entities: {}
+  };
 
-This PRD is auto-generated from TRD milestone ${index + 1}.
-
-## Requirements
-
-${milestone.items.map((item, i) => `${i + 1}. ${item}`).join('\n')}
-
-## Acceptance Criteria
-
-${milestone.items.map((item) => `- [ ] ${item}`).join('\n')}
-`;
+  const prdContent = renderPrd(parsedIntent, { includeFrontmatter: true });
 
   return {
     id: `prd-${crypto.randomUUID().slice(0, 8)}`,
