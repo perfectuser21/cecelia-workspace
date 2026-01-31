@@ -7,9 +7,11 @@
  * - Projects
  * - Tasks
  * - PRD drafts
+ * - TRD drafts
  */
 
 import pool from '../task-system/db.js';
+import { renderPrd, renderTrd } from './templates.js';
 
 /**
  * Intent types that can be recognized
@@ -439,46 +441,38 @@ function generateTasks(projectName, intentType, _input, entities = {}) {
 }
 
 /**
- * Generate PRD draft from parsed intent
+ * Generate PRD draft from parsed intent (legacy function)
  * @param {Object} parsedIntent - Parsed intent object
  * @returns {string} - PRD draft in markdown format
+ * @deprecated Use generateStandardPrd for new implementations
  */
 function generatePrdDraft(parsedIntent) {
-  const { projectName, intentType, tasks, originalInput } = parsedIntent;
+  // Use new template system but without frontmatter for backward compatibility
+  return renderPrd(parsedIntent, { includeFrontmatter: false });
+}
 
-  const prdDraft = `# PRD - ${projectName}
+/**
+ * Generate standard PRD with frontmatter from parsed intent
+ * @param {Object} parsedIntent - Parsed intent object
+ * @param {Object} options - Options for PRD generation
+ * @param {boolean} options.includeFrontmatter - Include YAML frontmatter (default: true)
+ * @param {string} options.version - Document version (default: 1.0.0)
+ * @returns {string} - Standard PRD in markdown format
+ */
+function generateStandardPrd(parsedIntent, options = {}) {
+  return renderPrd(parsedIntent, options);
+}
 
-## 需求来源
-
-${originalInput}
-
-## 功能描述
-
-基于用户需求，${intentType === INTENT_TYPES.CREATE_PROJECT ? '创建' : '实现'}${projectName}。
-
-## 涉及文件
-
-- src/api/${projectName}/ (后端 API)
-- src/pages/${projectName}/ (前端页面)
-- tests/${projectName}/ (测试文件)
-
-## 成功标准
-
-${tasks.map((t) => `- [ ] ${t.title}`).join('\n')}
-
-## 任务拆解
-
-${tasks.map((t, i) => `### Task ${i + 1}: ${t.title}
-
-**优先级**: ${t.priority}
-**描述**: ${t.description}
-`).join('\n')}
-
----
-*此 PRD 由 Intent Parser 自动生成，请根据实际需求进行调整。*
-`;
-
-  return prdDraft;
+/**
+ * Generate TRD draft from parsed intent
+ * @param {Object} parsedIntent - Parsed intent object
+ * @param {Object} options - Options for TRD generation
+ * @param {boolean} options.includeFrontmatter - Include YAML frontmatter (default: true)
+ * @param {string} options.version - Document version (default: 1.0.0)
+ * @returns {string} - TRD in markdown format
+ */
+function generateTrdDraft(parsedIntent, options = {}) {
+  return renderTrd(parsedIntent, options);
 }
 
 /**
@@ -618,6 +612,8 @@ export {
   extractProjectName,
   generateTasks,
   generatePrdDraft,
+  generateStandardPrd,
+  generateTrdDraft,
   parseIntent,
   parseAndCreate
 };

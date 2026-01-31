@@ -12,6 +12,8 @@ import {
   extractProjectName,
   generateTasks,
   generatePrdDraft,
+  generateStandardPrd,
+  generateTrdDraft,
   parseIntent,
   parseAndCreate
 } from '../intent.js';
@@ -214,7 +216,8 @@ describe('Intent Recognition Module', () => {
           { title: 'Task 1', description: 'Desc 1', priority: 'P0' },
           { title: 'Task 2', description: 'Desc 2', priority: 'P1' }
         ],
-        originalInput: 'Create a test project'
+        originalInput: 'Create a test project',
+        entities: {}
       };
 
       const prd = generatePrdDraft(parsedIntent);
@@ -223,7 +226,151 @@ describe('Intent Recognition Module', () => {
       expect(prd).toContain('Create a test project');
       expect(prd).toContain('Task 1');
       expect(prd).toContain('Task 2');
-      expect(prd).toContain('**优先级**: P0');
+    });
+
+    it('does not include frontmatter (backward compatibility)', () => {
+      const parsedIntent = {
+        projectName: 'test-project',
+        intentType: INTENT_TYPES.CREATE_PROJECT,
+        tasks: [],
+        originalInput: 'Test',
+        entities: {}
+      };
+
+      const prd = generatePrdDraft(parsedIntent);
+
+      expect(prd).not.toMatch(/^---/);
+      expect(prd).toMatch(/^# PRD/);
+    });
+  });
+
+  describe('generateStandardPrd', () => {
+    const baseParsedIntent = {
+      projectName: 'standard-project',
+      intentType: INTENT_TYPES.CREATE_PROJECT,
+      tasks: [
+        { title: 'Design', description: 'Design the system', priority: 'P0' },
+        { title: 'Implement', description: 'Build the system', priority: 'P0' }
+      ],
+      originalInput: '创建一个标准项目',
+      entities: {}
+    };
+
+    it('includes frontmatter by default', () => {
+      const prd = generateStandardPrd(baseParsedIntent);
+
+      expect(prd).toMatch(/^---/);
+      expect(prd).toContain('id: prd-standard-project');
+      expect(prd).toContain('version: 1.0.0');
+      expect(prd).toContain('changelog:');
+    });
+
+    it('includes all standard sections', () => {
+      const prd = generateStandardPrd(baseParsedIntent);
+
+      expect(prd).toContain('## 背景');
+      expect(prd).toContain('## 目标');
+      expect(prd).toContain('## 功能需求');
+      expect(prd).toContain('## 非功能需求');
+      expect(prd).toContain('## 验收标准');
+      expect(prd).toContain('## 里程碑');
+    });
+
+    it('includes milestone table', () => {
+      const prd = generateStandardPrd(baseParsedIntent);
+
+      expect(prd).toContain('| 阶段 | 描述 | 状态 |');
+      expect(prd).toContain('| M1 | 需求确认 | 待开始 |');
+    });
+
+    it('can exclude frontmatter', () => {
+      const prd = generateStandardPrd(baseParsedIntent, { includeFrontmatter: false });
+
+      expect(prd).not.toMatch(/^---/);
+    });
+
+    it('supports custom version', () => {
+      const prd = generateStandardPrd(baseParsedIntent, { version: '2.0.0' });
+
+      expect(prd).toContain('version: 2.0.0');
+    });
+  });
+
+  describe('generateTrdDraft', () => {
+    const baseParsedIntent = {
+      projectName: 'api-service',
+      intentType: INTENT_TYPES.CREATE_PROJECT,
+      tasks: [
+        { title: 'Design API', description: 'Define API spec', priority: 'P0' },
+        { title: 'Implement', description: 'Build endpoints', priority: 'P0' }
+      ],
+      originalInput: '创建一个 API 服务',
+      entities: {}
+    };
+
+    it('includes frontmatter by default', () => {
+      const trd = generateTrdDraft(baseParsedIntent);
+
+      expect(trd).toMatch(/^---/);
+      expect(trd).toContain('id: trd-api-service');
+      expect(trd).toContain('version: 1.0.0');
+    });
+
+    it('includes all TRD sections', () => {
+      const trd = generateTrdDraft(baseParsedIntent);
+
+      expect(trd).toContain('## 技术背景');
+      expect(trd).toContain('## 架构设计');
+      expect(trd).toContain('## API 设计');
+      expect(trd).toContain('## 数据模型');
+      expect(trd).toContain('## 测试策略');
+    });
+
+    it('includes architecture diagram', () => {
+      const trd = generateTrdDraft(baseParsedIntent);
+
+      expect(trd).toContain('Client');
+      expect(trd).toContain('Server');
+      expect(trd).toContain('Database');
+    });
+
+    it('includes API endpoint table', () => {
+      const trd = generateTrdDraft(baseParsedIntent);
+
+      expect(trd).toContain('| 方法 | 路径 | 描述 |');
+      expect(trd).toContain('GET');
+      expect(trd).toContain('POST');
+    });
+
+    it('includes SQL schema', () => {
+      const trd = generateTrdDraft(baseParsedIntent);
+
+      expect(trd).toContain('CREATE TABLE api_service');
+      expect(trd).toContain('id UUID PRIMARY KEY');
+    });
+
+    it('includes test coverage checklist', () => {
+      const trd = generateTrdDraft(baseParsedIntent);
+
+      expect(trd).toContain('- [ ] Design API 测试');
+      expect(trd).toContain('- [ ] Implement 测试');
+    });
+
+    it('can exclude frontmatter', () => {
+      const trd = generateTrdDraft(baseParsedIntent, { includeFrontmatter: false });
+
+      expect(trd).not.toMatch(/^---/);
+      expect(trd).toMatch(/^# TRD/);
+    });
+
+    it('uses entity module in design', () => {
+      const intent = {
+        ...baseParsedIntent,
+        entities: { module: 'user-auth' }
+      };
+      const trd = generateTrdDraft(intent);
+
+      expect(trd).toContain('- user-auth 模块');
     });
   });
 
@@ -361,10 +508,10 @@ describe('Intent Recognition Module', () => {
       expect(result.tasks.length).toBeGreaterThanOrEqual(3);
       expect(result.tasks.length).toBeLessThanOrEqual(6);
 
-      // Verify PRD draft generated
+      // Verify PRD draft generated with standard template sections
       expect(result.prdDraft).toContain('GMV Dashboard');
-      expect(result.prdDraft).toContain('成功标准');
-      expect(result.prdDraft).toContain('任务拆解');
+      expect(result.prdDraft).toContain('验收标准');
+      expect(result.prdDraft).toContain('功能需求');
     });
   });
 });
