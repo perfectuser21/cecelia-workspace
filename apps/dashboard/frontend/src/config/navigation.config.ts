@@ -61,6 +61,7 @@ export const autopilotPageComponents: Record<string, () => Promise<{ default: Co
   'AiAbilityDetailPage': () => import('../pages/AiAbilityDetailPage'),
   'AccountsList': () => import('../pages/accounts/AccountsList'),
   'FeatureDashboard': () => import('../pages/FeatureDashboard'),
+  'CommandCenter': () => import('../pages/CommandCenter'),
 };
 
 // 向后兼容：保留 pageComponents 导出（仅 Autopilot 组件）
@@ -142,6 +143,8 @@ export const additionalRoutes: RouteConfig[] = [
 
   // === Features Dashboard (Core 实例) ===
   { path: '/features', component: 'FeatureDashboard', requireAuth: true },
+  { path: '/command', component: 'CommandCenter', requireAuth: true },
+  { path: '/command/*', component: 'CommandCenter', requireAuth: true },
 
   // 管理员子页面已迁移到 Core
   // ClaudeMonitor, VpsMonitor, ClaudeStats, N8n*, Canvas 等
