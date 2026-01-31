@@ -9,7 +9,7 @@
 
 import pool from '../task-system/db.js';
 import crypto from 'crypto';
-import { renderPrd } from './templates.js';
+import { renderPrd, generateFrontmatter, getCurrentDate } from './templates.js';
 
 /**
  * Parse TRD content and extract section structure

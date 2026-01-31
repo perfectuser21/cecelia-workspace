@@ -433,6 +433,17 @@ async function autoFailTimedOutTasks(inProgressTasks) {
 
     const elapsed = (Date.now() - new Date(triggeredAt).getTime()) / (1000 * 60);
     if (elapsed > DISPATCH_TIMEOUT_MINUTES) {
+      // Write structured error details for retry-analyzer
+      const errorDetails = {
+        type: 'timeout',
+        message: `Task timed out after ${Math.round(elapsed)} minutes (limit: ${DISPATCH_TIMEOUT_MINUTES}min)`,
+        elapsed_minutes: Math.round(elapsed),
+        timeout_limit: DISPATCH_TIMEOUT_MINUTES,
+      };
+      await pool.query(
+        `UPDATE tasks SET payload = COALESCE(payload, '{}'::jsonb) || $2::jsonb WHERE id = $1`,
+        [task.id, JSON.stringify({ error_details: errorDetails })]
+      );
       await updateTask({ task_id: task.id, status: 'failed' });
       await recordFailure('cecelia-run');
       await emit('patrol_cleanup', 'patrol', {

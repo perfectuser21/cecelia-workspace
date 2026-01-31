@@ -9,6 +9,7 @@ import pool from '../task-system/db.js';
 import { getDailyFocus } from './focus.js';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
+import { shouldRetryTask } from './retry-analyzer.js';
 import { generatePrdFromGoalKR } from './templates.js';
 
 /**
@@ -179,30 +180,50 @@ async function autoGenerateTask(kr, project, state, options = {}) {
     ORDER BY updated_at DESC LIMIT 5
   `, [kr.id, project.id]);
 
-  // Strategy 1: Retry most recent failed task (with retry count check)
+  // Strategy 1: Retry most recent failed task (with intelligent analysis)
   for (const failed of failedResult.rows) {
-    const retries = failed.payload?.retry_count || 0;
-    if (retries < 2) {
-      const retryTitle = failed.title.startsWith('[Retry]') ? failed.title : `[Retry] ${failed.title}`;
+    const { shouldRetry, analysis } = shouldRetryTask(failed);
 
-      if (options.dryRun) {
-        return { id: null, title: retryTitle, priority: failed.priority, goal_id: kr.id, project_id: project.id, _generated: true, _strategy: 'retry' };
+    if (!shouldRetry) {
+      // Mark as abandoned if not already
+      if (failed.payload?.status !== 'abandoned') {
+        await pool.query(
+          `UPDATE tasks SET status = 'abandoned', payload = COALESCE(payload, '{}'::jsonb) || $2::jsonb WHERE id = $1`,
+          [failed.id, JSON.stringify({ failure_analysis: analysis })]
+        );
       }
-
-      const insertResult = await pool.query(`
-        INSERT INTO tasks (title, description, priority, project_id, goal_id, status, payload)
-        VALUES ($1, $2, $3, $4, $5, 'queued', $6) RETURNING *
-      `, [
-        retryTitle,
-        failed.description || '',
-        failed.priority || 'P1',
-        project.id,
-        kr.id,
-        JSON.stringify({ retry_of: failed.id, retry_count: retries + 1, auto_generated: true })
-      ]);
-
-      return insertResult.rows[0];
+      continue;
     }
+
+    const retries = failed.payload?.retry_count || 0;
+    const retryTitle = failed.title.startsWith('[Retry]') ? failed.title : `[Retry] ${failed.title}`;
+
+    const retryPayload = {
+      retry_of: failed.id,
+      retry_count: retries + 1,
+      auto_generated: true,
+      failure_analysis: analysis,
+      dispatch_timeout: analysis.adjustments.dispatch_timeout,
+      retry_delay_ms: analysis.adjustments.retry_delay_ms,
+    };
+
+    if (options.dryRun) {
+      return { id: null, title: retryTitle, priority: failed.priority, goal_id: kr.id, project_id: project.id, _generated: true, _strategy: 'retry', payload: retryPayload };
+    }
+
+    const insertResult = await pool.query(`
+      INSERT INTO tasks (title, description, priority, project_id, goal_id, status, payload)
+      VALUES ($1, $2, $3, $4, $5, 'queued', $6) RETURNING *
+    `, [
+      retryTitle,
+      failed.description || '',
+      failed.priority || 'P1',
+      project.id,
+      kr.id,
+      JSON.stringify(retryPayload)
+    ]);
+
+    return insertResult.rows[0];
   }
 
   // Strategy 2: V3 - Generate concrete task from KR decomposition

@@ -8,7 +8,7 @@ import { getTickStatus, enableTick, disableTick, executeTick, runTickSafe } from
 import { parseIntent, parseAndCreate, INTENT_TYPES, INTENT_ACTION_MAP, extractEntities, classifyIntent, getSuggestedAction } from './intent.js';
 import pool from '../task-system/db.js';
 import { decomposeTRD, getTRDProgress, listTRDs } from './decomposer.js';
-import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, PRD_TYPE_MAP, validatePrd } from './templates.js';
+import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, validatePrd, validateTrd, PRD_TYPE_MAP } from './templates.js';
 import { compareGoalProgress, generateDecision, executeDecision, getDecisionHistory, rollbackDecision } from './decision.js';
 import { planNextTask, getPlanStatus, handlePlanInput } from './planner.js';
 import { ensureEventsTable, queryEvents, getEventCounts } from './event-bus.js';
@@ -17,6 +17,7 @@ import { emit as emitEvent } from './event-bus.js';
 import { recordSuccess as cbSuccess, recordFailure as cbFailure } from './circuit-breaker.js';
 import { notifyTaskCompleted, notifyTaskFailed } from './notifier.js';
 import { runDiagnosis } from './self-diagnosis.js';
+import { getRetrySummary } from './retry-analyzer.js';
 import crypto from 'crypto';
 
 const router = Router();
@@ -115,13 +116,14 @@ router.get('/status', async (req, res) => {
     // 支持 ?mode=interactive|scheduled|incident
     const decisionMode = req.query.mode || 'interactive';
 
-    const [policy, workingMemory, topTasks, recentDecisions, snapshot, dailyFocus] = await Promise.all([
+    const [policy, workingMemory, topTasks, recentDecisions, snapshot, dailyFocus, retrySummary] = await Promise.all([
       getActivePolicy(),
       getWorkingMemory(),
       getTopTasks(10),
       getRecentDecisions(5),
       getLatestSnapshot(),
-      getFocusSummary()
+      getFocusSummary(),
+      getRetrySummary().catch(() => ({ failed_count: 0, retrying_count: 0, abandoned_count: 0 }))
     ]);
 
     const now = new Date();
@@ -218,7 +220,8 @@ router.get('/status', async (req, res) => {
           in_progress: topTasks.filter(t => t.status === 'in_progress').length,
           queued: topTasks.filter(t => t.status === 'queued').length,
           overdue: topTasks.filter(t => t.due_at && new Date(t.due_at) < now && t.status !== 'completed').length
-        }
+        },
+        retry_summary: retrySummary
       }
     };
 
@@ -1317,6 +1320,42 @@ router.post('/generate/trd', async (req, res) => {
       error: 'Failed to generate TRD',
       details: err.message
     });
+  }
+});
+
+// ==================== Validate API ====================
+
+/**
+ * POST /api/brain/validate/prd
+ * Validate a PRD document
+ */
+router.post('/validate/prd', (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content) {
+      return res.status(400).json({ success: false, error: 'content is required' });
+    }
+    const result = validatePrd(content);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Validation failed', details: err.message });
+  }
+});
+
+/**
+ * POST /api/brain/validate/trd
+ * Validate a TRD document
+ */
+router.post('/validate/trd', (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content) {
+      return res.status(400).json({ success: false, error: 'content is required' });
+    }
+    const result = validateTrd(content);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Validation failed', details: err.message });
   }
 });
 
