@@ -86,40 +86,58 @@ const PRD_TEMPLATE = {
 };
 
 /**
- * Standard TRD Template Structure
+ * Standard TRD Template Structure (aligned with prds/templates/TRD-TEMPLATE.md)
  */
 const TRD_TEMPLATE = {
   name: 'trd',
   sections: [
     {
-      id: 'technical_background',
-      title: '技术背景',
-      description: '技术栈和现有架构说明',
+      id: 'overview',
+      title: '概述',
+      description: '目标、背景、范围',
       required: true
     },
     {
-      id: 'architecture_design',
-      title: '架构设计',
-      description: '系统架构和组件设计',
-      required: true
-    },
-    {
-      id: 'api_design',
-      title: 'API 设计',
-      description: '接口定义和数据格式',
+      id: 'system_architecture',
+      title: '系统架构',
+      description: '架构图和组件说明',
       required: true
     },
     {
       id: 'data_model',
       title: '数据模型',
-      description: '数据库设计和数据结构',
+      description: '数据库变更和数据流',
       required: true
     },
     {
-      id: 'test_strategy',
-      title: '测试策略',
-      description: '测试方案和覆盖范围',
+      id: 'prd_decomposition',
+      title: 'PRD 拆解',
+      description: '依赖图和 PRD 清单',
+      required: false
+    },
+    {
+      id: 'api_design',
+      title: '接口设计',
+      description: '端点定义和请求/响应格式',
       required: true
+    },
+    {
+      id: 'technical_decisions',
+      title: '技术决策',
+      description: '决策记录和风险缓解',
+      required: false
+    },
+    {
+      id: 'acceptance_criteria',
+      title: '验收标准',
+      description: '功能、技术、集成验收清单',
+      required: true
+    },
+    {
+      id: 'appendix',
+      title: '附录',
+      description: '相关文档和变更日志',
+      required: false
     }
   ]
 };
@@ -242,6 +260,7 @@ function renderTrd(parsedIntent, options = {}) {
 
   const docId = `trd-${projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   const today = getCurrentDate();
+  const tableName = projectName.replace(/-/g, '_');
 
   let trd = '';
 
@@ -252,74 +271,46 @@ function renderTrd(parsedIntent, options = {}) {
   }
 
   // Title
-  trd += `# TRD - ${projectName}\n\n`;
+  trd += `# TRD: ${projectName}\n\n`;
 
-  // Technical Background
-  trd += `## 技术背景\n\n`;
-  trd += `### 需求来源\n\n`;
+  // 1. 概述
+  trd += `## 概述\n\n`;
+  trd += `### 目标\n\n`;
+  const objectiveVerb = getIntentVerb(intentType);
+  trd += `${objectiveVerb}${projectName}，满足技术需求。\n\n`;
+  trd += `### 背景\n\n`;
   trd += `${originalInput}\n\n`;
-  trd += `### 现有技术栈\n\n`;
-  trd += `- 后端：Node.js / Express\n`;
-  trd += `- 前端：React / TypeScript\n`;
-  trd += `- 数据库：PostgreSQL\n`;
-  trd += `- 测试：Vitest\n\n`;
+  trd += `### 范围\n\n`;
+  trd += `- **包含**：${projectName} 核心功能实现\n`;
+  trd += `- **不包含**：无关模块的修改\n\n`;
 
-  // Architecture Design
-  trd += `## 架构设计\n\n`;
-  trd += `### 系统架构\n\n`;
+  // 2. 系统架构
+  trd += `## 系统架构\n\n`;
+  trd += `### 架构图\n\n`;
   trd += '```\n';
   trd += `┌─────────────┐    ┌─────────────┐    ┌─────────────┐\n`;
   trd += `│   Client    │───▶│   Server    │───▶│  Database   │\n`;
   trd += `└─────────────┘    └─────────────┘    └─────────────┘\n`;
   trd += '```\n\n';
-  trd += `### 组件设计\n\n`;
+  trd += `### 组件说明\n\n`;
+  trd += `| 组件 | 职责 | 依赖 |\n`;
+  trd += `|------|------|------|\n`;
   if (entities.module) {
-    trd += `- ${entities.module} 模块\n`;
+    trd += `| ${entities.module} | 核心业务逻辑 | 无 |\n`;
   }
   if (entities.component) {
-    trd += `- ${entities.component} 组件\n`;
+    trd += `| ${entities.component} | UI 组件 | ${entities.module || '无'} |\n`;
   }
   if (!entities.module && !entities.component) {
-    trd += `- ${projectName} 核心模块\n`;
+    trd += `| ${projectName} | 核心模块 | 无 |\n`;
   }
   trd += '\n';
 
-  // API Design
-  trd += `## API 设计\n\n`;
-  trd += `### 接口列表\n\n`;
-  trd += `| 方法 | 路径 | 描述 |\n`;
-  trd += `|------|------|------|\n`;
-  if (entities.apiEndpoint) {
-    trd += `| GET | ${entities.apiEndpoint} | 获取数据 |\n`;
-  } else {
-    trd += `| GET | /api/${projectName} | 获取列表 |\n`;
-    trd += `| POST | /api/${projectName} | 创建记录 |\n`;
-    trd += `| PUT | /api/${projectName}/:id | 更新记录 |\n`;
-    trd += `| DELETE | /api/${projectName}/:id | 删除记录 |\n`;
-  }
-  trd += '\n';
-
-  trd += `### 请求/响应格式\n\n`;
-  trd += '```json\n';
-  trd += `// 请求示例\n`;
-  trd += `{\n`;
-  trd += `  "name": "example",\n`;
-  trd += `  "data": {}\n`;
-  trd += `}\n\n`;
-  trd += `// 响应示例\n`;
-  trd += `{\n`;
-  trd += `  "success": true,\n`;
-  trd += `  "data": {},\n`;
-  trd += `  "message": "操作成功"\n`;
-  trd += `}\n`;
-  trd += '```\n\n';
-
-  // Data Model
+  // 3. 数据模型
   trd += `## 数据模型\n\n`;
-  trd += `### 主要实体\n\n`;
+  trd += `### 数据库变更\n\n`;
   trd += '```sql\n';
-  trd += `-- ${projectName} 主表\n`;
-  trd += `CREATE TABLE ${projectName.replace(/-/g, '_')} (\n`;
+  trd += `CREATE TABLE ${tableName} (\n`;
   trd += `  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`;
   trd += `  name VARCHAR(255) NOT NULL,\n`;
   trd += `  status VARCHAR(50) DEFAULT 'pending',\n`;
@@ -327,43 +318,109 @@ function renderTrd(parsedIntent, options = {}) {
   trd += `  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n`;
   trd += `);\n`;
   trd += '```\n\n';
+  trd += `### 数据流\n\n`;
+  trd += '```\n';
+  trd += `[输入] → [处理] → [存储] → [输出]\n`;
+  trd += '```\n\n';
 
-  // Test Strategy
-  trd += `## 测试策略\n\n`;
-  trd += `### 测试类型\n\n`;
-  trd += `- **单元测试**：覆盖核心业务逻辑\n`;
-  trd += `- **集成测试**：验证 API 接口\n`;
-  trd += `- **端到端测试**：关键用户流程\n\n`;
-  trd += `### 测试覆盖\n\n`;
+  // 4. PRD 拆解
+  trd += `## PRD 拆解\n\n`;
+  trd += `### 依赖图\n\n`;
+  if (tasks.length > 0) {
+    trd += '```\n';
+    tasks.forEach((task, i) => {
+      trd += `PRD-${String(i + 1).padStart(2, '0')} (${task.title})`;
+      trd += i < tasks.length - 1 ? '\n    ↓\n' : '\n';
+    });
+    trd += '```\n\n';
+  } else {
+    trd += '```\n';
+    trd += `PRD-01 (基础)\n    ↓\nPRD-02 (实现)\n    ↓\nPRD-03 (验收)\n`;
+    trd += '```\n\n';
+  }
+  trd += `### PRD 清单\n\n`;
+  trd += `| 序号 | 描述 | 依赖 |\n`;
+  trd += `|------|------|------|\n`;
+  if (tasks.length > 0) {
+    tasks.forEach((task, i) => {
+      const dep = i === 0 ? '无' : String(i).padStart(2, '0');
+      trd += `| ${String(i + 1).padStart(2, '0')} | ${task.title} | ${dep} |\n`;
+    });
+  } else {
+    trd += `| 01 | 基础实现 | 无 |\n`;
+    trd += `| 02 | 功能开发 | 01 |\n`;
+    trd += `| 03 | 测试验收 | 02 |\n`;
+  }
+  trd += '\n';
+
+  // 5. 接口设计
+  trd += `## 接口设计\n\n`;
+  trd += `### API 端点\n\n`;
+  trd += `| 方法 | 路径 | 描述 |\n`;
+  trd += `|------|------|------|\n`;
+  if (entities.apiEndpoint) {
+    trd += `| GET | ${entities.apiEndpoint} | 获取数据 |\n`;
+  } else {
+    trd += `| GET | /api/${projectName} | 获取列表 |\n`;
+    trd += `| POST | /api/${projectName} | 创建记录 |\n`;
+    trd += `| PATCH | /api/${projectName}/:id | 更新记录 |\n`;
+    trd += `| DELETE | /api/${projectName}/:id | 删除记录 |\n`;
+  }
+  trd += '\n';
+  trd += `### 请求/响应示例\n\n`;
+  trd += '```json\n';
+  trd += `// POST /api/${projectName}\n`;
+  trd += `{\n`;
+  trd += `  "name": "example",\n`;
+  trd += `  "data": {}\n`;
+  trd += `}\n\n`;
+  trd += `// Response\n`;
+  trd += `{\n`;
+  trd += `  "id": "uuid",\n`;
+  trd += `  "name": "example",\n`;
+  trd += `  "created_at": "${today}T00:00:00Z"\n`;
+  trd += `}\n`;
+  trd += '```\n\n';
+
+  // 6. 技术决策
+  trd += `## 技术决策\n\n`;
+  trd += `### 决策记录\n\n`;
+  trd += `| 决策点 | 选项 A | 选项 B | 决定 | 原因 |\n`;
+  trd += `|--------|--------|--------|------|------|\n`;
+  trd += `| 数据存储 | PostgreSQL | MongoDB | PostgreSQL | 已有基础设施 |\n\n`;
+  trd += `### 风险与缓解\n\n`;
+  trd += `| 风险 | 影响 | 缓解措施 |\n`;
+  trd += `|------|------|----------|\n`;
+  trd += `| 性能问题 | 中 | 添加索引，分页查询 |\n\n`;
+
+  // 7. 验收标准
+  trd += `## 验收标准\n\n`;
+  trd += `### 功能验收\n\n`;
   if (tasks.length > 0) {
     tasks.forEach(task => {
-      trd += `- [ ] ${task.title} 测试\n`;
+      trd += `- [ ] ${task.title} 正常工作\n`;
     });
   } else {
-    trd += `- [ ] 核心功能测试\n`;
-    trd += `- [ ] 边界条件测试\n`;
-    trd += `- [ ] 错误处理测试\n`;
+    trd += `- [ ] 核心功能正常工作\n`;
+    trd += `- [ ] API 响应符合规范\n`;
   }
   trd += '\n';
+  trd += `### 技术验收\n\n`;
+  trd += `- [ ] 所有测试通过\n`;
+  trd += `- [ ] 无 linting 错误\n`;
+  trd += `- [ ] 数据库迁移可回滚\n\n`;
+  trd += `### 集成验收\n\n`;
+  trd += `- [ ] API 接口联调正常\n`;
+  trd += `- [ ] 与现有功能无冲突\n\n`;
 
-  // Implementation Plan
-  trd += `## 实施计划\n\n`;
-  trd += `### 任务分解\n\n`;
-  if (tasks.length > 0) {
-    tasks.forEach((task, index) => {
-      trd += `${index + 1}. **${task.title}** (${task.priority})\n`;
-      trd += `   - ${task.description}\n`;
-    });
-  } else {
-    trd += `1. 需求分析\n`;
-    trd += `2. 技术设计\n`;
-    trd += `3. 编码实现\n`;
-    trd += `4. 测试验证\n`;
-  }
-  trd += '\n';
-
-  // Footer
-  trd += `---\n*此 TRD 由 Intent Parser 自动生成，请根据实际需求进行调整。*\n`;
+  // 8. 附录
+  trd += `## 附录\n\n`;
+  trd += `### 相关文档\n\n`;
+  trd += `- ${projectName} PRD\n\n`;
+  trd += `### 变更日志\n\n`;
+  trd += `| 版本 | 日期 | 变更 |\n`;
+  trd += `|------|------|------|\n`;
+  trd += `| ${version} | ${today} | 初始版本 |\n`;
 
   return trd;
 }
@@ -446,6 +503,116 @@ function generateTrdFromGoal(params, options = {}) {
   };
 
   return renderTrd(parsedIntent, options);
+}
+
+/**
+ * Generate a TRD from Goal + KR context
+ * @param {Object} params - Generation parameters
+ * @param {string} params.title - Feature title (required)
+ * @param {string} [params.description] - Feature description
+ * @param {Object} [params.kr] - Key Result context
+ * @param {Object} [params.project] - Project context
+ * @param {Array<{title: string, description?: string}>} [params.milestones] - Optional milestones
+ * @returns {string} Generated TRD markdown with frontmatter
+ */
+function generateTrdFromGoalKR(params) {
+  const { title, description = '', kr, project, milestones = [] } = params;
+
+  const tasks = milestones.map((m, i) => ({
+    title: m.title || `Milestone ${i + 1}`,
+    description: m.description || m.title || '',
+    priority: `P${Math.min(i, 2)}`
+  }));
+
+  const slug = title.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-').slice(0, 60);
+  const today = getCurrentDate();
+
+  const frontmatter = generateFrontmatter({
+    id: `trd-auto-${slug}`,
+    version: '1.0.0',
+    created: today,
+    updated: today
+  });
+
+  let trd = frontmatter + '\n\n';
+  trd += `# TRD: ${title}\n\n`;
+
+  // 概述
+  trd += `## 概述\n\n`;
+  trd += `### 目标\n\n`;
+  trd += `${description || title}\n\n`;
+  trd += `### 背景\n\n`;
+  if (kr) {
+    trd += `KR: ${kr.title || 'N/A'} (progress: ${kr.progress ?? 0}%, priority: ${kr.priority || 'P1'})\n`;
+    if (project) {
+      trd += `Project: ${project.name || 'N/A'} (${project.repo_path || 'no repo'})\n`;
+    }
+    trd += `Auto-generated by Planner V3\n\n`;
+  } else {
+    trd += `Auto-generated TRD\n\n`;
+  }
+  trd += `### 范围\n\n`;
+  trd += `- **包含**：${title}\n`;
+  trd += `- **不包含**：无关模块\n\n`;
+
+  // 系统架构
+  trd += `## 系统架构\n\n`;
+  trd += `### 架构图\n\n`;
+  trd += '```\n';
+  trd += `┌─────────────┐    ┌─────────────┐    ┌─────────────┐\n`;
+  trd += `│   Client    │───▶│   Server    │───▶│  Database   │\n`;
+  trd += `└─────────────┘    └─────────────┘    └─────────────┘\n`;
+  trd += '```\n\n';
+  trd += `### 组件说明\n\n`;
+  trd += `| 组件 | 职责 | 依赖 |\n`;
+  trd += `|------|------|------|\n`;
+  trd += `| ${title} | 核心模块 | 无 |\n\n`;
+
+  // 数据模型
+  trd += `## 数据模型\n\n`;
+  trd += `### 数据库变更\n\n`;
+  trd += `待定义。\n\n`;
+  trd += `### 数据流\n\n`;
+  trd += '```\n[输入] → [处理] → [存储] → [输出]\n```\n\n';
+
+  // PRD 拆解
+  trd += `## PRD 拆解\n\n`;
+  if (tasks.length > 0) {
+    trd += `### PRD 清单\n\n`;
+    trd += `| 序号 | 描述 | 依赖 |\n`;
+    trd += `|------|------|------|\n`;
+    tasks.forEach((task, i) => {
+      const dep = i === 0 ? '无' : String(i).padStart(2, '0');
+      trd += `| ${String(i + 1).padStart(2, '0')} | ${task.title} | ${dep} |\n`;
+    });
+    trd += '\n';
+  } else {
+    trd += `待定义。\n\n`;
+  }
+
+  // 接口设计
+  trd += `## 接口设计\n\n`;
+  if (project && project.repo_path) {
+    trd += `Project: ${project.repo_path}\n\n`;
+  }
+  trd += `待定义。\n\n`;
+
+  // 技术决策
+  trd += `## 技术决策\n\n`;
+  trd += `待定义。\n\n`;
+
+  // 验收标准
+  trd += `## 验收标准\n\n`;
+  trd += `- [ ] 任务完成并标记为 completed\n`;
+  trd += `- [ ] 代码提交并通过 CI\n`;
+  trd += `- [ ] 无回归问题\n\n`;
+
+  // 附录
+  trd += `## 附录\n\n`;
+  trd += `- 不修改无关模块\n`;
+  trd += `- 不引入破坏性变更\n`;
+
+  return trd;
 }
 
 /**
@@ -620,12 +787,13 @@ function validateTrd(trdContent) {
     return { valid: false, errors: ['TRD content is empty or not a string'], warnings: [] };
   }
 
+  // Required sections (new 8-section standard + backward compat)
   const requiredSections = [
-    { pattern: /##\s*技术背景/, label: '技术背景' },
-    { pattern: /##\s*架构设计/, label: '架构设计' },
-    { pattern: /##\s*API\s*设计/, label: 'API 设计' },
+    { pattern: /##\s*概述|##\s*技术背景/, label: '概述' },
+    { pattern: /##\s*系统架构|##\s*架构设计/, label: '系统架构' },
     { pattern: /##\s*数据模型/, label: '数据模型' },
-    { pattern: /##\s*测试策略/, label: '测试策略' }
+    { pattern: /##\s*接口设计|##\s*API\s*设计/, label: '接口设计' },
+    { pattern: /##\s*验收标准|##\s*测试策略/, label: '验收标准' }
   ];
 
   for (const section of requiredSections) {
@@ -635,7 +803,7 @@ function validateTrd(trdContent) {
   }
 
   // Content non-empty checks for key sections
-  const keyHeaders = ['技术背景', '架构设计', '测试策略'];
+  const keyHeaders = ['概述', '系统架构', '数据模型'];
   for (const header of keyHeaders) {
     const content = extractSection(trdContent, header);
     if (content !== null && content.trim().length === 0) {
@@ -643,8 +811,15 @@ function validateTrd(trdContent) {
     }
   }
 
-  if (!/##\s*实施计划/.test(trdContent)) {
-    warnings.push('Missing recommended section: 实施计划');
+  // Optional but recommended sections
+  if (!/##\s*PRD\s*拆解/.test(trdContent)) {
+    warnings.push('Missing recommended section: PRD 拆解');
+  }
+  if (!/##\s*技术决策/.test(trdContent)) {
+    warnings.push('Missing recommended section: 技术决策');
+  }
+  if (!/##\s*附录/.test(trdContent)) {
+    warnings.push('Missing recommended section: 附录');
   }
 
   return { valid: errors.length === 0, errors, warnings };
@@ -674,7 +849,7 @@ function prdToJson(prdContent) {
  */
 function trdToJson(trdContent) {
   const titleMatch = trdContent.match(/^#\s+(.+)$/m);
-  const title = titleMatch ? titleMatch[1].replace(/^TRD\s*-\s*/, '') : '';
+  const title = titleMatch ? titleMatch[1].replace(/^TRD[\s:：-]*/, '').trim() : '';
 
   const sections = {};
   for (const section of TRD_TEMPLATE.sections) {
@@ -718,6 +893,7 @@ export {
   generatePrdFromTask,
   generatePrdFromGoalKR,
   generateTrdFromGoal,
+  generateTrdFromGoalKR,
   validatePrd,
   validateTrd,
   getTemplate,

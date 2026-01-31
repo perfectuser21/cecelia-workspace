@@ -14,13 +14,12 @@ import {
   generatePrdFromTask,
   generatePrdFromGoalKR,
   generateTrdFromGoal,
+  generateTrdFromGoalKR,
   validatePrd,
   validateTrd,
   getTemplate,
   listTemplates,
   getCurrentDate,
-  validatePrd,
-  validateTrd,
   prdToJson,
   trdToJson,
   extractSection
@@ -123,15 +122,22 @@ describe('Templates Module', () => {
 
     it('has required sections', () => {
       const sectionIds = TRD_TEMPLATE.sections.map(s => s.id);
-      expect(sectionIds).toContain('technical_background');
-      expect(sectionIds).toContain('architecture_design');
-      expect(sectionIds).toContain('api_design');
+      expect(sectionIds).toContain('overview');
+      expect(sectionIds).toContain('system_architecture');
       expect(sectionIds).toContain('data_model');
-      expect(sectionIds).toContain('test_strategy');
+      expect(sectionIds).toContain('api_design');
+      expect(sectionIds).toContain('acceptance_criteria');
     });
 
-    it('has 5 sections total', () => {
-      expect(TRD_TEMPLATE.sections.length).toBe(5);
+    it('has 8 sections total', () => {
+      expect(TRD_TEMPLATE.sections.length).toBe(8);
+    });
+
+    it('has optional sections', () => {
+      const sectionIds = TRD_TEMPLATE.sections.map(s => s.id);
+      expect(sectionIds).toContain('prd_decomposition');
+      expect(sectionIds).toContain('technical_decisions');
+      expect(sectionIds).toContain('appendix');
     });
   });
 
@@ -283,15 +289,18 @@ describe('Templates Module', () => {
       expect(trd).toMatch(/^# TRD/);
     });
 
-    it('includes all required sections', () => {
+    it('includes all 8 sections', () => {
       const trd = renderTrd(mockParsedIntent);
 
-      expect(trd).toContain('# TRD - api-service');
-      expect(trd).toContain('## 技术背景');
-      expect(trd).toContain('## 架构设计');
-      expect(trd).toContain('## API 设计');
+      expect(trd).toContain('# TRD: api-service');
+      expect(trd).toContain('## 概述');
+      expect(trd).toContain('## 系统架构');
       expect(trd).toContain('## 数据模型');
-      expect(trd).toContain('## 测试策略');
+      expect(trd).toContain('## PRD 拆解');
+      expect(trd).toContain('## 接口设计');
+      expect(trd).toContain('## 技术决策');
+      expect(trd).toContain('## 验收标准');
+      expect(trd).toContain('## 附录');
     });
 
     it('includes architecture diagram', () => {
@@ -329,36 +338,36 @@ describe('Templates Module', () => {
       expect(trd).toContain('created_at TIMESTAMP');
     });
 
-    it('lists test coverage items', () => {
+    it('lists acceptance criteria from tasks', () => {
       const trd = renderTrd(mockParsedIntent);
 
-      expect(trd).toContain('- [ ] Design database 测试');
-      expect(trd).toContain('- [ ] Build API 测试');
+      expect(trd).toContain('- [ ] Design database 正常工作');
+      expect(trd).toContain('- [ ] Build API 正常工作');
     });
 
-    it('includes implementation plan with tasks', () => {
+    it('includes PRD decomposition with tasks', () => {
       const trd = renderTrd(mockParsedIntent);
 
-      expect(trd).toContain('1. **Design database** (P0)');
-      expect(trd).toContain('2. **Build API** (P0)');
+      expect(trd).toContain('PRD-01 (Design database)');
+      expect(trd).toContain('PRD-02 (Build API)');
     });
 
     it('handles empty tasks', () => {
       const intent = { ...mockParsedIntent, tasks: [] };
       const trd = renderTrd(intent);
 
-      expect(trd).toContain('- [ ] 核心功能测试');
-      expect(trd).toContain('1. 需求分析');
+      expect(trd).toContain('- [ ] 核心功能正常工作');
+      expect(trd).toContain('PRD-01 (基础)');
     });
 
-    it('uses module entity in component design', () => {
+    it('uses module entity in component table', () => {
       const intent = {
         ...mockParsedIntent,
         entities: { module: 'user-auth' }
       };
       const trd = renderTrd(intent);
 
-      expect(trd).toContain('- user-auth 模块');
+      expect(trd).toContain('| user-auth |');
     });
   });
 
@@ -366,9 +375,9 @@ describe('Templates Module', () => {
     it('generates TRD with title only', () => {
       const trd = generateTrdFromGoal({ title: 'Brain System v2' });
 
-      expect(trd).toContain('# TRD - Brain System v2');
-      expect(trd).toContain('## 技术背景');
-      expect(trd).toContain('## 架构设计');
+      expect(trd).toContain('# TRD: Brain System v2');
+      expect(trd).toContain('## 概述');
+      expect(trd).toContain('## 系统架构');
     });
 
     it('generates TRD with title and description', () => {
@@ -377,11 +386,11 @@ describe('Templates Module', () => {
         description: 'Build an intelligent task management system'
       });
 
-      expect(trd).toContain('# TRD - Task Intelligence');
+      expect(trd).toContain('# TRD: Task Intelligence');
       expect(trd).toContain('Build an intelligent task management system');
     });
 
-    it('includes milestones as tasks in implementation plan', () => {
+    it('includes milestones as PRD decomposition', () => {
       const trd = generateTrdFromGoal({
         title: 'My Goal',
         description: 'Goal description',
@@ -391,17 +400,17 @@ describe('Templates Module', () => {
         ]
       });
 
-      expect(trd).toContain('1. **Phase 1: Setup** (P0)');
-      expect(trd).toContain('2. **Phase 2: Core** (P1)');
-      expect(trd).toContain('- [ ] Phase 1: Setup 测试');
-      expect(trd).toContain('- [ ] Phase 2: Core 测试');
+      expect(trd).toContain('PRD-01 (Phase 1: Setup)');
+      expect(trd).toContain('PRD-02 (Phase 2: Core)');
+      expect(trd).toContain('- [ ] Phase 1: Setup 正常工作');
+      expect(trd).toContain('- [ ] Phase 2: Core 正常工作');
     });
 
     it('handles empty milestones', () => {
       const trd = generateTrdFromGoal({ title: 'Simple Goal', milestones: [] });
 
-      expect(trd).toContain('- [ ] 核心功能测试');
-      expect(trd).toContain('1. 需求分析');
+      expect(trd).toContain('- [ ] 核心功能正常工作');
+      expect(trd).toContain('PRD-01 (基础)');
     });
 
     it('uses title as fallback for description', () => {
@@ -448,7 +457,7 @@ describe('Templates Module', () => {
 
       expect(templates.length).toBe(2);
       expect(templates).toContainEqual({ name: 'prd', sectionCount: 6 });
-      expect(templates).toContainEqual({ name: 'trd', sectionCount: 5 });
+      expect(templates).toContainEqual({ name: 'trd', sectionCount: 8 });
     });
   });
 
@@ -599,12 +608,12 @@ describe('Templates Module', () => {
     });
 
     it('returns valid:false when required sections are missing', () => {
-      const trd = '## 技术背景\nSomething\n## 架构设计\nSomething';
+      const trd = '## 概述\nSomething\n## 系统架构\nSomething';
       const result = validateTrd(trd);
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('Missing required section: API 设计');
       expect(result.errors).toContain('Missing required section: 数据模型');
-      expect(result.errors).toContain('Missing required section: 测试策略');
+      expect(result.errors).toContain('Missing required section: 接口设计');
+      expect(result.errors).toContain('Missing required section: 验收标准');
     });
 
     it('returns valid:false for empty content', () => {
@@ -617,11 +626,13 @@ describe('Templates Module', () => {
       expect(result.valid).toBe(false);
     });
 
-    it('warns when 实施计划 is missing', () => {
-      const trd = '## 技术背景\nA\n## 架构设计\nB\n## API 设计\nC\n## 数据模型\nD\n## 测试策略\nE';
+    it('warns when optional sections are missing', () => {
+      const trd = '## 概述\nA\n## 系统架构\nB\n## 数据模型\nC\n## 接口设计\nD\n## 验收标准\nE';
       const result = validateTrd(trd);
       expect(result.valid).toBe(true);
-      expect(result.warnings).toContain('Missing recommended section: 实施计划');
+      expect(result.warnings).toContain('Missing recommended section: PRD 拆解');
+      expect(result.warnings).toContain('Missing recommended section: 技术决策');
+      expect(result.warnings).toContain('Missing recommended section: 附录');
     });
 
     it('accepts generateTrdFromGoal output as valid', () => {
@@ -674,11 +685,11 @@ describe('Templates Module', () => {
 
       // Verify structure
       expect(trd).toContain('id: trd-user-service');
-      expect(trd).toContain('# TRD - user-service');
+      expect(trd).toContain('# TRD: user-service');
       expect(trd).toContain('给用户模块添加认证功能');
-      expect(trd).toContain('### 现有技术栈');
+      expect(trd).toContain('## 概述');
       expect(trd).toContain('CREATE TABLE user_service');
-      expect(trd).toContain('- user 模块');
+      expect(trd).toContain('| user |');
     });
   });
 
@@ -800,27 +811,27 @@ ${'这是一段足够长的功能需求描述'.repeat(5)}
   });
 
   describe('validateTrd (enhanced)', () => {
-    const validTrd = `# TRD - Test
+    const validTrd = `# TRD: Test
 
-## 技术背景
+## 概述
 
-Node.js + Express 架构
+目标和背景说明
 
-## 架构设计
+## 系统架构
 
 微服务架构设计方案
-
-## API 设计
-
-RESTful 接口
 
 ## 数据模型
 
 PostgreSQL
 
-## 测试策略
+## 接口设计
 
-单元测试 + 集成测试
+RESTful 接口
+
+## 验收标准
+
+- [ ] 功能正常
 `;
 
     it('passes for valid TRD', () => {
@@ -830,21 +841,17 @@ PostgreSQL
     });
 
     it('fails when missing required sections', () => {
-      const result = validateTrd('# TRD\n\n## API 设计\n\n内容');
+      const result = validateTrd('# TRD\n\n## 接口设计\n\n内容');
       expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.includes('技术背景'))).toBe(true);
+      expect(result.errors.some(e => e.includes('概述'))).toBe(true);
     });
 
     it('warns when required section is empty', () => {
       const trd = `# TRD
 
-## 技术背景
+## 概述
 
-## 架构设计
-
-内容
-
-## API 设计
+## 系统架构
 
 内容
 
@@ -852,12 +859,43 @@ PostgreSQL
 
 内容
 
-## 测试策略
+## 接口设计
+
+内容
+
+## 验收标准
 
 内容
 `;
       const result = validateTrd(trd);
       expect(result.warnings.some(e => e.includes('empty'))).toBe(true);
+    });
+
+    it('backward compat: accepts old section names', () => {
+      const oldTrd = `# TRD
+
+## 技术背景
+
+内容
+
+## 架构设计
+
+内容
+
+## 数据模型
+
+内容
+
+## API 设计
+
+内容
+
+## 测试策略
+
+内容
+`;
+      const result = validateTrd(oldTrd);
+      expect(result.valid).toBe(true);
     });
   });
 
@@ -897,34 +935,114 @@ PostgreSQL
   });
 
   describe('trdToJson', () => {
-    it('parses TRD markdown into JSON', () => {
-      const trd = `# TRD - 认证系统
+    it('parses TRD markdown into JSON with 8 sections', () => {
+      const trd = `# TRD: 认证系统
 
-## 技术背景
+## 概述
 
-JWT 认证
+JWT 认证系统
 
-## 架构设计
+## 系统架构
 
 微服务
-
-## API 设计
-
-REST
 
 ## 数据模型
 
 users 表
 
-## 测试策略
+## PRD 拆解
 
-vitest
+PRD-01
+
+## 接口设计
+
+REST API
+
+## 技术决策
+
+使用 JWT
+
+## 验收标准
+
+- 功能正常
+
+## 附录
+
+参考文档
 `;
       const result = trdToJson(trd);
       expect(result.title).toBe('认证系统');
-      expect(result.sections.technical_background).toContain('JWT');
-      expect(result.sections.architecture_design).toContain('微服务');
-      expect(result.sections.test_strategy).toContain('vitest');
+      expect(result.sections.overview).toContain('JWT');
+      expect(result.sections.system_architecture).toContain('微服务');
+      expect(result.sections.data_model).toContain('users');
+      expect(result.sections.prd_decomposition).toContain('PRD-01');
+      expect(result.sections.api_design).toContain('REST');
+      expect(result.sections.technical_decisions).toContain('JWT');
+      expect(result.sections.acceptance_criteria).toContain('功能正常');
+      expect(result.sections.appendix).toContain('参考文档');
+    });
+  });
+
+  describe('generateTrdFromGoalKR', () => {
+    it('generates full TRD with all Goal+KR+Project params', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Implement TRD engine',
+        description: 'Build TRD markdown generator from KR context',
+        kr: { title: 'TRD 模板完整性', progress: 45, priority: 'P0' },
+        project: { name: 'cecelia-workspace', repo_path: '/home/xx/dev/cecelia-workspace' }
+      });
+
+      expect(trd).toContain('---');
+      expect(trd).toContain('id: trd-auto-');
+      expect(trd).toContain('# TRD: Implement TRD engine');
+      expect(trd).toContain('KR: TRD 模板完整性 (progress: 45%, priority: P0)');
+      expect(trd).toContain('Project: cecelia-workspace');
+      expect(trd).toContain('Build TRD markdown generator from KR context');
+      expect(trd).toContain('/home/xx/dev/cecelia-workspace');
+      // All 8 sections
+      expect(trd).toContain('## 概述');
+      expect(trd).toContain('## 系统架构');
+      expect(trd).toContain('## 数据模型');
+      expect(trd).toContain('## PRD 拆解');
+      expect(trd).toContain('## 接口设计');
+      expect(trd).toContain('## 技术决策');
+      expect(trd).toContain('## 验收标准');
+      expect(trd).toContain('## 附录');
+    });
+
+    it('generates generic TRD without kr/project params', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Simple feature',
+        description: 'A simple feature description'
+      });
+
+      expect(trd).toContain('# TRD: Simple feature');
+      expect(trd).toContain('Auto-generated TRD');
+      expect(trd).not.toContain('KR:');
+      expect(trd).toContain('A simple feature description');
+    });
+
+    it('handles milestones as PRD decomposition', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Multi-phase',
+        milestones: [
+          { title: 'Phase 1', description: 'Setup' },
+          { title: 'Phase 2', description: 'Build' }
+        ]
+      });
+
+      expect(trd).toContain('| 01 | Phase 1 |');
+      expect(trd).toContain('| 02 | Phase 2 |');
+    });
+
+    it('passes validateTrd', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Valid TRD',
+        description: 'Should be valid',
+        kr: { title: 'KR1', progress: 0, priority: 'P1' }
+      });
+      const result = validateTrd(trd);
+      expect(result.valid).toBe(true);
     });
   });
 });
