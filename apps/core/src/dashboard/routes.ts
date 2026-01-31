@@ -316,6 +316,62 @@ router.patch('/runs/:id/status', (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/cecelia/stream
+ * Server-Sent Events endpoint for real-time dashboard updates
+ */
+router.get('/stream', async (req: Request, res: Response) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+
+  const sendEvent = (data: Record<string, unknown>) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  const pushUpdate = async () => {
+    try {
+      const fs = await import('fs');
+      const MAX_SEATS = parseInt(process.env.MAX_CONCURRENT || '8', 10);
+      const LOCK_DIR = process.env.LOCK_DIR || '/tmp/cecelia-locks';
+      const slots: { slot: number; mode: string; task_id?: string; title?: string; started?: string; duration?: string }[] = [];
+      for (let i = 1; i <= MAX_SEATS; i++) {
+        const slotDir = `${LOCK_DIR}/slot-${i}`;
+        if (fs.existsSync(slotDir)) {
+          try {
+            const infoPath = `${slotDir}/info.json`;
+            if (!fs.existsSync(infoPath)) { slots.push({ slot: i, mode: 'headless' }); continue; }
+            const info = JSON.parse(fs.readFileSync(infoPath, 'utf-8'));
+            let duration: string | undefined;
+            if (info.started) {
+              const mins = Math.floor((Date.now() - new Date(info.started).getTime()) / 60000);
+              duration = mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h${mins % 60}m`;
+            }
+            slots.push({ slot: i, mode: info.mode || 'headless', task_id: info.task_id, title: info.title, started: info.started, duration });
+          } catch {
+            slots.push({ slot: i, mode: 'headless' });
+          }
+        }
+      }
+
+      const overview = taskTracker.getOverview(10);
+      sendEvent({ seats: { total: MAX_SEATS, active: slots.length, slots }, overview });
+    } catch {
+      sendEvent({ error: 'Failed to fetch data' });
+    }
+  };
+
+  await pushUpdate();
+  const interval = setInterval(pushUpdate, 5000);
+
+  req.on('close', () => {
+    clearInterval(interval);
+  });
+});
+
+/**
  * GET /api/cecelia/health
  * Health check endpoint
  */
