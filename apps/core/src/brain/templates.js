@@ -506,6 +506,84 @@ function generatePrdFromGoalKR(params) {
 }
 
 /**
+ * Validate a PRD document string against required fields.
+ * @param {string} prdContent - PRD markdown content
+ * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
+ */
+function validatePrd(prdContent) {
+  const errors = [];
+  const warnings = [];
+
+  if (!prdContent || typeof prdContent !== 'string') {
+    return { valid: false, errors: ['PRD content is empty or not a string'], warnings: [] };
+  }
+
+  const requiredFields = [
+    { pattern: /##\s*需求来源|##\s*背景|需求来源\s*[:：]|\*\*需求来源\*\*/, label: '需求来源' },
+    { pattern: /##\s*功能描述|功能描述\s*[:：]|\*\*功能描述\*\*|##\s*功能需求/, label: '功能描述' },
+    { pattern: /##\s*成功标准|成功标准\s*[:：]|\*\*成功标准\*\*|##\s*验收标准/, label: '成功标准' }
+  ];
+
+  for (const field of requiredFields) {
+    if (!field.pattern.test(prdContent)) {
+      errors.push(`Missing required field: ${field.label}`);
+    }
+  }
+
+  if (!/##\s*非目标|非目标\s*[:：]|\*\*非目标\*\*/.test(prdContent)) {
+    warnings.push('Missing recommended field: 非目标');
+  }
+
+  if (!/##\s*涉及文件|涉及文件\s*[:：]|\*\*涉及文件\*\*/.test(prdContent)) {
+    warnings.push('Missing recommended field: 涉及文件');
+  }
+
+  const successMatch = prdContent.match(/(?:##\s*(?:成功标准|验收标准)|\*\*成功标准\*\*)([\s\S]*?)(?=\n##|\n\*\*[^*]|\n---|\n$)/);
+  if (successMatch) {
+    const section = successMatch[1];
+    if (!/[-*]\s|^\d+\./m.test(section)) {
+      warnings.push('成功标准 section has no list items');
+    }
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
+/**
+ * Validate a TRD document string against required sections.
+ * @param {string} trdContent - TRD markdown content
+ * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
+ */
+function validateTrd(trdContent) {
+  const errors = [];
+  const warnings = [];
+
+  if (!trdContent || typeof trdContent !== 'string') {
+    return { valid: false, errors: ['TRD content is empty or not a string'], warnings: [] };
+  }
+
+  const requiredSections = [
+    { pattern: /##\s*技术背景/, label: '技术背景' },
+    { pattern: /##\s*架构设计/, label: '架构设计' },
+    { pattern: /##\s*API\s*设计/, label: 'API 设计' },
+    { pattern: /##\s*数据模型/, label: '数据模型' },
+    { pattern: /##\s*测试策略/, label: '测试策略' }
+  ];
+
+  for (const section of requiredSections) {
+    if (!section.pattern.test(trdContent)) {
+      errors.push(`Missing required section: ${section.label}`);
+    }
+  }
+
+  if (!/##\s*实施计划/.test(trdContent)) {
+    warnings.push('Missing recommended section: 实施计划');
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
+/**
  * Get template by name
  * @param {string} templateName - Template name ('prd' or 'trd')
  * @returns {Object|null} Template object
@@ -539,6 +617,8 @@ export {
   generatePrdFromTask,
   generatePrdFromGoalKR,
   generateTrdFromGoal,
+  validatePrd,
+  validateTrd,
   getTemplate,
   listTemplates,
   getCurrentDate

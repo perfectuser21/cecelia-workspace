@@ -360,11 +360,13 @@ describe('Planner Agent', () => {
       const kr = { title: 'Test KR', progress: 50, priority: 'P1' };
       const project = { name: 'test-project', repo_path: '/tmp/test' };
 
-      const prdPath = generateTaskPRD('Test Task', 'Test description', kr, project);
+      const result = generateTaskPRD('Test Task', 'Test description', kr, project);
 
-      expect(prdPath).toBeTruthy();
+      expect(result.path).toBeTruthy();
+      expect(result.validation).toBeDefined();
+      expect(result.validation.valid).toBe(true);
 
-      const content = readFileSync(prdPath, 'utf-8');
+      const content = readFileSync(result.path, 'utf-8');
       expect(content).toContain('## 需求来源');
       expect(content).toContain('## 功能描述');
       expect(content).toContain('## 成功标准');
@@ -372,7 +374,7 @@ describe('Planner Agent', () => {
       expect(content).toContain('Test description');
 
       // Cleanup
-      unlinkSync(prdPath);
+      unlinkSync(result.path);
     });
   });
 

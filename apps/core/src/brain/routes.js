@@ -8,7 +8,7 @@ import { getTickStatus, enableTick, disableTick, executeTick, runTickSafe } from
 import { parseIntent, parseAndCreate, INTENT_TYPES, INTENT_ACTION_MAP, extractEntities, classifyIntent, getSuggestedAction } from './intent.js';
 import pool from '../task-system/db.js';
 import { decomposeTRD, getTRDProgress, listTRDs } from './decomposer.js';
-import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, PRD_TYPE_MAP } from './templates.js';
+import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, validatePrd, validateTrd, PRD_TYPE_MAP } from './templates.js';
 import { compareGoalProgress, generateDecision, executeDecision, getDecisionHistory, rollbackDecision } from './decision.js';
 import { planNextTask, getPlanStatus, handlePlanInput } from './planner.js';
 import { ensureEventsTable, queryEvents, getEventCounts } from './event-bus.js';
@@ -1317,6 +1317,44 @@ router.post('/generate/trd', async (req, res) => {
       error: 'Failed to generate TRD',
       details: err.message
     });
+  }
+});
+
+/**
+ * POST /api/brain/validate/prd
+ * Validate PRD content against standardization rules
+ */
+router.post('/validate/prd', (req, res) => {
+  try {
+    const { content } = req.body;
+
+    if (!content) {
+      return res.status(400).json({ success: false, error: 'content is required' });
+    }
+
+    const result = validatePrd(content);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Validation failed', details: err.message });
+  }
+});
+
+/**
+ * POST /api/brain/validate/trd
+ * Validate TRD content against standardization rules
+ */
+router.post('/validate/trd', (req, res) => {
+  try {
+    const { content } = req.body;
+
+    if (!content) {
+      return res.status(400).json({ success: false, error: 'content is required' });
+    }
+
+    const result = validateTrd(content);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Validation failed', details: err.message });
   }
 });
 

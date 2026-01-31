@@ -14,6 +14,8 @@ import {
   generatePrdFromTask,
   generatePrdFromGoalKR,
   generateTrdFromGoal,
+  validatePrd,
+  validateTrd,
   getTemplate,
   listTemplates,
   getCurrentDate
@@ -503,6 +505,125 @@ describe('Templates Module', () => {
 
       expect(prd).toContain('## 功能描述');
       expect(prd).toContain('Fallback test');
+    });
+  });
+
+  describe('validatePrd', () => {
+    it('returns valid:true for a complete PRD', () => {
+      const prd = generatePrdFromGoalKR({
+        title: 'Test',
+        description: 'Test desc',
+        kr: { title: 'KR1', progress: 50, priority: 'P0' },
+        project: { name: 'proj', repo_path: '/repo' }
+      });
+      const result = validatePrd(prd);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('returns valid:false when 需求来源 is missing', () => {
+      const prd = '## 功能描述\nSomething\n## 成功标准\n- item';
+      const result = validatePrd(prd);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Missing required field: 需求来源');
+    });
+
+    it('returns valid:false when 功能描述 is missing', () => {
+      const prd = '## 需求来源\nSomething\n## 成功标准\n- item';
+      const result = validatePrd(prd);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Missing required field: 功能描述');
+    });
+
+    it('returns valid:false when 成功标准 is missing', () => {
+      const prd = '## 需求来源\nSomething\n## 功能描述\nSomething';
+      const result = validatePrd(prd);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Missing required field: 成功标准');
+    });
+
+    it('returns valid:false for empty content', () => {
+      const result = validatePrd('');
+      expect(result.valid).toBe(false);
+    });
+
+    it('returns valid:false for null content', () => {
+      const result = validatePrd(null);
+      expect(result.valid).toBe(false);
+    });
+
+    it('warns when 非目标 is missing', () => {
+      const prd = '## 需求来源\nX\n## 功能描述\nY\n## 成功标准\n- item\n## 涉及文件\nZ';
+      const result = validatePrd(prd);
+      expect(result.valid).toBe(true);
+      expect(result.warnings).toContain('Missing recommended field: 非目标');
+    });
+
+    it('recognizes bold-style field markers', () => {
+      const prd = '**需求来源**: X\n**功能描述**: Y\n**成功标准**:\n- item';
+      const result = validatePrd(prd);
+      expect(result.valid).toBe(true);
+    });
+
+    it('accepts renderPrd output as valid', () => {
+      const prd = renderPrd({
+        projectName: 'test',
+        intentType: 'create_feature',
+        tasks: [{ title: 'Task 1', description: 'Desc', priority: 'P0' }],
+        originalInput: 'Test input',
+        entities: {}
+      });
+      const result = validatePrd(prd);
+      // renderPrd uses 背景/功能需求/验收标准 which map to our required fields
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  describe('validateTrd', () => {
+    it('returns valid:true for a complete TRD', () => {
+      const trd = renderTrd({
+        projectName: 'test',
+        intentType: 'create_project',
+        tasks: [],
+        originalInput: 'Test',
+        entities: {}
+      });
+      const result = validateTrd(trd);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('returns valid:false when required sections are missing', () => {
+      const trd = '## 技术背景\nSomething\n## 架构设计\nSomething';
+      const result = validateTrd(trd);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Missing required section: API 设计');
+      expect(result.errors).toContain('Missing required section: 数据模型');
+      expect(result.errors).toContain('Missing required section: 测试策略');
+    });
+
+    it('returns valid:false for empty content', () => {
+      const result = validateTrd('');
+      expect(result.valid).toBe(false);
+    });
+
+    it('returns valid:false for null content', () => {
+      const result = validateTrd(null);
+      expect(result.valid).toBe(false);
+    });
+
+    it('warns when 实施计划 is missing', () => {
+      const trd = '## 技术背景\nA\n## 架构设计\nB\n## API 设计\nC\n## 数据模型\nD\n## 测试策略\nE';
+      const result = validateTrd(trd);
+      expect(result.valid).toBe(true);
+      expect(result.warnings).toContain('Missing recommended section: 实施计划');
+    });
+
+    it('accepts generateTrdFromGoal output as valid', () => {
+      const trd = generateTrdFromGoal({ title: 'Test Goal', description: 'Desc' });
+      const result = validateTrd(trd);
+      expect(result.valid).toBe(true);
+      expect(result.warnings).toHaveLength(0);
     });
   });
 
