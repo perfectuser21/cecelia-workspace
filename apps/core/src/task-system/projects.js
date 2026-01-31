@@ -5,13 +5,15 @@ const router = Router();
 
 // ==================== State Machine ====================
 
-export const VALID_STATUSES = ['planning', 'active', 'reviewing', 'completed'];
+export const VALID_STATUSES = ['planning', 'active', 'reviewing', 'completed', 'archived', 'paused'];
 
 export const VALID_TRANSITIONS = {
-  planning: ['active'],
-  active: ['reviewing', 'planning'],
-  reviewing: ['completed', 'active'],
-  completed: [],
+  planning: ['active', 'archived'],
+  active: ['reviewing', 'planning', 'paused', 'archived'],
+  reviewing: ['completed', 'active', 'archived'],
+  completed: ['archived'],
+  archived: [],
+  paused: ['active', 'archived'],
 };
 
 export function validateTransition(from, to) {
@@ -27,16 +29,36 @@ export function validateTransition(from, to) {
 // GET /api/projects - List projects
 router.get('/', async (req, res) => {
   try {
-    const { workspace_id } = req.query;
+    const { workspace_id, area_id, status, parent_id, top_level } = req.query;
 
-    let query = 'SELECT * FROM projects';
-    let params = [];
+    const conditions = [];
+    const params = [];
+    let paramIndex = 1;
 
     if (workspace_id) {
-      query += ' WHERE workspace_id = $1';
+      conditions.push(`workspace_id = $${paramIndex++}`);
       params.push(workspace_id);
     }
+    if (area_id) {
+      conditions.push(`area_id = $${paramIndex++}`);
+      params.push(area_id);
+    }
+    if (status) {
+      conditions.push(`status = $${paramIndex++}`);
+      params.push(status);
+    }
+    // parent_id takes priority over top_level
+    if (parent_id) {
+      conditions.push(`parent_id = $${paramIndex++}`);
+      params.push(parent_id);
+    } else if (top_level === 'true') {
+      conditions.push('parent_id IS NULL');
+    }
 
+    let query = 'SELECT * FROM projects';
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
     query += ' ORDER BY created_at DESC';
 
     const result = await pool.query(query, params);
