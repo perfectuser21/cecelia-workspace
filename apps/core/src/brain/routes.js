@@ -6,6 +6,7 @@ import { createTask, updateTask, createGoal, updateGoal, triggerN8n, setMemory, 
 import { getDailyFocus, setDailyFocus, clearDailyFocus, getFocusSummary } from './focus.js';
 import { getTickStatus, enableTick, disableTick, executeTick, runTickSafe } from './tick.js';
 import { parseIntent, parseAndCreate, INTENT_TYPES, INTENT_ACTION_MAP, extractEntities, classifyIntent, getSuggestedAction } from './intent.js';
+import { storeEntity, resolvePronoun, getStats as getContextStats } from './context-manager.js';
 import pool from '../task-system/db.js';
 import { decomposeTRD, getTRDProgress, listTRDs } from './decomposer.js';
 import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, generateTrdFromGoalKR, validatePrd, validateTrd, prdToJson, trdToJson, PRD_TYPE_MAP } from './templates.js';
@@ -645,6 +646,120 @@ async function executeQueryStatus(parsedIntent) {
 // ==================== Intent API（KR1 意图识别）====================
 
 /**
+ * POST /api/brain/intent
+ * Simplified intent recognition endpoint
+ * Returns intent classification and extracted entities with confidence score
+ *
+ * Request body:
+ *   {
+ *     text: "创建一个高优先级目标：完成用户系统",
+ *     context: {
+ *       session_id: "optional-session-id"
+ *     }
+ *   }
+ *
+ * Response:
+ *   {
+ *     intent: "create_goal",
+ *     entities: {
+ *       priority: "P0",
+ *       title: "完成用户系统"
+ *     },
+ *     confidence: 0.95
+ *   }
+ *
+ * Or when cannot recognize:
+ *   {
+ *     intent: "unknown",
+ *     entities: {},
+ *     confidence: 0,
+ *     suggestions: ["create_goal", "create_task"]
+ *   }
+ */
+router.post('/intent', async (req, res) => {
+  try {
+    const { text, context = {} } = req.body;
+
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'text is required and must be a string'
+      });
+    }
+
+    const session_id = (context.session_id && typeof context.session_id === 'string' && context.session_id.trim())
+      ? context.session_id
+      : crypto.randomUUID();
+
+    // Resolve pronouns using context
+    const resolvedEntity = resolvePronoun(session_id, text);
+
+    // Classify intent
+    const intentResult = classifyIntent(text);
+
+    // Extract entities
+    const entities = extractEntities(text);
+
+    // Add title extraction (main subject after removing intent keywords)
+    if (!entities.title && intentResult.type !== INTENT_TYPES.UNKNOWN) {
+      let cleanedText = text;
+
+      // Remove common intent phrases
+      const intentPrefixes = [
+        '创建一个', '创建', '添加一个', '添加', '新建',
+        '目标：', '目标:', '任务：', '任务:',
+        'create a ', 'create ', 'add a ', 'add '
+      ];
+
+      for (const prefix of intentPrefixes) {
+        cleanedText = cleanedText.replace(new RegExp(prefix, 'gi'), '');
+      }
+
+      entities.title = cleanedText.trim();
+    }
+
+    // If pronoun was resolved, merge resolved entity data
+    if (resolvedEntity) {
+      entities.resolved_entity = {
+        type: resolvedEntity.type,
+        id: resolvedEntity.id,
+        title: resolvedEntity.title
+      };
+    }
+
+    // Calculate confidence (0-1 scale)
+    const confidence = Math.min(intentResult.confidence, 1.0);
+
+    // Build response
+    const response = {
+      intent: intentResult.type,
+      entities,
+      confidence
+    };
+
+    // If confidence is low, provide suggestions
+    if (confidence < 0.4) {
+      response.intent = 'unknown';
+      response.confidence = 0;
+      response.suggestions = [
+        INTENT_TYPES.CREATE_GOAL,
+        INTENT_TYPES.CREATE_TASK,
+        INTENT_TYPES.QUERY_STATUS,
+        INTENT_TYPES.CREATE_FEATURE
+      ];
+    }
+
+    res.json(response);
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to recognize intent',
+      details: err.message
+    });
+  }
+});
+
+/**
  * POST /api/brain/intent/parse
  * Parse natural language input and return structured intent
  *
@@ -730,6 +845,37 @@ router.post('/intent/create', async (req, res) => {
 
     const result = await parseAndCreate(input, options);
 
+    // Store created entities in context for future reference
+    const session_id = options.session_id || crypto.randomUUID();
+
+    if (result.created) {
+      if (result.created.project) {
+        storeEntity(session_id, {
+          type: 'project',
+          id: result.created.project.id,
+          title: result.created.project.name
+        });
+      }
+
+      if (result.created.goal) {
+        storeEntity(session_id, {
+          type: 'goal',
+          id: result.created.goal.id,
+          title: result.created.goal.title
+        });
+      }
+
+      if (result.created.tasks && result.created.tasks.length > 0) {
+        for (const task of result.created.tasks) {
+          storeEntity(session_id, {
+            type: 'task',
+            id: task.id,
+            title: task.title
+          });
+        }
+      }
+    }
+
     res.json({
       success: true,
       ...result
@@ -765,6 +911,38 @@ router.get('/intent/types', (req, res) => {
     },
     action_map: INTENT_ACTION_MAP
   });
+});
+
+/**
+ * GET /api/brain/intent/context-stats
+ * Get context manager statistics (for debugging/monitoring)
+ *
+ * Response:
+ *   {
+ *     success: true,
+ *     stats: {
+ *       totalSessions: 5,
+ *       activeSessions: 3,
+ *       totalEntities: 15,
+ *       oldestSession: "2026-02-01T06:00:00Z",
+ *       newestSession: "2026-02-01T07:00:00Z"
+ *     }
+ *   }
+ */
+router.get('/intent/context-stats', (req, res) => {
+  try {
+    const stats = getContextStats();
+    res.json({
+      success: true,
+      stats
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get context stats',
+      details: err.message
+    });
+  }
 });
 
 /**
@@ -933,6 +1111,101 @@ router.post('/parse-intent', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to parse intent',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * POST /api/intent/recognize
+ * KR1: Clean intent recognition endpoint with standardized response format
+ * This is the primary endpoint specified in the PRD
+ *
+ * Request body:
+ *   {
+ *     text: "实现用户登录接口",
+ *     context: { currentProject: "my-project" },  // optional
+ *     confidenceThreshold: 0.4  // optional
+ *   }
+ *
+ * Response:
+ *   {
+ *     success: true,
+ *     result: {
+ *       intent: "create_task",
+ *       confidence: 0.85,
+ *       confidenceLevel: "high",
+ *       entities: { title: "实现用户登录接口", priority: "P1" },
+ *       originalInput: "实现用户登录接口",
+ *       requiresConfirmation: false,
+ *       explanation: "Recognized as task creation with high confidence"
+ *     },
+ *     suggestedAction: {
+ *       action: "create-task",
+ *       params: { title: "实现用户登录接口", priority: "P1" },
+ *       confidence: 0.85
+ *     }
+ *   }
+ */
+router.post('/intent/recognize', async (req, res) => {
+  try {
+    const { text, context, confidenceThreshold = 0.4 } = req.body;
+
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'text is required and must be a string'
+      });
+    }
+
+    // Parse the intent using existing infrastructure
+    const parsed = await parseIntent(text);
+
+    // Determine if confirmation is required (low confidence or ambiguous intent)
+    const requiresConfirmation = parsed.confidence < 0.7 || parsed.intentType === INTENT_TYPES.UNKNOWN;
+
+    // Generate human-readable explanation
+    let explanation = '';
+    if (parsed.confidence >= 0.7) {
+      explanation = `Recognized as ${parsed.intentType} with high confidence`;
+    } else if (parsed.confidence >= 0.4) {
+      explanation = `Possibly ${parsed.intentType}, but confidence is medium - please confirm`;
+    } else {
+      explanation = `Unable to confidently recognize intent - confidence below threshold`;
+    }
+
+    // Build result object matching PRD specification
+    const result = {
+      intent: parsed.intentType,
+      confidence: parsed.confidence,
+      confidenceLevel: parsed.confidenceLevel,
+      entities: parsed.entities || {},
+      originalInput: text,
+      keywords: parsed.keywords,
+      matchedPhrases: parsed.matchedPhrases,
+      requiresConfirmation,
+      explanation
+    };
+
+    // Build suggested action if applicable
+    let suggestedAction = null;
+    if (parsed.suggestedAction && parsed.confidence >= confidenceThreshold) {
+      suggestedAction = {
+        action: parsed.suggestedAction.action,
+        params: parsed.suggestedAction.params,
+        confidence: parsed.confidence
+      };
+    }
+
+    res.json({
+      success: true,
+      result,
+      suggestedAction
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to recognize intent',
       details: err.message
     });
   }
@@ -1122,7 +1395,9 @@ router.post('/execution-callback', async (req, res) => {
             [krId]
           );
           const { total, done } = krTasks.rows[0];
-          const krProgress = total > 0 ? Math.round((parseInt(done) / parseInt(total)) * 100) : 0;
+          const totalNum = parseInt(total) || 0;
+          const doneNum = parseInt(done) || 0;
+          const krProgress = totalNum > 0 ? Math.round((doneNum / totalNum) * 100) : 0;
 
           await pool.query('UPDATE goals SET progress = $1 WHERE id = $2', [krProgress, krId]);
           console.log(`[execution-callback] KR ${krId} progress → ${krProgress}%`);
@@ -1136,9 +1411,9 @@ router.post('/execution-callback', async (req, res) => {
               'SELECT progress, weight FROM goals WHERE parent_id = $1',
               [oId]
             );
-            const totalWeight = allKRs.rows.reduce((s, r) => s + parseFloat(r.weight || 1), 0);
+            const totalWeight = allKRs.rows.reduce((s, r) => s + (parseFloat(r.weight) || 1), 0);
             const weightedProgress = allKRs.rows.reduce(
-              (s, r) => s + (r.progress || 0) * parseFloat(r.weight || 1), 0
+              (s, r) => s + ((r.progress || 0) * (parseFloat(r.weight) || 1)), 0
             );
             const oProgress = totalWeight > 0 ? Math.round(weightedProgress / totalWeight) : 0;
 
