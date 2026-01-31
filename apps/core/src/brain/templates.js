@@ -546,7 +546,7 @@ function validatePrd(content) {
   }
 
   // Check acceptance criteria quality
-  const acMatch = content.match(/##\s*(验收标准|成功标准|Acceptance Criteria)\s*\n([\s\S]*?)(?=\n##\s|\n---|\Z|$)/i);
+  const acMatch = content.match(/##\s*(验收标准|成功标准|Acceptance Criteria)\s*\n([\s\S]*?)(?=\n##\s|\n---|$)/i);
   if (acMatch) {
     const acContent = acMatch[2].trim();
     if (acContent.length === 0 || acContent === '待定义。' || acContent === '待定义') {
