@@ -7,10 +7,12 @@ import pool from '../task-system/db.js';
 import { getDailyFocus } from './focus.js';
 import { updateTask } from './actions.js';
 import { triggerCeceliaRun, checkCeceliaRunAvailable } from './executor.js';
+import { compareGoalProgress, generateDecision, executeDecision } from './decision.js';
 
 // Tick configuration
 const TICK_INTERVAL_MINUTES = 30;
 const STALE_THRESHOLD_HOURS = 24; // Tasks in_progress for more than 24h are stale
+const AUTO_EXECUTE_CONFIDENCE = 0.8; // Auto-execute decisions with confidence >= this
 
 // Working memory keys
 const TICK_ENABLED_KEY = 'tick_enabled';
@@ -134,19 +136,89 @@ async function incrementActionsToday(count = 1) {
 }
 
 /**
- * Execute a tick - the core decision loop
+ * Execute a tick - the core self-driving loop
  *
- * 1. Get daily focus OKR
- * 2. Check related task status
- * 3. Decide next action
- * 4. Execute action
- * 5. Log decision
+ * 1. Compare goal progress (Decision Engine)
+ * 2. Generate and execute high-confidence decisions
+ * 3. Get daily focus OKR
+ * 4. Check related task status
+ * 5. Decide next action
+ * 6. Execute action via cecelia-run
+ * 7. Log decision
  */
 async function executeTick() {
   const actionsTaken = [];
   const now = new Date();
+  let decisionEngineResult = null;
 
-  // 1. Get daily focus
+  // 1. Decision Engine: Compare goal progress
+  try {
+    const comparison = await compareGoalProgress();
+
+    // Log comparison result
+    await logTickDecision(
+      'tick',
+      `Goal comparison: ${comparison.overall_health}, ${comparison.goals.length} goals analyzed`,
+      { action: 'compare_goals', overall_health: comparison.overall_health },
+      { success: true, goals_analyzed: comparison.goals.length }
+    );
+
+    // 2. Generate decision if there are issues
+    if (comparison.overall_health !== 'healthy' || comparison.next_actions.length > 0) {
+      const decision = await generateDecision({ trigger: 'tick' });
+
+      await logTickDecision(
+        'tick',
+        `Decision generated: ${decision.actions.length} actions, confidence: ${decision.confidence}`,
+        { action: 'generate_decision', decision_id: decision.decision_id },
+        { success: true, confidence: decision.confidence }
+      );
+
+      // Auto-execute high-confidence decisions
+      if (decision.confidence >= AUTO_EXECUTE_CONFIDENCE && decision.actions.length > 0) {
+        const execResult = await executeDecision(decision.decision_id);
+
+        await logTickDecision(
+          'tick',
+          `Auto-executed decision: ${execResult.results.length} actions`,
+          { action: 'execute_decision', decision_id: decision.decision_id },
+          { success: true, executed: execResult.results.length }
+        );
+
+        actionsTaken.push({
+          action: 'execute_decision',
+          decision_id: decision.decision_id,
+          actions_executed: execResult.results.length,
+          confidence: decision.confidence
+        });
+      } else if (decision.actions.length > 0) {
+        // Low confidence - log but don't execute
+        await logTickDecision(
+          'tick',
+          `Decision pending approval: confidence ${decision.confidence} < ${AUTO_EXECUTE_CONFIDENCE}`,
+          { action: 'decision_pending', decision_id: decision.decision_id },
+          { success: true, requires_approval: true }
+        );
+      }
+
+      decisionEngineResult = {
+        comparison_health: comparison.overall_health,
+        decision_id: decision.decision_id,
+        actions_generated: decision.actions.length,
+        confidence: decision.confidence
+      };
+    }
+  } catch (err) {
+    // Decision engine error should not stop the tick
+    await logTickDecision(
+      'tick',
+      `Decision engine error: ${err.message}`,
+      { action: 'decision_error', error: err.message },
+      { success: false, error: err.message }
+    );
+  }
+
+  // 3. Get daily focus
   const focusResult = await getDailyFocus();
 
   if (!focusResult) {
@@ -158,7 +230,8 @@ async function executeTick() {
     );
     return {
       success: true,
-      actions_taken: [],
+      decision_engine: decisionEngineResult,
+      actions_taken: actionsTaken,
       reason: 'No active Objective to focus on',
       next_tick: new Date(now.getTime() + TICK_INTERVAL_MINUTES * 60 * 1000).toISOString()
     };
@@ -167,8 +240,7 @@ async function executeTick() {
   const { focus } = focusResult;
   const objectiveId = focus.objective.id;
 
-  // 2. Get tasks related to focus objective
-  // Include tasks linked to objective directly or through Key Results
+  // 4. Get tasks related to focus objective
   const krIds = focus.key_results.map(kr => kr.id);
   const allGoalIds = [objectiveId, ...krIds];
 
@@ -184,7 +256,7 @@ async function executeTick() {
 
   const tasks = tasksResult.rows;
 
-  // 3. Decision logic
+  // 5. Decision logic
   const inProgress = tasks.filter(t => t.status === 'in_progress');
   const queued = tasks.filter(t => t.status === 'queued');
 
@@ -205,7 +277,7 @@ async function executeTick() {
     });
   }
 
-  // 4. Execute action: Start next task if nothing in progress
+  // 6. Execute action: Start next task if nothing in progress
   if (inProgress.length === 0 && queued.length > 0) {
     const nextTask = queued[0];
 
@@ -285,7 +357,7 @@ async function executeTick() {
     );
   }
 
-  // 5. Update tick state
+  // 7. Update tick state
   await pool.query(`
     INSERT INTO working_memory (key, value_json, updated_at)
     VALUES ($1, $2, NOW())
@@ -299,6 +371,7 @@ async function executeTick() {
 
   return {
     success: true,
+    decision_engine: decisionEngineResult,
     focus: {
       objective_id: objectiveId,
       objective_title: focus.objective.title
