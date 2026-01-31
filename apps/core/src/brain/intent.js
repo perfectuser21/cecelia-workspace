@@ -21,7 +21,9 @@ const INTENT_TYPES = {
   CREATE_FEATURE: 'create_feature',      // "给登录页面加一个忘记密码功能"
   CREATE_GOAL: 'create_goal',            // "创建一个 P0 目标：提升系统稳定性"
   CREATE_TASK: 'create_task',            // "添加一个任务：修复登录超时"
+  QUERY_TASKS: 'query_tasks',            // "当前有哪些任务？" (alias for QUERY_STATUS)
   QUERY_STATUS: 'query_status',          // "当前有哪些任务？"
+  UPDATE_TASK: 'update_task',            // "把登录功能标记为完成"
   FIX_BUG: 'fix_bug',                    // "修复购物车页面的价格显示问题"
   REFACTOR: 'refactor',                  // "重构用户模块的代码结构"
   EXPLORE: 'explore',                    // "帮我看看这个 API 怎么用"
@@ -68,6 +70,14 @@ const INTENT_KEYWORDS = {
   [INTENT_TYPES.QUESTION]: [
     '为什么', '怎么', '如何', '什么', '?', '？',
     'why', 'how', 'what', 'which'
+  ],
+  [INTENT_TYPES.UPDATE_TASK]: [
+    '更新', '标记', '改为', '设置为', '完成', '取消', '暂停',
+    'update', 'mark', 'set', 'complete', 'cancel', 'pause'
+  ],
+  [INTENT_TYPES.QUERY_TASKS]: [
+    '查询', '搜索', '找', '有哪些', '列表',
+    'query', 'search', 'find', 'list'
   ]
 };
 
@@ -152,6 +162,25 @@ const INTENT_PHRASES = {
     { pattern: /(.+)是什么/, weight: 0.3 },
     { pattern: /why\s+(.+)\?/i, weight: 0.4 },
     { pattern: /how\s+(.+)\?/i, weight: 0.4 }
+  ],
+  [INTENT_TYPES.UPDATE_TASK]: [
+    { pattern: /把(.+)标记为(.+)/, weight: 0.4 },
+    { pattern: /将(.+)改为(.+)/, weight: 0.4 },
+    { pattern: /(.+)标记为(.+)/, weight: 0.3 },
+    { pattern: /完成(.+)任务/, weight: 0.4 },
+    { pattern: /取消(.+)任务/, weight: 0.4 },
+    { pattern: /mark\s+(.+)\s+as\s+(.+)/i, weight: 0.4 },
+    { pattern: /set\s+(.+)\s+to\s+(.+)/i, weight: 0.4 },
+    { pattern: /update\s+(.+)\s+status/i, weight: 0.3 }
+  ],
+  [INTENT_TYPES.QUERY_TASKS]: [
+    { pattern: /查询(.+)任务/, weight: 0.4 },
+    { pattern: /有哪些(.+)/, weight: 0.3 },
+    { pattern: /列出(.+)任务/, weight: 0.4 },
+    { pattern: /我的(.+)任务/, weight: 0.3 },
+    { pattern: /find\s+(.+)\s+tasks?/i, weight: 0.4 },
+    { pattern: /list\s+(.+)\s+tasks?/i, weight: 0.4 },
+    { pattern: /show\s+(.+)\s+tasks?/i, weight: 0.3 }
   ]
 };
 
@@ -167,6 +196,8 @@ const INTENT_ACTION_MAP = {
   [INTENT_TYPES.FIX_BUG]: { action: 'create-task', requiredParams: ['title'] },
   [INTENT_TYPES.REFACTOR]: { action: 'create-task', requiredParams: ['title'] },
   [INTENT_TYPES.QUERY_STATUS]: { action: null, handler: 'queryStatus' },
+  [INTENT_TYPES.QUERY_TASKS]: { action: null, handler: 'queryTasks' },
+  [INTENT_TYPES.UPDATE_TASK]: { action: 'update-task', requiredParams: ['task_id'] },
   [INTENT_TYPES.EXPLORE]: { action: null, handler: 'parseAndCreate' },
   [INTENT_TYPES.QUESTION]: { action: null, handler: null },
   [INTENT_TYPES.UNKNOWN]: { action: null, handler: null }
@@ -237,6 +268,15 @@ const ENTITY_PATTERNS = {
     /blocked\s+by\s+(.+)/i,
     /depends\s+on\s+(.+)/i,
     /after\s+(.+)/i
+  ],
+  // Status patterns (for UPDATE_TASK intent)
+  status: [
+    /(完成|已完成|completed?|done)/i,
+    /(进行中|in[_\s]?progress|doing)/i,
+    /(待办|pending|queued|todo)/i,
+    /(取消|cancelled?|canceled)/i,
+    /(失败|failed|error)/i,
+    /(阻塞|blocked)/i
   ]
 };
 
@@ -335,6 +375,16 @@ const PRIORITY_MAP_EN = {
   'low priority': 'P2'
 };
 
+// Map status keywords to standard values
+const STATUS_MAP = {
+  '完成': 'completed', '已完成': 'completed', 'completed': 'completed', 'done': 'completed',
+  '进行中': 'in_progress', 'in progress': 'in_progress', 'in_progress': 'in_progress', 'doing': 'in_progress',
+  '待办': 'pending', 'pending': 'pending', 'queued': 'queued', 'todo': 'pending',
+  '取消': 'cancelled', 'cancelled': 'cancelled', 'canceled': 'cancelled',
+  '失败': 'failed', 'failed': 'failed', 'error': 'failed',
+  '阻塞': 'blocked', 'blocked': 'blocked'
+};
+
 function extractEntities(input) {
   const entities = {
     module: null,
@@ -343,6 +393,7 @@ function extractEntities(input) {
     apiEndpoint: null,
     component: null,
     priority: null,
+    status: null,
     timeframe: null,
     dependency: null
   };
@@ -364,6 +415,10 @@ function extractEntities(input) {
         // Normalize priority to P0/P1/P2
         if (entityType === 'priority') {
           value = PRIORITY_MAP[value] || PRIORITY_MAP_EN[value.toLowerCase()] || value;
+        }
+        // Normalize status to standard values
+        if (entityType === 'status') {
+          value = STATUS_MAP[value] || STATUS_MAP[value.toLowerCase()] || value;
         }
 
         if (value && !entities[entityType]) {
@@ -646,6 +701,21 @@ function buildActionParams(intentType, input, entities, projectName) {
       title: input.slice(0, 100),
       priority: entities.priority || 'P0'
     };
+  }
+  if (intentType === INTENT_TYPES.UPDATE_TASK) {
+    // For update task, we need task_id (would be resolved from context/fuzzy match)
+    // For now, just return status and priority if available
+    const params = {};
+    if (entities.status) params.status = entities.status;
+    if (entities.priority) params.priority = entities.priority;
+    // Note: task_id should be provided by context or fuzzy matching
+    return params;
+  }
+  if (intentType === INTENT_TYPES.QUERY_TASKS) {
+    const params = {};
+    if (entities.status) params.status = entities.status;
+    if (entities.priority) params.priority = entities.priority;
+    return params;
   }
   return {};
 }
