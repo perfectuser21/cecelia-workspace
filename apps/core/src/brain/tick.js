@@ -6,7 +6,7 @@
 import pool from '../task-system/db.js';
 import { getDailyFocus } from './focus.js';
 import { updateTask } from './actions.js';
-import { triggerCeceliaRun, checkCeceliaRunAvailable, getActiveProcessCount, killProcess, cleanupOrphanProcesses } from './executor.js';
+import { triggerCeceliaRun, checkCeceliaRunAvailable, getActiveProcessCount, killProcess, cleanupOrphanProcesses, checkServerResources } from './executor.js';
 import { compareGoalProgress, generateDecision, executeDecision } from './decision.js';
 import { planNextTask } from './planner.js';
 import { emit } from './event-bus.js';
@@ -322,6 +322,12 @@ async function selectNextDispatchableTask(goalIds) {
  */
 async function dispatchNextTask(goalIds) {
   const actions = [];
+
+  // 0. Server resource check — refuse to dispatch if overloaded
+  const resources = checkServerResources();
+  if (!resources.ok) {
+    return { dispatched: false, reason: 'server_overloaded', detail: resources.reason, metrics: resources.metrics, actions };
+  }
 
   // 1. Check concurrency — dual check: DB status AND real process count
   const activeResult = await pool.query(

@@ -13,6 +13,7 @@ vi.mock('../executor.js', () => ({
   triggerCeceliaRun: vi.fn(), checkCeceliaRunAvailable: vi.fn(),
   getActiveProcessCount: vi.fn(() => 0), killProcess: vi.fn(() => true),
   cleanupOrphanProcesses: vi.fn(() => 0),
+  checkServerResources: vi.fn(() => ({ ok: true, reason: null, metrics: {} })),
 }));
 vi.mock('../decision.js', () => ({
   compareGoalProgress: vi.fn(), generateDecision: vi.fn(), executeDecision: vi.fn()

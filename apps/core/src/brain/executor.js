@@ -5,11 +5,14 @@
  * - Tracks child PIDs in memory (activeProcesses Map)
  * - Deduplicates by taskId before spawning
  * - Cleans up orphan `claude -p` processes on startup
+ * - Dynamic resource check before spawning (CPU load + memory)
  */
 
 /* global console */
 import { spawn, execSync } from 'child_process';
 import { writeFile, mkdir } from 'fs/promises';
+import { readFileSync } from 'fs';
+import os from 'os';
 import path from 'path';
 import pool from '../task-system/db.js';
 
@@ -17,6 +20,58 @@ import pool from '../task-system/db.js';
 const CECELIA_RUN_PATH = process.env.CECELIA_RUN_PATH || '/home/xx/bin/cecelia-run';
 const PROMPT_DIR = '/tmp/cecelia-prompts';
 const WORK_DIR = process.env.CECELIA_WORK_DIR || '/home/xx/dev/cecelia-workspace';
+
+// Resource thresholds — don't spawn if server is overloaded
+const CPU_CORES = os.cpus().length;
+const TOTAL_MEM_MB = Math.round(os.totalmem() / 1024 / 1024);
+const LOAD_THRESHOLD = CPU_CORES * 0.8;        // 80% of cores (e.g. 6.4 for 8-core)
+const MEM_AVAILABLE_MIN_MB = TOTAL_MEM_MB * 0.2; // Must have 20% free (e.g. ~3GB for 15GB)
+const SWAP_USED_MAX_PCT = 50;                    // Don't spawn if swap > 50% used
+
+/**
+ * Check server resource availability before spawning.
+ * Returns { ok, reason, metrics } — ok=false means don't spawn.
+ */
+function checkServerResources() {
+  const loadAvg1 = os.loadavg()[0];
+  const freeMem = Math.round(os.freemem() / 1024 / 1024);
+
+  // Read swap from /proc/meminfo (Linux)
+  let swapUsedPct = 0;
+  try {
+    const meminfo = readFileSync('/proc/meminfo', 'utf-8');
+    const swapTotal = parseInt(meminfo.match(/SwapTotal:\s+(\d+)/)?.[1] || '0', 10);
+    const swapFree = parseInt(meminfo.match(/SwapFree:\s+(\d+)/)?.[1] || '0', 10);
+    if (swapTotal > 0) {
+      swapUsedPct = Math.round(((swapTotal - swapFree) / swapTotal) * 100);
+    }
+  } catch {
+    // Not Linux or no /proc — skip swap check
+  }
+
+  const metrics = {
+    load_avg_1m: loadAvg1,
+    load_threshold: LOAD_THRESHOLD,
+    free_mem_mb: freeMem,
+    mem_min_mb: MEM_AVAILABLE_MIN_MB,
+    swap_used_pct: swapUsedPct,
+    swap_max_pct: SWAP_USED_MAX_PCT,
+    cpu_cores: CPU_CORES,
+    total_mem_mb: TOTAL_MEM_MB,
+  };
+
+  if (loadAvg1 > LOAD_THRESHOLD) {
+    return { ok: false, reason: `CPU overloaded: load ${loadAvg1.toFixed(1)} > threshold ${LOAD_THRESHOLD}`, metrics };
+  }
+  if (freeMem < MEM_AVAILABLE_MIN_MB) {
+    return { ok: false, reason: `Low memory: ${freeMem}MB free < ${MEM_AVAILABLE_MIN_MB}MB min`, metrics };
+  }
+  if (swapUsedPct > SWAP_USED_MAX_PCT) {
+    return { ok: false, reason: `Swap overused: ${swapUsedPct}% > ${SWAP_USED_MAX_PCT}% max`, metrics };
+  }
+
+  return { ok: true, reason: null, metrics };
+}
 
 /**
  * In-memory process registry: taskId -> { pid, startedAt, runId, process }
@@ -230,6 +285,19 @@ async function triggerCeceliaRun(task) {
       activeProcesses.delete(task.id);
     }
 
+    // === RESOURCE CHECK ===
+    const resources = checkServerResources();
+    if (!resources.ok) {
+      console.log(`[executor] Server overloaded, refusing to spawn: ${resources.reason}`);
+      return {
+        success: false,
+        taskId: task.id,
+        reason: 'server_overloaded',
+        detail: resources.reason,
+        metrics: resources.metrics,
+      };
+    }
+
     await ensurePromptDir();
 
     const runId = generateRunId(task.id);
@@ -367,4 +435,5 @@ export {
   killProcess,
   cleanupOrphanProcesses,
   isProcessAlive,
+  checkServerResources,
 };
