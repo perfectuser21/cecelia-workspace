@@ -322,6 +322,7 @@ async function triggerCeceliaRun(task) {
       env: {
         ...process.env,
         WEBHOOK_URL: webhookUrl,
+        CLAUDE_MODEL: 'sonnet', // Force headless to use sonnet (cheaper, fast enough)
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true, // Run in own process group for clean kill
