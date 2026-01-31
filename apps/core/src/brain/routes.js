@@ -8,7 +8,7 @@ import { getTickStatus, enableTick, disableTick, executeTick, runTickSafe } from
 import { parseIntent, parseAndCreate, INTENT_TYPES, INTENT_ACTION_MAP, extractEntities, classifyIntent, getSuggestedAction } from './intent.js';
 import pool from '../task-system/db.js';
 import { decomposeTRD, getTRDProgress, listTRDs } from './decomposer.js';
-import { generatePrdFromTask, PRD_TYPE_MAP } from './templates.js';
+import { generatePrdFromTask, generateTrdFromGoal, PRD_TYPE_MAP } from './templates.js';
 import { compareGoalProgress, generateDecision, executeDecision, getDecisionHistory, rollbackDecision } from './decision.js';
 import crypto from 'crypto';
 
@@ -1145,6 +1145,41 @@ router.post('/generate/prd', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to generate PRD',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * POST /api/brain/generate/trd
+ * Generate a TRD from goal description
+ */
+router.post('/generate/trd', async (req, res) => {
+  try {
+    const { title, description, milestones = [] } = req.body;
+
+    if (!title) {
+      return res.status(400).json({
+        success: false,
+        error: 'title is required'
+      });
+    }
+
+    const trd = generateTrdFromGoal({ title, description, milestones });
+
+    res.json({
+      success: true,
+      trd,
+      metadata: {
+        title,
+        milestones_count: milestones.length,
+        generated_at: new Date().toISOString()
+      }
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate TRD',
       details: err.message
     });
   }
