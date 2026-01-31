@@ -539,7 +539,7 @@ function validatePrd(markdown) {
   }
 
   // Check for fuzzy words in success criteria section
-  const criteriaMatch = markdown.match(/(?:\*\*成功标准\*\*|## 成功标准|## 验收标准)([\s\S]*?)(?=\n## |\n\*\*[^*]+\*\*:|\Z)/);
+  const criteriaMatch = markdown.match(/(?:\*\*成功标准\*\*|## 成功标准|## 验收标准)([\s\S]*?)(?=\n## |\n\*\*[^*]+\*\*:|$)/);
   if (criteriaMatch) {
     const criteriaText = criteriaMatch[1];
     for (const word of FUZZY_WORDS) {
