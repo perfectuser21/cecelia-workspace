@@ -9,6 +9,7 @@ const manifest: FeatureManifest = {
 
   routes: [
     { path: '/command', component: 'CommandCenter' },
+    { path: '/command/*', component: 'CommandCenter' },
     { path: '/command/ai', component: 'AIDetail' },
     { path: '/command/media', component: 'MediaDetail' },
     { path: '/command/clients', component: 'ClientsDetail' },
