@@ -387,6 +387,39 @@ function getIntentVerb(intentType) {
 }
 
 /**
+ * PRD type to intent type mapping
+ */
+const PRD_TYPE_MAP = {
+  feature: 'create_feature',
+  bugfix: 'fix_bug',
+  refactor: 'refactor'
+};
+
+/**
+ * Generate a PRD from a task description
+ * @param {Object} params - Generation parameters
+ * @param {string} params.title - Task title (required)
+ * @param {string} params.description - Task description
+ * @param {string} params.type - PRD type: feature | bugfix | refactor (default: feature)
+ * @param {Object} options - Rendering options
+ * @returns {string} Generated PRD markdown
+ */
+function generatePrdFromTask(params, options = {}) {
+  const { title, description = '', type = 'feature' } = params;
+  const intentType = PRD_TYPE_MAP[type] || 'create_feature';
+
+  const parsedIntent = {
+    projectName: title,
+    intentType,
+    tasks: [],
+    originalInput: description || title,
+    entities: {}
+  };
+
+  return renderPrd(parsedIntent, options);
+}
+
+/**
  * Get template by name
  * @param {string} templateName - Template name ('prd' or 'trd')
  * @returns {Object|null} Template object
@@ -413,9 +446,11 @@ function listTemplates() {
 export {
   PRD_TEMPLATE,
   TRD_TEMPLATE,
+  PRD_TYPE_MAP,
   generateFrontmatter,
   renderPrd,
   renderTrd,
+  generatePrdFromTask,
   getTemplate,
   listTemplates,
   getCurrentDate

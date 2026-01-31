@@ -8,6 +8,7 @@ import { getTickStatus, enableTick, disableTick, executeTick, runTickSafe } from
 import { parseIntent, parseAndCreate, INTENT_TYPES, INTENT_ACTION_MAP, extractEntities, classifyIntent, getSuggestedAction } from './intent.js';
 import pool from '../task-system/db.js';
 import { decomposeTRD, getTRDProgress, listTRDs } from './decomposer.js';
+import { generatePrdFromTask, PRD_TYPE_MAP } from './templates.js';
 import { compareGoalProgress, generateDecision, executeDecision, getDecisionHistory, rollbackDecision } from './decision.js';
 import crypto from 'crypto';
 
@@ -1100,6 +1101,51 @@ router.get('/executor/status', async (req, res) => {
     res.status(500).json({
       available: false,
       error: err.message
+    });
+  }
+});
+
+// ==================== Generate API ====================
+
+/**
+ * POST /api/brain/generate/prd
+ * Generate a PRD from task description
+ */
+router.post('/generate/prd', async (req, res) => {
+  try {
+    const { title, description, type = 'feature' } = req.body;
+
+    if (!title) {
+      return res.status(400).json({
+        success: false,
+        error: 'title is required'
+      });
+    }
+
+    const validTypes = Object.keys(PRD_TYPE_MAP);
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid type. Must be one of: ${validTypes.join(', ')}`
+      });
+    }
+
+    const prd = generatePrdFromTask({ title, description, type });
+
+    res.json({
+      success: true,
+      prd,
+      metadata: {
+        title,
+        type,
+        generated_at: new Date().toISOString()
+      }
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate PRD',
+      details: err.message
     });
   }
 });
