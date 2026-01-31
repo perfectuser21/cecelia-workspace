@@ -10,7 +10,7 @@ import { triggerCeceliaRun, checkCeceliaRunAvailable } from './executor.js';
 import { compareGoalProgress, generateDecision, executeDecision } from './decision.js';
 
 // Tick configuration
-const TICK_INTERVAL_MINUTES = 30;
+const TICK_INTERVAL_MINUTES = 5;
 const STALE_THRESHOLD_HOURS = 24; // Tasks in_progress for more than 24h are stale
 const AUTO_EXECUTE_CONFIDENCE = 0.8; // Auto-execute decisions with confidence >= this
 

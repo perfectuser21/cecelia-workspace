@@ -175,7 +175,10 @@ export function establishDependencies(allTasks) {
 /**
  * Main decomposition function
  */
-export async function decomposeTRD(trdContent, projectId = null, goalId = null) {
+export async function decomposeTRD(trdContent, projectId = null, goalId) {
+  if (!goalId) {
+    throw new Error('goal_id is required for TRD decomposition');
+  }
   const sections = parseTRDSections(trdContent);
 
   if (sections.length === 0) {
