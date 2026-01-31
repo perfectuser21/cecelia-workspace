@@ -1,19 +1,21 @@
-# QA Decision - Planner Agent
+---
+id: qa-decision-project-state-machine
+version: 1.0.0
+created: 2026-01-31
+updated: 2026-01-31
+changelog:
+  - 1.0.0: 初始版本
+---
 
-Decision: NO_RCI
-Priority: P1
-RepoType: Engine
+## QA Decision - 项目状态机
 
-## Tests
+**Classification**: NO_RCI (P1)
+**Reason**: 纯后端逻辑变更，状态机验证是确定性逻辑，单元测试足够覆盖。
 
-| DoD Item | Method | Location |
-|----------|--------|----------|
-| planNextTask() | auto | tests/brain/planner.test.js |
-| tick integration | auto | tests/brain/planner.test.js |
-| POST /api/brain/plan | auto | tests/brain/planner.test.js |
-| GET /api/brain/plan/status | auto | tests/brain/planner.test.js |
-| Hard constraints | auto | tests/brain/planner.test.js |
+### 测试策略
 
-## Reason
-
-新功能模块，纯后端逻辑，单元测试覆盖即可。
+| 类型 | 必要性 | 说明 |
+|------|--------|------|
+| 单元测试 | ✅ 必须 | 状态转换验证逻辑 |
+| 集成测试 | ✅ 必须 | API 端点 + DB |
+| E2E | ❌ 不需要 | 无 UI |
