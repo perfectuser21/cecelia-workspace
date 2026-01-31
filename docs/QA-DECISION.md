@@ -1,5 +1,5 @@
 ---
-id: qa-decision-prd-template-engine
+id: qa-decision-kr2-validation
 version: 1.0.0
 created: 2026-01-31
 updated: 2026-01-31
@@ -14,18 +14,21 @@ Priority: P1
 RepoType: Engine
 
 Tests:
-  - dod_item: "generatePrdFromGoalKR 输出包含完整字段"
+  - dod_item: "validatePrd 检查必填 section"
     method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
-  - dod_item: "planner.js 调用 generatePrdFromGoalKR"
+    location: apps/core/tests/brain/validation.test.js
+  - dod_item: "validateTrd 检查必填 section"
     method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
+    location: apps/core/tests/brain/validation.test.js
+  - dod_item: "TBD 占位符检测"
+    method: auto
+    location: apps/core/tests/brain/validation.test.js
   - dod_item: "现有测试全部通过"
     method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
+    location: manual:vitest run
 
 RCI:
   new: []
   update: []
 
-Reason: 模板引擎增强，不涉及核心 Hook/Gate/CI 流程，通过单元测试覆盖。
+Reason: 验证模块是纯函数，不涉及外部依赖或核心流程变更，单元测试覆盖即可。

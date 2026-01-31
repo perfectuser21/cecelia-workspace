@@ -17,6 +17,7 @@ import { emit as emitEvent } from './event-bus.js';
 import { recordSuccess as cbSuccess, recordFailure as cbFailure } from './circuit-breaker.js';
 import { notifyTaskCompleted, notifyTaskFailed } from './notifier.js';
 import { runDiagnosis } from './self-diagnosis.js';
+import { validatePrd, validateTrd } from './validation.js';
 import crypto from 'crypto';
 
 const router = Router();
@@ -1245,9 +1246,11 @@ router.post('/generate/prd', async (req, res) => {
         project: projectData || undefined
       });
 
+      const validation = validatePrd(prd);
       return res.json({
         success: true,
         prd,
+        validation,
         metadata: {
           title,
           goal_id,
@@ -1266,10 +1269,12 @@ router.post('/generate/prd', async (req, res) => {
     }
 
     const prd = generatePrdFromTask({ title, description, type });
+    const validation = validatePrd(prd);
 
     res.json({
       success: true,
       prd,
+      validation,
       metadata: {
         title,
         type,
@@ -1301,10 +1306,12 @@ router.post('/generate/trd', async (req, res) => {
     }
 
     const trd = generateTrdFromGoal({ title, description, milestones });
+    const validation = validateTrd(trd);
 
     res.json({
       success: true,
       trd,
+      validation,
       metadata: {
         title,
         milestones_count: milestones.length,
@@ -1317,6 +1324,42 @@ router.post('/generate/trd', async (req, res) => {
       error: 'Failed to generate TRD',
       details: err.message
     });
+  }
+});
+
+// ==================== Validation API ====================
+
+/**
+ * POST /api/brain/validate/prd
+ * Validate a PRD document
+ */
+router.post('/validate/prd', (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content) {
+      return res.status(400).json({ success: false, error: 'content is required' });
+    }
+    const result = validatePrd(content);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Validation failed', details: err.message });
+  }
+});
+
+/**
+ * POST /api/brain/validate/trd
+ * Validate a TRD document
+ */
+router.post('/validate/trd', (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content) {
+      return res.status(400).json({ success: false, error: 'content is required' });
+    }
+    const result = validateTrd(content);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Validation failed', details: err.message });
   }
 });
 
