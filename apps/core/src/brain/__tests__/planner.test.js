@@ -406,7 +406,7 @@ describe('Planner Agent', () => {
 
       // Cleanup PRD file
       if (result.payload.prd_path) {
-        try { unlinkSync(result.payload.prd_path); } catch {}
+        try { unlinkSync(result.payload.prd_path); } catch { /* ignore cleanup errors */ }
       }
     });
   });
