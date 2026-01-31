@@ -1,46 +1,40 @@
----
-id: qa-decision-cecelia-conversation-api
-version: 1.0.0
-created: 2026-02-01
-updated: 2026-02-01
-changelog:
-  - 1.0.0: 初始版本
----
-
 # QA Decision
 
 Decision: NO_RCI
-Priority: P1
+Priority: P0
 RepoType: Business
 
 Tests:
-  - dod_item: "POST /api/cecelia/chat 接收消息并返回回复"
+  - dod_item: "所有现有模板测试通过"
     method: auto
-    location: tests/api/cecelia-chat.test.ts
-  - dod_item: "能识别'创建任务'意图并创建任务记录"
+    location: apps/core/src/brain/__tests__/templates.test.js
+
+  - dod_item: "generatePrdFromGoalKR() 生成的 PRD 通过验证"
     method: auto
-    location: tests/api/cecelia-chat.test.ts
-  - dod_item: "能识别'查询状态'意图并返回系统状态"
+    location: apps/core/src/brain/__tests__/templates.test.js
+
+  - dod_item: "generateTrdFromGoalKR() 生成的 TRD 通过验证"
     method: auto
-    location: tests/api/cecelia-chat.test.ts
-  - dod_item: "返回的 reply 是自然语言（非 JSON 格式）"
+    location: apps/core/src/brain/__tests__/templates.test.js
+
+  - dod_item: "测试覆盖率达到 80% 以上"
     method: auto
-    location: tests/api/cecelia-chat.test.ts
-  - dod_item: "意图不明确时返回澄清问题"
+    location: npm run test:coverage
+
+  - dod_item: "代码审计通过，无 L1/L2 级别问题"
+    method: manual
+    location: manual:运行 /audit skill，确认 Decision: PASS
+
+  - dod_item: "所有文档生成函数有完整的 JSDoc 注释"
+    method: manual
+    location: manual:检查 templates.js 中的函数注释完整性
+
+  - dod_item: "CI 测试通过"
     method: auto
-    location: tests/api/cecelia-chat.test.ts
-  - dod_item: "集成测试覆盖：创建任务、查询状态、意图不明确三种场景"
-    method: auto
-    location: tests/api/cecelia-chat.test.ts
-  - dod_item: "测试验证回复格式为自然语言字符串"
-    method: auto
-    location: tests/api/cecelia-chat.test.ts
-  - dod_item: "npm run qa 通过"
-    method: auto
-    location: tests/api/cecelia-chat.test.ts
+    location: .github/workflows/ci.yml
 
 RCI:
   new: []
   update: []
 
-Reason: Business API 功能，不涉及核心 Engine（Hook/Gate/CI），已有完整自动化测试覆盖所有场景，无需 RCI
+Reason: P0 核心功能，影响 Brain 自动化能力。作为 Business 仓库，使用项目内测试确保质量（apps/core/src/brain/__tests__/templates.test.js），无需全局回归契约。
