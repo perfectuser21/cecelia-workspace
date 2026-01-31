@@ -1,12 +1,15 @@
 ---
-id: audit-report-command-center-v3
+id: audit-report-tick-auto-loop
 version: 1.0.0
 created: 2026-01-31
+updated: 2026-01-31
+changelog:
+  - 1.0.0: 初始版本
 ---
 
-# Audit Report - Command Center 数据展示优化
+# Audit Report - Brain Tick Auto Loop
 
-Branch: cp-command-center-v3
+Branch: cp-fix-tick-auto-loop
 Date: 2026-01-31
 Target Level: L2
 
@@ -17,27 +20,36 @@ Target Level: L2
 | Level | Count | Description |
 |-------|-------|-------------|
 | L1 (Blocker) | 0 | No blocking issues |
-| L2 (Functional) | 0 | All fixed |
-| L3 (Best Practice) | 4 | Non-blocking |
-| L4 (Over-optimization) | 1 | Theoretical |
+| L2 (Functional) | 0 | No functional issues |
+| L3 (Best Practice) | 1 | Non-blocking |
+| L4 (Over-optimization) | 0 | None |
 
-## Fixed Issues
+## Changes Reviewed
 
-### L2-01: Today statistics (FIXED)
-- Added `getTodayStats()` using `completed_at` and `started_at`
-- Now correctly shows today's completed/started tasks
+### tick.js
+- `runTickSafe()`: Reentry guard with timeout protection - correct
+- `startTickLoop()` / `stopTickLoop()`: Clean setInterval management with `.unref()` - correct
+- `initTickLoop()`: Safe DB check on startup with error handling - correct
+- `enableTick()` / `disableTick()`: Properly linked to loop start/stop - correct
+- `getTickStatus()`: Returns `loop_running` and `tick_running` fields - correct
 
-### L2-02: Unassigned project filter (FIXED)
-- Fixed filter logic for `undefined` project_id
-- `unassigned` option now works correctly
+### routes.js
+- Manual tick endpoint uses `runTickSafe('manual')` - correct, prevents concurrent execution
+- Execution-callback uses `runTickSafe('execution-callback')` - correct, same guard
 
-## Remaining L3 Issues (Non-blocking)
+### server.ts
+- `initTickLoop()` called after server listen - correct timing
 
-- Unused imports (Share2, Briefcase)
-- Unused `location` variable
-- Loose typing with `any`
-- Duplicate files (dashboard mirrors core)
+## L3 Issues (Non-blocking)
+
+- `tickFn` parameter in `runTickSafe()` exposes testing seam in production API. Acceptable for testability.
 
 ## Blockers
 
 None
+
+## Test Coverage
+
+- 9 new tests (tick-loop.test.js): all pass
+- 15 existing tests (tick.test.js): all pass
+- 118 total brain tests: all pass

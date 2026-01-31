@@ -11,6 +11,8 @@ import { compareGoalProgress, generateDecision, executeDecision } from './decisi
 
 // Tick configuration
 const TICK_INTERVAL_MINUTES = 5;
+const TICK_LOOP_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes between loop ticks
+const TICK_TIMEOUT_MS = 60 * 1000; // 60 seconds max execution time
 const STALE_THRESHOLD_HOURS = 24; // Tasks in_progress for more than 24h are stale
 const AUTO_EXECUTE_CONFIDENCE = 0.8; // Auto-execute decisions with confidence >= this
 
@@ -18,6 +20,11 @@ const AUTO_EXECUTE_CONFIDENCE = 0.8; // Auto-execute decisions with confidence >
 const TICK_ENABLED_KEY = 'tick_enabled';
 const TICK_LAST_KEY = 'tick_last';
 const TICK_ACTIONS_TODAY_KEY = 'tick_actions_today';
+
+// Loop state (in-memory)
+let _loopTimer = null;
+let _tickRunning = false;
+let _tickLockTime = null;
 
 /**
  * Get tick status
@@ -48,11 +55,109 @@ async function getTickStatus() {
 
   return {
     enabled,
+    loop_running: _loopTimer !== null,
     interval_minutes: TICK_INTERVAL_MINUTES,
+    loop_interval_ms: TICK_LOOP_INTERVAL_MS,
     last_tick: lastTick,
     next_tick: nextTick,
-    actions_today: actionsToday
+    actions_today: actionsToday,
+    tick_running: _tickRunning
   };
+}
+
+/**
+ * Run tick with reentry guard and timeout protection
+ * @param {string} source - who triggered this tick
+ * @param {Function} [tickFn] - optional tick function override (for testing)
+ */
+async function runTickSafe(source = 'loop', tickFn) {
+  const doTick = tickFn || executeTick;
+  // Reentry guard: check if already running
+  if (_tickRunning) {
+    // Timeout protection: release lock if held too long
+    if (_tickLockTime && (Date.now() - _tickLockTime > TICK_TIMEOUT_MS)) {
+      console.warn(`[tick-loop] Tick lock held for >${TICK_TIMEOUT_MS}ms, force-releasing (source: ${source})`);
+      _tickRunning = false;
+      _tickLockTime = null;
+    } else {
+      console.log(`[tick-loop] Tick already running, skipping (source: ${source})`);
+      return { skipped: true, reason: 'already_running', source };
+    }
+  }
+
+  _tickRunning = true;
+  _tickLockTime = Date.now();
+
+  try {
+    const result = await doTick();
+    console.log(`[tick-loop] Tick completed (source: ${source}), actions: ${result.actions_taken?.length || 0}`);
+    return result;
+  } catch (err) {
+    console.error(`[tick-loop] Tick failed (source: ${source}):`, err.message);
+    return { success: false, error: err.message, source };
+  } finally {
+    _tickRunning = false;
+    _tickLockTime = null;
+  }
+}
+
+/**
+ * Start the tick loop (setInterval)
+ */
+function startTickLoop() {
+  if (_loopTimer) {
+    console.log('[tick-loop] Loop already running, skipping start');
+    return false;
+  }
+
+  _loopTimer = setInterval(async () => {
+    try {
+      await runTickSafe('loop');
+    } catch (err) {
+      console.error('[tick-loop] Unexpected error in loop:', err.message);
+    }
+  }, TICK_LOOP_INTERVAL_MS);
+
+  // Don't prevent process exit
+  if (_loopTimer.unref) {
+    _loopTimer.unref();
+  }
+
+  console.log(`[tick-loop] Started (interval: ${TICK_LOOP_INTERVAL_MS}ms)`);
+  return true;
+}
+
+/**
+ * Stop the tick loop
+ */
+function stopTickLoop() {
+  if (!_loopTimer) {
+    console.log('[tick-loop] No loop running, skipping stop');
+    return false;
+  }
+
+  clearInterval(_loopTimer);
+  _loopTimer = null;
+  console.log('[tick-loop] Stopped');
+  return true;
+}
+
+/**
+ * Initialize tick loop on server startup
+ * Checks DB state and starts loop if tick is enabled
+ */
+async function initTickLoop() {
+  try {
+    const status = await getTickStatus();
+    if (status.enabled) {
+      console.log('[tick-loop] Tick is enabled in DB, starting loop on startup');
+      startTickLoop();
+    } else {
+      console.log('[tick-loop] Tick is disabled in DB, not starting loop');
+    }
+  } catch (err) {
+    console.error('[tick-loop] Failed to init tick loop:', err.message);
+  }
 }
 
 /**
@@ -65,7 +170,9 @@ async function enableTick() {
     ON CONFLICT (key) DO UPDATE SET value_json = $2, updated_at = NOW()
   `, [TICK_ENABLED_KEY, { enabled: true }]);
 
-  return { success: true, enabled: true };
+  startTickLoop();
+
+  return { success: true, enabled: true, loop_running: true };
 }
 
 /**
@@ -78,7 +185,9 @@ async function disableTick() {
     ON CONFLICT (key) DO UPDATE SET value_json = $2, updated_at = NOW()
   `, [TICK_ENABLED_KEY, { enabled: false }]);
 
-  return { success: true, enabled: false };
+  stopTickLoop();
+
+  return { success: true, enabled: false, loop_running: false };
 }
 
 /**
@@ -392,5 +501,11 @@ export {
   disableTick,
   executeTick,
   isStale,
-  TICK_INTERVAL_MINUTES
+  runTickSafe,
+  startTickLoop,
+  stopTickLoop,
+  initTickLoop,
+  TICK_INTERVAL_MINUTES,
+  TICK_LOOP_INTERVAL_MS,
+  TICK_TIMEOUT_MS
 };

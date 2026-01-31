@@ -24,6 +24,7 @@ import okrRoutes from '../okr/routes.js';
 import watchdogRoutes from '../watchdog/routes.js';
 import systemRoutes from '../system/routes.js';
 import { startMonitor as startWatchdogMonitor } from '../watchdog/service.js';
+import { initTickLoop } from '../brain/tick.js';
 import { auditMiddleware, initAuditTable } from '../middleware/audit.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -209,6 +210,9 @@ server.listen(PORT, async () => {
 
   // Start watchdog monitor automatically
   startWatchdogMonitor();
+
+  // Initialize tick loop if enabled in DB
+  await initTickLoop();
 });
 
 export default app;

@@ -4,7 +4,7 @@ import { getSystemStatus, getRecentDecisions, getWorkingMemory, getActivePolicy,
 import { createSnapshot, getRecentSnapshots, getLatestSnapshot } from './perception.js';
 import { createTask, updateTask, createGoal, updateGoal, triggerN8n, setMemory, batchUpdateTasks } from './actions.js';
 import { getDailyFocus, setDailyFocus, clearDailyFocus, getFocusSummary } from './focus.js';
-import { getTickStatus, enableTick, disableTick, executeTick } from './tick.js';
+import { getTickStatus, enableTick, disableTick, executeTick, runTickSafe } from './tick.js';
 import { parseIntent, parseAndCreate, INTENT_TYPES, extractEntities, classifyIntent } from './intent.js';
 import pool from '../task-system/db.js';
 import { decomposeTRD, getTRDProgress, listTRDs } from './decomposer.js';
@@ -380,7 +380,7 @@ router.post('/focus/clear', async (req, res) => {
  */
 router.post('/tick', async (req, res) => {
   try {
-    const result = await executeTick();
+    const result = await runTickSafe('manual');
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Failed to execute tick', details: err.message });
@@ -927,7 +927,7 @@ router.post('/execution-callback', async (req, res) => {
     if (newStatus === 'completed') {
       console.log(`[execution-callback] Task completed, triggering next tick...`);
       try {
-        nextTickResult = await executeTick();
+        nextTickResult = await runTickSafe('execution-callback');
         console.log(`[execution-callback] Next tick triggered, actions: ${nextTickResult.actions_taken?.length || 0}`);
       } catch (tickErr) {
         console.error(`[execution-callback] Failed to trigger next tick: ${tickErr.message}`);
