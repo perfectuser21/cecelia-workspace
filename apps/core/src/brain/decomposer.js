@@ -218,7 +218,7 @@ export async function decomposeTRD(trdContent, projectId = null, goalId) {
     `, [
       task.title,
       task.priority,
-      'pending',
+      'queued',
       projectId,
       goalId,
       task.prd_content,
@@ -313,7 +313,7 @@ export async function getTRDProgress(trdId) {
     milestones.push({
       id,
       status: stats.completed === stats.total ? 'completed' :
-              stats.completed > 0 ? 'in_progress' : 'pending',
+              stats.completed > 0 ? 'in_progress' : 'queued',
       progress: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0
     });
   }

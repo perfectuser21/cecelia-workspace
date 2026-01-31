@@ -51,12 +51,13 @@ function generateRunId(taskId) {
  */
 function preparePrompt(task) {
   // Check for PRD content in different locations
+  // All prompts must start with /dev to trigger the skill
   if (task.prd_content) {
-    return task.prd_content;
+    return `/dev\n\n${task.prd_content}`;
   }
 
   if (task.payload?.prd_content) {
-    return task.payload.prd_content;
+    return `/dev\n\n${task.payload.prd_content}`;
   }
 
   if (task.payload?.prd_path) {
