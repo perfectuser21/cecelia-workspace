@@ -9,6 +9,7 @@
 
 import pool from '../task-system/db.js';
 import { emit } from './event-bus.js';
+import { notifyCircuitOpen } from './notifier.js';
 
 const FAILURE_THRESHOLD = 3;
 const OPEN_DURATION_MS = 30 * 60 * 1000; // 30 minutes
@@ -91,6 +92,7 @@ async function recordFailure(key = 'default') {
       reason: 'half_open_probe_failed',
       failures: b.failures
     });
+    notifyCircuitOpen({ key, failures: b.failures, reason: 'half_open_probe_failed' }).catch(() => {});
   } else if (b.failures >= FAILURE_THRESHOLD && b.state === 'CLOSED') {
     b.state = 'OPEN';
     b.openedAt = Date.now();
@@ -99,6 +101,7 @@ async function recordFailure(key = 'default') {
       reason: 'failure_threshold_reached',
       failures: b.failures
     });
+    notifyCircuitOpen({ key, failures: b.failures, reason: 'failure_threshold_reached' }).catch(() => {});
   }
 }
 
