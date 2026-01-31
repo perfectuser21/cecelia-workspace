@@ -420,6 +420,35 @@ function generatePrdFromTask(params, options = {}) {
 }
 
 /**
+ * Generate a TRD from a goal description
+ * @param {Object} params - Generation parameters
+ * @param {string} params.title - Goal title (required)
+ * @param {string} params.description - Goal description
+ * @param {Array<{title: string, description?: string}>} params.milestones - Optional milestones
+ * @param {Object} options - Rendering options
+ * @returns {string} Generated TRD markdown
+ */
+function generateTrdFromGoal(params, options = {}) {
+  const { title, description = '', milestones = [] } = params;
+
+  const tasks = milestones.map((m, i) => ({
+    title: m.title || `Milestone ${i + 1}`,
+    description: m.description || m.title || '',
+    priority: `P${Math.min(i, 2)}`
+  }));
+
+  const parsedIntent = {
+    projectName: title,
+    intentType: 'create_project',
+    tasks,
+    originalInput: description || title,
+    entities: {}
+  };
+
+  return renderTrd(parsedIntent, options);
+}
+
+/**
  * Get template by name
  * @param {string} templateName - Template name ('prd' or 'trd')
  * @returns {Object|null} Template object
@@ -451,6 +480,7 @@ export {
   renderPrd,
   renderTrd,
   generatePrdFromTask,
+  generateTrdFromGoal,
   getTemplate,
   listTemplates,
   getCurrentDate
