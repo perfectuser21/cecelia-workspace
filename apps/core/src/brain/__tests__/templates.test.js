@@ -3,7 +3,7 @@
  * Tests for PRD and TRD template rendering
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   PRD_TEMPLATE,
   TRD_TEMPLATE,
