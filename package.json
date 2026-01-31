@@ -1,6 +1,6 @@
 {
   "name": "cecelia-workspace",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Cecelia Workspace - AI-powered automation platform monorepo",
   "private": true,
   "type": "module",
@@ -17,7 +17,14 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "clean": "find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +",
-    "clean:dist": "find . -name 'dist' -type d -prune -exec rm -rf '{}' +"
+    "clean:dist": "find . -name 'dist' -type d -prune -exec rm -rf '{}' +",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:api": "vitest run tests/api",
+    "test:unit": "vitest run --exclude tests/api"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.18"
   },
   "keywords": [
     "monorepo",

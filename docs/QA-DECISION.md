@@ -1,5 +1,5 @@
 ---
-id: qa-decision-prd-template-engine
+id: qa-decision-test-project-arch
 version: 1.0.0
 created: 2026-01-31
 updated: 2026-01-31
@@ -10,22 +10,22 @@ changelog:
 # QA Decision
 
 Decision: NO_RCI
-Priority: P1
-RepoType: Engine
+Priority: P2
+RepoType: Infrastructure
 
 Tests:
-  - dod_item: "generatePrdFromGoalKR 输出包含完整字段"
-    method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
-  - dod_item: "planner.js 调用 generatePrdFromGoalKR"
-    method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
-  - dod_item: "现有测试全部通过"
-    method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
+  - dod_item: "vitest.config.ts 配置正确"
+    method: manual
+    location: vitest.config.ts
+  - dod_item: "npm test 可运行"
+    method: manual
+    location: package.json
+  - dod_item: "createTestClient 导出正确"
+    method: manual
+    location: tests/helpers/api-client.ts
 
 RCI:
   new: []
   update: []
 
-Reason: 模板引擎增强，不涉及核心 Hook/Gate/CI 流程，通过单元测试覆盖。
+Reason: 测试基础设施配置，不涉及业务逻辑，通过手动验证配置文件即可。
