@@ -8,7 +8,7 @@ import { getTickStatus, enableTick, disableTick, executeTick, runTickSafe } from
 import { parseIntent, parseAndCreate, INTENT_TYPES, INTENT_ACTION_MAP, extractEntities, classifyIntent, getSuggestedAction } from './intent.js';
 import pool from '../task-system/db.js';
 import { decomposeTRD, getTRDProgress, listTRDs } from './decomposer.js';
-import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, validatePrd, validateTrd, prdToJson, trdToJson, PRD_TYPE_MAP } from './templates.js';
+import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, generateTrdFromGoalKR, validatePrd, validateTrd, prdToJson, trdToJson, PRD_TYPE_MAP } from './templates.js';
 import { compareGoalProgress, generateDecision, executeDecision, getDecisionHistory, rollbackDecision } from './decision.js';
 import { planNextTask, getPlanStatus, handlePlanInput } from './planner.js';
 import { ensureEventsTable, queryEvents, getEventCounts } from './event-bus.js';
@@ -1327,6 +1327,46 @@ router.post('/generate/trd', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to generate TRD',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * POST /api/brain/generate/trd-from-kr
+ * Generate a TRD from Goal + KR context
+ */
+router.post('/generate/trd-from-kr', async (req, res) => {
+  try {
+    const { title, description, kr, project, milestones = [], format } = req.body;
+
+    if (!title) {
+      return res.status(400).json({
+        success: false,
+        error: 'title is required'
+      });
+    }
+
+    const trd = generateTrdFromGoalKR({ title, description, kr, project, milestones });
+
+    if (format === 'json') {
+      return res.json({ success: true, data: trdToJson(trd), metadata: { title, has_kr: !!kr, milestones_count: milestones.length, generated_at: new Date().toISOString() } });
+    }
+
+    res.json({
+      success: true,
+      trd,
+      metadata: {
+        title,
+        has_kr: !!kr,
+        milestones_count: milestones.length,
+        generated_at: new Date().toISOString()
+      }
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate TRD from KR',
       details: err.message
     });
   }

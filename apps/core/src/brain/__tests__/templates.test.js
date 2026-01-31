@@ -14,6 +14,7 @@ import {
   generatePrdFromTask,
   generatePrdFromGoalKR,
   generateTrdFromGoal,
+  generateTrdFromGoalKR,
   validatePrd,
   validateTrd,
   getTemplate,
@@ -418,6 +419,88 @@ describe('Templates Module', () => {
 
       expect(trd).not.toMatch(/^---/);
       expect(trd).toMatch(/^# TRD/);
+    });
+  });
+
+  describe('generateTrdFromGoalKR', () => {
+    it('generates TRD with full KR context', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Implement TRD engine',
+        description: 'Build TRD markdown generator',
+        kr: { title: 'TRD 模板完整性', progress: 45, priority: 'P0' },
+        project: { name: 'cecelia-workspace', repo_path: '/home/xx/dev/cecelia-workspace' }
+      });
+
+      expect(trd).toContain('---');
+      expect(trd).toContain('id: trd-auto-');
+      expect(trd).toContain('version: 1.0.0');
+      expect(trd).toContain('# TRD - Implement TRD engine');
+      expect(trd).toContain('KR: TRD 模板完整性 (progress: 45%, priority: P0)');
+      expect(trd).toContain('Project: cecelia-workspace');
+      expect(trd).toContain('## 技术背景');
+      expect(trd).toContain('## 架构设计');
+      expect(trd).toContain('## API 设计');
+      expect(trd).toContain('## 数据模型');
+      expect(trd).toContain('## 测试策略');
+      expect(trd).toContain('## 实施计划');
+    });
+
+    it('degrades gracefully without KR', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Simple task',
+        description: 'A simple description'
+      });
+
+      expect(trd).toContain('# TRD - Simple task');
+      expect(trd).toContain('A simple description');
+      expect(trd).not.toContain('KR:');
+      expect(trd).not.toContain('KR 验收对齐');
+    });
+
+    it('includes milestones in implementation plan', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Test',
+        milestones: [
+          { title: 'Phase 1', description: 'Setup' },
+          { title: 'Phase 2', description: 'Core impl' }
+        ]
+      });
+
+      expect(trd).toContain('1. **Phase 1**');
+      expect(trd).toContain('   - Setup');
+      expect(trd).toContain('2. **Phase 2**');
+    });
+
+    it('includes KR alignment in test strategy when KR provided', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Test',
+        kr: { title: 'KR Test', progress: 20, priority: 'P1' }
+      });
+
+      expect(trd).toContain('### KR 验收对齐');
+      expect(trd).toContain('KR: KR Test');
+      expect(trd).toContain('当前进度: 20%');
+    });
+
+    it('passes validateTrd', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Validate test',
+        description: 'Should pass validation',
+        kr: { title: 'KR1', progress: 50, priority: 'P0' }
+      });
+      const result = validateTrd(trd);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('handles kr with missing fields', () => {
+      const trd = generateTrdFromGoalKR({
+        title: 'Partial KR',
+        kr: { title: 'Some KR' }
+      });
+
+      expect(trd).toContain('KR: Some KR (progress: 0%, priority: P1)');
+      expect(trd).not.toContain('undefined');
     });
   });
 
