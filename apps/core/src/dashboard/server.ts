@@ -19,6 +19,7 @@ import panoramaRoutes from '../panorama/routes.js';
 import devgateRoutes from '../devgate/routes.js';
 import mediaRoutes from '../media/routes.js';
 import taskSystemRoutes from '../task-system/routes.js';
+import areasRoutes from '../task-system/areas.js';
 import brainRoutes from '../brain/routes.js';
 import okrRoutes from '../okr/routes.js';
 import watchdogRoutes from '../watchdog/routes.js';
@@ -155,6 +156,9 @@ app.use('/api/media', mediaRoutes);
 
 // Task System API routes (PARA + OKR)
 app.use('/api/tasks', taskSystemRoutes);
+
+// Areas API routes (PARA alignment)
+app.use('/api/areas', areasRoutes);
 
 // Brain API routes (decision pack, actions, memory)
 app.use('/api/brain', brainRoutes);

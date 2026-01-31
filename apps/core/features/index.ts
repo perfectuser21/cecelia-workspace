@@ -6,13 +6,14 @@ export { coreInstanceConfig, coreTheme } from './config';
 import type { CoreConfig, CoreRoute, NavGroup, NavGroupItem, FeatureManifest } from './types';
 import { coreInstanceConfig } from './config';
 
-// Feature manifests - 5 domains
+// Feature manifests - 6 lines
 export const coreFeatures = {
-  'planning': () => import('./planning'),
-  'execution': () => import('./execution'),
-  'business': () => import('./business'),
-  'system': () => import('./system'),
-  'knowledge': () => import('./knowledge'),
+  'dashboard': () => import('./dashboard'),
+  'daily': () => import('./daily'),
+  'gtd': () => import('./gtd'),
+  'content': () => import('./content'),
+  'aidev': () => import('./aidev'),
+  'brain': () => import('./brain'),
 };
 
 // Load all features and register them
