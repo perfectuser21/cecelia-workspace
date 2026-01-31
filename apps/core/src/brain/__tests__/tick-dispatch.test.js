@@ -10,7 +10,9 @@ vi.mock('../actions.js', () => ({
   batchUpdateTasks: vi.fn()
 }));
 vi.mock('../executor.js', () => ({
-  triggerCeceliaRun: vi.fn(), checkCeceliaRunAvailable: vi.fn()
+  triggerCeceliaRun: vi.fn(), checkCeceliaRunAvailable: vi.fn(),
+  getActiveProcessCount: vi.fn(() => 0), killProcess: vi.fn(() => true),
+  cleanupOrphanProcesses: vi.fn(() => 0),
 }));
 vi.mock('../decision.js', () => ({
   compareGoalProgress: vi.fn(), generateDecision: vi.fn(), executeDecision: vi.fn()
@@ -31,8 +33,8 @@ import {
 const goalIds = ['goal-1', 'kr-1'];
 
 describe('Tick Dispatch constants', () => {
-  it('DISPATCH_TIMEOUT_MINUTES is 30', () => {
-    expect(DISPATCH_TIMEOUT_MINUTES).toBe(30);
+  it('DISPATCH_TIMEOUT_MINUTES is 60', () => {
+    expect(DISPATCH_TIMEOUT_MINUTES).toBe(60);
   });
   it('DISPATCH_COOLDOWN_MS is 60 seconds', () => {
     expect(DISPATCH_COOLDOWN_MS).toBe(60 * 1000);
@@ -175,7 +177,7 @@ describe('autoFailTimedOutTasks', () => {
   });
 
   it('auto-fails task past timeout', async () => {
-    const triggeredAt = new Date(Date.now() - 35 * 60 * 1000).toISOString();
+    const triggeredAt = new Date(Date.now() - 65 * 60 * 1000).toISOString();
     updateTask.mockResolvedValueOnce({ success: true });
     pool.query.mockResolvedValue({ rows: [] }); // decision_log
 
@@ -200,7 +202,7 @@ describe('autoFailTimedOutTasks', () => {
   });
 
   it('uses started_at as fallback when run_triggered_at missing', async () => {
-    const oldTime = new Date(Date.now() - 40 * 60 * 1000).toISOString();
+    const oldTime = new Date(Date.now() - 70 * 60 * 1000).toISOString();
     updateTask.mockResolvedValueOnce({ success: true });
     pool.query.mockResolvedValue({ rows: [] });
 
@@ -209,7 +211,7 @@ describe('autoFailTimedOutTasks', () => {
     ]);
 
     expect(actions.length).toBe(1);
-    expect(actions[0].elapsed_minutes).toBeGreaterThan(30);
+    expect(actions[0].elapsed_minutes).toBeGreaterThan(60);
   });
 });
 
@@ -226,7 +228,7 @@ describe('getTickStatus includes dispatch fields', () => {
     expect(status).toHaveProperty('max_concurrent');
     expect(status).toHaveProperty('dispatch_timeout_minutes');
     expect(status.max_concurrent).toBe(3); // default from env CECELIA_MAX_CONCURRENT || 3
-    expect(status.dispatch_timeout_minutes).toBe(30);
+    expect(status.dispatch_timeout_minutes).toBe(60);
     expect(status.last_dispatch).toBeNull();
   });
 });

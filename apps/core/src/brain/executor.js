@@ -1,23 +1,134 @@
 /**
  * Cecelia Executor - Trigger headless Claude Code execution
  *
- * This module integrates the Brain's tick mechanism with cecelia-run,
- * enabling automatic task execution in a self-driving loop.
+ * v2: Process-level tracking to prevent runaway dispatch.
+ * - Tracks child PIDs in memory (activeProcesses Map)
+ * - Deduplicates by taskId before spawning
+ * - Cleans up orphan `claude -p` processes on startup
  */
 
 /* global console */
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn, execSync } from 'child_process';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import pool from '../task-system/db.js';
-
-const execAsync = promisify(exec);
 
 // Configuration
 const CECELIA_RUN_PATH = process.env.CECELIA_RUN_PATH || '/home/xx/bin/cecelia-run';
 const PROMPT_DIR = '/tmp/cecelia-prompts';
 const WORK_DIR = process.env.CECELIA_WORK_DIR || '/home/xx/dev/cecelia-workspace';
+
+/**
+ * In-memory process registry: taskId -> { pid, startedAt, runId, process }
+ */
+const activeProcesses = new Map();
+
+/**
+ * Get the number of actively tracked processes (with liveness check)
+ */
+function getActiveProcessCount() {
+  // Prune dead processes first
+  for (const [taskId, entry] of activeProcesses) {
+    if (!isProcessAlive(entry.pid)) {
+      console.log(`[executor] Pruning dead process: task=${taskId} pid=${entry.pid}`);
+      activeProcesses.delete(taskId);
+    }
+  }
+  return activeProcesses.size;
+}
+
+/**
+ * Check if a PID is still alive
+ */
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0); // signal 0 = existence check
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Kill the process for a specific task
+ * @returns {boolean} true if killed
+ */
+function killProcess(taskId) {
+  const entry = activeProcesses.get(taskId);
+  if (!entry) return false;
+
+  try {
+    // Kill the process group (negative PID) to catch child shells
+    try {
+      process.kill(-entry.pid, 'SIGTERM');
+    } catch {
+      process.kill(entry.pid, 'SIGTERM');
+    }
+    console.log(`[executor] Killed process: task=${taskId} pid=${entry.pid}`);
+  } catch (err) {
+    console.log(`[executor] Process already dead: task=${taskId} pid=${entry.pid} err=${err.message}`);
+  }
+
+  activeProcesses.delete(taskId);
+  return true;
+}
+
+/**
+ * Get snapshot of all active processes (for diagnostics)
+ */
+function getActiveProcesses() {
+  const result = [];
+  for (const [taskId, entry] of activeProcesses) {
+    result.push({
+      taskId,
+      pid: entry.pid,
+      runId: entry.runId,
+      startedAt: entry.startedAt,
+      alive: isProcessAlive(entry.pid),
+    });
+  }
+  return result;
+}
+
+/**
+ * Clean up orphan `claude -p /dev` processes not in our registry.
+ * Called on startup to handle leftover processes from previous server runs.
+ */
+function cleanupOrphanProcesses() {
+  try {
+    const output = execSync(
+      "ps aux | grep 'claude -p /dev' | grep -v grep | awk '{print $2}'",
+      { encoding: 'utf-8', timeout: 5000 }
+    ).trim();
+
+    if (!output) {
+      console.log('[executor] No orphan claude processes found');
+      return 0;
+    }
+
+    const pids = output.split('\n').map(p => parseInt(p, 10)).filter(p => !isNaN(p));
+    const trackedPids = new Set([...activeProcesses.values()].map(e => e.pid));
+
+    let killed = 0;
+    for (const pid of pids) {
+      if (!trackedPids.has(pid)) {
+        try {
+          process.kill(pid, 'SIGTERM');
+          killed++;
+          console.log(`[executor] Killed orphan process: pid=${pid}`);
+        } catch {
+          // already dead
+        }
+      }
+    }
+
+    console.log(`[executor] Orphan cleanup: found=${pids.length} killed=${killed} tracked=${trackedPids.size}`);
+    return killed;
+  } catch (err) {
+    console.error('[executor] Orphan cleanup failed:', err.message);
+    return 0;
+  }
+}
 
 /**
  * Ensure prompt directory exists
@@ -26,7 +137,6 @@ async function ensurePromptDir() {
   try {
     await mkdir(PROMPT_DIR, { recursive: true });
   } catch (err) {
-    // Directory might already exist
     if (err.code !== 'EEXIST') {
       console.error('[executor] Failed to create prompt dir:', err.message);
     }
@@ -43,28 +153,18 @@ function generateRunId(taskId) {
 
 /**
  * Prepare prompt content from task
- *
- * Task can have:
- * - prd_content: Direct PRD text
- * - prd_path: Path to PRD file
- * - payload.prd: PRD in payload JSON
  */
 function preparePrompt(task) {
-  // Check for PRD content in different locations
-  // All prompts must start with /dev to trigger the skill
   if (task.prd_content) {
     return `/dev\n\n${task.prd_content}`;
   }
-
   if (task.payload?.prd_content) {
     return `/dev\n\n${task.payload.prd_content}`;
   }
-
   if (task.payload?.prd_path) {
     return `/dev ${task.payload.prd_path}`;
   }
 
-  // Fallback: Create a minimal PRD from task title/description
   const prd = `# PRD - ${task.title}
 
 ## 背景
@@ -104,19 +204,32 @@ async function updateTaskRunInfo(taskId, runId, status = 'triggered') {
 }
 
 /**
- * Trigger cecelia-run for a task
+ * Trigger cecelia-run for a task.
  *
- * This function:
- * 1. Prepares the prompt file
- * 2. Generates a run ID
- * 3. Launches cecelia-run asynchronously
- * 4. Updates task with run info
+ * v2: Uses spawn() for PID tracking + task-level dedup.
  *
  * @param {Object} task - The task object from database
- * @returns {Object} - { success, runId, taskId, error? }
+ * @returns {Object} - { success, runId, taskId, error?, reason? }
  */
 async function triggerCeceliaRun(task) {
   try {
+    // === DEDUP CHECK ===
+    const existing = activeProcesses.get(task.id);
+    if (existing && isProcessAlive(existing.pid)) {
+      console.log(`[executor] Task ${task.id} already running (pid=${existing.pid}), skipping`);
+      return {
+        success: false,
+        taskId: task.id,
+        reason: 'already_running',
+        existingPid: existing.pid,
+        existingRunId: existing.runId,
+      };
+    }
+    // Clean stale entry if process is dead
+    if (existing) {
+      activeProcesses.delete(task.id);
+    }
+
     await ensurePromptDir();
 
     const runId = generateRunId(task.id);
@@ -132,30 +245,59 @@ async function triggerCeceliaRun(task) {
     // 3. Update task with run info before execution
     await updateTaskRunInfo(task.id, runId, 'triggered');
 
-    // 4. Launch cecelia-run asynchronously (fire and forget)
-    // The callback webhook will handle completion
+    // 4. Launch cecelia-run with spawn() for PID tracking
     const logFile = `/tmp/cecelia-${task.id}.log`;
-    // Set WEBHOOK_URL to point to Brain API callback endpoint
     const webhookUrl = process.env.BRAIN_CALLBACK_URL || 'http://localhost:5212/api/brain/execution-callback';
-    const cmd = `cd "${WORK_DIR}" && WEBHOOK_URL="${webhookUrl}" nohup "${CECELIA_RUN_PATH}" "${task.id}" "${runId}" "${promptFile}" > "${logFile}" 2>&1 &`;
 
-    console.log(`[executor] Launching: ${cmd}`);
-
-    // Use exec without waiting for completion
-    exec(cmd, (error) => {
-      if (error) {
-        console.error(`[executor] Failed to launch cecelia-run: ${error.message}`);
-      }
+    const child = spawn(CECELIA_RUN_PATH, [task.id, runId, promptFile], {
+      cwd: WORK_DIR,
+      env: {
+        ...process.env,
+        WEBHOOK_URL: webhookUrl,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true, // Run in own process group for clean kill
     });
 
-    console.log(`[executor] Triggered run ${runId} for task ${task.id}`);
+    // Don't let child keep parent alive
+    child.unref();
+
+    // Redirect stdout/stderr to log file (non-blocking)
+    const fs = await import('fs');
+    const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+    child.stdout.pipe(logStream);
+    child.stderr.pipe(logStream);
+
+    // Track the process
+    activeProcesses.set(task.id, {
+      pid: child.pid,
+      startedAt: new Date().toISOString(),
+      runId,
+      process: child,
+    });
+
+    console.log(`[executor] Spawned pid=${child.pid} for task=${task.id} run=${runId}`);
+
+    // Auto-remove from registry when process exits
+    child.on('exit', (code, signal) => {
+      console.log(`[executor] Process exited: task=${task.id} pid=${child.pid} code=${code} signal=${signal}`);
+      activeProcesses.delete(task.id);
+      logStream.end();
+    });
+
+    child.on('error', (err) => {
+      console.error(`[executor] Process error: task=${task.id} pid=${child.pid} err=${err.message}`);
+      activeProcesses.delete(task.id);
+      logStream.end();
+    });
 
     return {
       success: true,
       runId,
       taskId: task.id,
+      pid: child.pid,
       promptFile,
-      logFile
+      logFile,
     };
 
   } catch (err) {
@@ -163,7 +305,7 @@ async function triggerCeceliaRun(task) {
     return {
       success: false,
       taskId: task.id,
-      error: err.message
+      error: err.message,
     };
   }
 }
@@ -173,7 +315,7 @@ async function triggerCeceliaRun(task) {
  */
 async function checkCeceliaRunAvailable() {
   try {
-    await execAsync(`test -x "${CECELIA_RUN_PATH}"`);
+    execSync(`test -x "${CECELIA_RUN_PATH}"`, { timeout: 5000 });
     return { available: true, path: CECELIA_RUN_PATH };
   } catch {
     return { available: false, path: CECELIA_RUN_PATH, error: 'Not found or not executable' };
@@ -199,9 +341,13 @@ async function getTaskExecutionStatus(taskId) {
       return { found: false };
     }
 
+    // Augment with live process info
+    const processInfo = activeProcesses.get(taskId);
     return {
       found: true,
-      ...result.rows[0]
+      ...result.rows[0],
+      process_alive: processInfo ? isProcessAlive(processInfo.pid) : false,
+      process_pid: processInfo?.pid || null,
     };
   } catch (err) {
     return { found: false, error: err.message };
@@ -214,5 +360,11 @@ export {
   getTaskExecutionStatus,
   updateTaskRunInfo,
   preparePrompt,
-  generateRunId
+  generateRunId,
+  // v2 additions
+  getActiveProcessCount,
+  getActiveProcesses,
+  killProcess,
+  cleanupOrphanProcesses,
+  isProcessAlive,
 };
