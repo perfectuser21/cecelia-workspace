@@ -207,7 +207,20 @@ async function autoGenerateTask(kr, project, state, options = {}) {
 
   // Strategy 2: V3 - Generate concrete task from KR decomposition
   const taskCandidate = generateTaskFromKR(kr, project, completedTitles, gap);
-  if (!taskCandidate) return null;
+  if (!taskCandidate) {
+    // Strategy exhausted: update KR progress based on completed tasks in the matched strategy
+    const strategy = KR_STRATEGIES.find(s => s.match(kr.title || ''));
+    if (strategy) {
+      const completedCount = strategy.tasks.filter(t =>
+        completedTitles.some(ct => ct === t.title || ct.includes(t.title) || t.title.includes(ct))
+      ).length;
+      const progress = Math.round((completedCount / strategy.tasks.length) * 100);
+      if (progress > (kr.progress || 0)) {
+        await pool.query('UPDATE goals SET progress = $1 WHERE id = $2', [progress, kr.id]);
+      }
+    }
+    return null;
+  }
 
   const priority = kr.priority || (gap > 50 ? 'P0' : gap > 25 ? 'P1' : 'P2');
 
@@ -261,6 +274,7 @@ const KR_STRATEGIES = [
   {
     name: 'intent_recognition',
     match: (krTitle) => /意图识别|intent|自然语言/.test(krTitle),
+    progressWeight: 4,
     tasks: [
       { title: '扩展 intent.js phrase patterns 覆盖率', description: '为每个意图类型补充更多中英文自然语言模式，提升匹配覆盖率至每类 10+ patterns' },
       { title: '添加 entity types（status/assignee/tag）', description: '新增 status、assignee、tag 等实体类型的提取 patterns' },
@@ -271,16 +285,18 @@ const KR_STRATEGIES = [
   {
     name: 'prd_trd_generation',
     match: (krTitle) => /PRD|TRD|自动生成|模板/.test(krTitle),
+    progressWeight: 4,
     tasks: [
-      { title: '实现 TRD 模板引擎', description: '基于 KR 上下文自动生成 TRD markdown 结构，包含里程碑分解' },
-      { title: '添加 PRD 验证逻辑', description: '实现 PRD 必填字段校验（需求来源、功能描述、成功标准、非目标）' },
-      { title: '实现 PRD 自动填充', description: '根据 KR metadata 和 project 信息自动填充 PRD 模板字段' },
-      { title: '添加 TRD→PRD 分解流水线测试', description: '编写端到端测试验证 TRD 分解为多个 Feature PRD 的流程' },
+      { title: 'PRD 生成端到端冒烟测试', description: '调用 POST /api/brain/generate/prd 验证返回的 markdown 通过 validatePrd 校验' },
+      { title: 'PRD 验证 API 集成测试', description: '调用 POST /api/brain/validate/prd 验证 valid=true/false 的不同输入' },
+      { title: 'TRD 分解结果持久化验证', description: '调用 POST /api/brain/trd/decompose 验证返回的 milestones 和 tasks 数量 > 0' },
+      { title: 'Planner 自动 PRD 质量达标', description: '验证 generateTaskPRD 生成的 PRD 能通过 validatePrd（score >= 60）' },
     ]
   },
   {
     name: 'planning_engine',
     match: (krTitle) => /Planning|规划|planner|调度/.test(krTitle),
+    progressWeight: 4,
     tasks: [
       { title: '升级 planner 任务分解逻辑', description: '将 generateTaskTitle 从简单字符串拼接改为基于 KR 上下文的具体任务推断' },
       { title: '实现 planner PRD 自动生成', description: '为每个自动生成的任务创建标准 PRD 文件，路径存入 task payload' },
@@ -291,6 +307,7 @@ const KR_STRATEGIES = [
   {
     name: 'self_healing',
     match: (krTitle) => /自修复|自愈|health|诊断/.test(krTitle),
+    progressWeight: 3,
     tasks: [
       { title: '实现服务健康检查 API', description: '添加 /api/health 端点，检查数据库、N8N、Cecelia 连接状态' },
       { title: '实现自动重启逻辑', description: '当健康检查失败时，自动重启对应服务组件' },
@@ -300,6 +317,7 @@ const KR_STRATEGIES = [
   {
     name: 'project_lifecycle',
     match: (krTitle) => /项目系统|生命周期|project.*管理/.test(krTitle),
+    progressWeight: 3,
     tasks: [
       { title: '实现项目状态机', description: '添加项目状态流转逻辑：planning → active → completed → archived' },
       { title: '添加项目进度自动计算', description: '根据关联任务完成率自动更新项目进度' },
@@ -309,6 +327,7 @@ const KR_STRATEGIES = [
   {
     name: 'frontend_display',
     match: (krTitle) => /前端|显示|实时|dashboard|UI/.test(krTitle),
+    progressWeight: 3,
     tasks: [
       { title: '实现执行状态实时展示组件', description: '在 Core 前端添加实时显示 Cecelia 执行状态的组件' },
       { title: '添加 WebSocket 状态推送', description: '后端通过 WebSocket 推送执行进度变更到前端' },
@@ -318,6 +337,7 @@ const KR_STRATEGIES = [
   {
     name: 'n8n_scheduling',
     match: (krTitle) => /N8N|调度|触发|workflow/.test(krTitle),
+    progressWeight: 3,
     tasks: [
       { title: '实现 N8N workflow 自动创建', description: '通过 API 自动创建和配置 N8N 调度 workflow' },
       { title: '添加任务并发控制', description: '限制 N8N 同时触发的 Cecelia 任务数量（max 3）' },
@@ -327,6 +347,7 @@ const KR_STRATEGIES = [
   {
     name: 'cecelia_dev_flow',
     match: (krTitle) => /Cecelia|执行|\/dev|完整流程/.test(krTitle),
+    progressWeight: 3,
     tasks: [
       { title: '修复 Cecelia 无头执行卡点', description: '排查并修复 Cecelia 无头模式下 /dev 流程的阻塞问题' },
       { title: '添加执行超时和重试机制', description: '为 Cecelia 执行添加超时检测和自动重试' },
@@ -336,6 +357,7 @@ const KR_STRATEGIES = [
   {
     name: 'conversation_interface',
     match: (krTitle) => /对话|接口|前台|chat/.test(krTitle),
+    progressWeight: 3,
     tasks: [
       { title: '实现对话式任务创建', description: '通过自然语言对话创建 OKR/Project/Task' },
       { title: '添加对话上下文管理', description: '维护对话历史，支持多轮对话引用' },

@@ -352,6 +352,84 @@ describe('Planner Agent', () => {
     });
   });
 
+  describe('V3: KR_STRATEGIES progressWeight', () => {
+    it('should have progressWeight === tasks.length for every strategy', async () => {
+      const { KR_STRATEGIES } = await import('../planner.js');
+      for (const strategy of KR_STRATEGIES) {
+        expect(strategy.progressWeight).toBe(strategy.tasks.length);
+      }
+    });
+
+    it('prd_trd_generation should have updated task titles', async () => {
+      const { KR_STRATEGIES } = await import('../planner.js');
+      const strategy = KR_STRATEGIES.find(s => s.name === 'prd_trd_generation');
+      expect(strategy).toBeDefined();
+      const titles = strategy.tasks.map(t => t.title);
+      expect(titles).toContain('PRD 生成端到端冒烟测试');
+      expect(titles).toContain('PRD 验证 API 集成测试');
+      expect(titles).toContain('TRD 分解结果持久化验证');
+      expect(titles).toContain('Planner 自动 PRD 质量达标');
+      // Old tasks should not be present
+      expect(titles).not.toContain('实现 TRD 模板引擎');
+      expect(titles).not.toContain('添加 PRD 验证逻辑');
+    });
+
+    it('strategy exhaustion should return null from generateTaskFromKR', async () => {
+      const { generateTaskFromKR, KR_STRATEGIES } = await import('../planner.js');
+      const kr = { id: 'kr-2', title: 'KR2: PRD/TRD 自动生成（标准化）', priority: 'P0', progress: 0 };
+      const project = { id: 'p-1', name: 'test', repo_path: '/tmp/test' };
+      const strategy = KR_STRATEGIES.find(s => s.name === 'prd_trd_generation');
+      const allTitles = strategy.tasks.map(t => t.title);
+
+      const result = generateTaskFromKR(kr, project, allTitles, 100);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('V3: autoGenerateTask progress update on exhaustion', () => {
+    it('should update KR progress when strategy tasks are exhausted', async () => {
+      const { autoGenerateTask } = await import('../planner.js');
+
+      // Create test KR with progress 0
+      const krResult = await pool.query(
+        "INSERT INTO goals (title, type, priority, status, progress) VALUES ('KR2: PRD/TRD 自动生成（标准化）', 'key_result', 'P0', 'pending', 0) RETURNING *"
+      );
+      testKRIds.push(krResult.rows[0].id);
+
+      const projResult = await pool.query(
+        "INSERT INTO projects (name, repo_path, status) VALUES ('progress-test', '/tmp/progress-test', 'active') RETURNING id"
+      );
+      testProjectIds.push(projResult.rows[0].id);
+
+      // Create completed tasks matching all 4 strategy titles
+      const strategyTitles = [
+        'PRD 生成端到端冒烟测试',
+        'PRD 验证 API 集成测试',
+        'TRD 分解结果持久化验证',
+        'Planner 自动 PRD 质量达标'
+      ];
+      for (const title of strategyTitles) {
+        const tResult = await pool.query(
+          "INSERT INTO tasks (title, priority, project_id, goal_id, status, completed_at) VALUES ($1, 'P0', $2, $3, 'completed', NOW()) RETURNING id",
+          [title, projResult.rows[0].id, krResult.rows[0].id]
+        );
+        testTaskIds.push(tResult.rows[0].id);
+      }
+
+      const kr = krResult.rows[0];
+      const project = { id: projResult.rows[0].id, name: 'progress-test', repo_path: '/tmp/progress-test' };
+      const state = { recentCompleted: [] };
+
+      // autoGenerateTask should return null (exhausted) and update KR progress
+      const result = await autoGenerateTask(kr, project, state);
+      expect(result).toBeNull();
+
+      // Verify KR progress was updated
+      const updated = await pool.query('SELECT progress FROM goals WHERE id = $1', [kr.id]);
+      expect(updated.rows[0].progress).toBe(100);
+    });
+  });
+
   describe('V3: generateTaskPRD', () => {
     it('should generate a PRD file with standard fields', async () => {
       const { generateTaskPRD } = await import('../planner.js');

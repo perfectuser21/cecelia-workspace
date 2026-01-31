@@ -1,5 +1,5 @@
 ---
-id: qa-decision-kr2-standardization
+id: qa-decision-planner-strategy-refresh
 version: 1.0.0
 created: 2026-01-31
 updated: 2026-01-31
@@ -14,21 +14,21 @@ Priority: P1
 RepoType: Engine
 
 Tests:
-  - dod_item: "validatePrd 验证必填字段"
+  - dod_item: "prd_trd_generation.tasks 包含 4 个新任务标题"
     method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
-  - dod_item: "validateTrd 验证必填节"
+    location: apps/core/src/brain/__tests__/planner.test.js
+  - dod_item: "每个 KR_STRATEGIES 策略有 progressWeight === tasks.length"
     method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
-  - dod_item: "generateTaskPRD 集成验证"
+    location: apps/core/src/brain/__tests__/planner.test.js
+  - dod_item: "generateNextTask 在策略耗尽时执行 UPDATE goals SET progress"
     method: auto
     location: apps/core/src/brain/__tests__/planner.test.js
   - dod_item: "现有测试全部通过"
     method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
+    location: apps/core/src/brain/__tests__/planner.test.js
 
 RCI:
   new: []
   update: []
 
-Reason: 添加验证函数，不修改现有生成逻辑，不涉及核心 Hook/Gate/CI 流程，通过单元测试覆盖。
+Reason: Planner 内部逻辑改进，不涉及核心 Hook/Gate/CI 流程，通过单元测试覆盖。
