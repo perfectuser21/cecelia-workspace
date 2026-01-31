@@ -17,6 +17,7 @@ import { emit as emitEvent } from './event-bus.js';
 import { recordSuccess as cbSuccess, recordFailure as cbFailure } from './circuit-breaker.js';
 import { notifyTaskCompleted, notifyTaskFailed } from './notifier.js';
 import { runDiagnosis } from './self-diagnosis.js';
+import { handleFailedTask, getRetryPolicy, forceRetry } from './retry-analyzer.js';
 import crypto from 'crypto';
 
 const router = Router();
@@ -1108,7 +1109,30 @@ router.post('/execution-callback', async (req, res) => {
       notifyTaskFailed({ task_id, title: `Task ${task_id}`, reason: status }).catch(() => {});
     }
 
-    // 5. Rollup progress to KR and O
+    // 5. Auto-retry failed tasks
+    let retryResult = null;
+    if (newStatus === 'failed') {
+      try {
+        const fullTask = await pool.query('SELECT * FROM tasks WHERE id = $1', [task_id]);
+        if (fullTask.rows.length > 0) {
+          const runResult = {
+            status,
+            result_summary: lastRunResult.result_summary,
+            elapsed_minutes: duration_ms ? Math.round(duration_ms / 60000) : 0
+          };
+          retryResult = await handleFailedTask(fullTask.rows[0], runResult);
+          if (retryResult.retryTask) {
+            console.log(`[execution-callback] Auto-retry created: ${retryResult.retryTask.id} (${retryResult.analysis.failureType})`);
+          } else {
+            console.log(`[execution-callback] No retry: ${retryResult.analysis.reason}`);
+          }
+        }
+      } catch (retryErr) {
+        console.error(`[execution-callback] Retry analysis error: ${retryErr.message}`);
+      }
+    }
+
+    // 6. Rollup progress to KR and O
     if (newStatus === 'completed' || newStatus === 'failed') {
       try {
         // Get the task's goal_id (which is a KR)
@@ -1151,7 +1175,7 @@ router.post('/execution-callback', async (req, res) => {
       }
     }
 
-    // 6. Event-driven: Trigger next task immediately after completion
+    // 7. Event-driven: Trigger next task immediately after completion
     let nextTickResult = null;
     if (newStatus === 'completed') {
       console.log(`[execution-callback] Task completed, triggering next tick...`);
@@ -1168,6 +1192,12 @@ router.post('/execution-callback', async (req, res) => {
       task_id,
       new_status: newStatus,
       message: `Task updated to ${newStatus}`,
+      retry: retryResult ? {
+        created: !!retryResult.retryTask,
+        failure_type: retryResult.analysis.failureType,
+        retry_task_id: retryResult.retryTask?.id || null,
+        reason: retryResult.analysis.reason
+      } : null,
       next_tick: nextTickResult
     });
 
@@ -1802,6 +1832,33 @@ router.get('/health', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ status: 'error', error: err.message });
+  }
+});
+
+// ==================== Retry API ====================
+
+/**
+ * GET /api/brain/retry-policy
+ * Get current retry policy configuration
+ */
+router.get('/retry-policy', (req, res) => {
+  res.json({ success: true, ...getRetryPolicy() });
+});
+
+/**
+ * POST /api/brain/tasks/:id/retry
+ * Force-retry a task (ignores retry count limit)
+ */
+router.post('/tasks/:id/retry', async (req, res) => {
+  try {
+    const result = await forceRetry(req.params.id);
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(404).json(result);
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to retry task', details: err.message });
   }
 });
 

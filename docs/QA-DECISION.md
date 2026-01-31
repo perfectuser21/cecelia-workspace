@@ -1,31 +1,28 @@
----
-id: qa-decision-prd-template-engine
-version: 1.0.0
-created: 2026-01-31
-updated: 2026-01-31
-changelog:
-  - 1.0.0: 初始版本
----
-
 # QA Decision
 
 Decision: NO_RCI
 Priority: P1
-RepoType: Engine
+RepoType: Business
 
 Tests:
-  - dod_item: "generatePrdFromGoalKR 输出包含完整字段"
+  - dod_item: "analyzeFailure() 归类 5 种失败类型"
     method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
-  - dod_item: "planner.js 调用 generatePrdFromGoalKR"
+    location: tests/brain/retry-analyzer.test.js
+  - dod_item: "execution-callback 自动重试入队"
     method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
-  - dod_item: "现有测试全部通过"
+    location: tests/brain/retry-analyzer.test.js
+  - dod_item: "autoFailTimedOutTasks 集成重试"
     method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
+    location: tests/brain/retry-analyzer.test.js
+  - dod_item: "retry-policy API"
+    method: manual
+    location: manual:curl GET /api/brain/retry-policy
+  - dod_item: "手动重试 API"
+    method: manual
+    location: manual:curl POST /api/brain/tasks/:id/retry
 
 RCI:
   new: []
   update: []
 
-Reason: 模板引擎增强，不涉及核心 Hook/Gate/CI 流程，通过单元测试覆盖。
+Reason: 新增失败重试模块，不涉及 Engine 核心（Hook/Gate/CI），业务逻辑用单元测试覆盖即可。

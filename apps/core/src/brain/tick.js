@@ -11,6 +11,7 @@ import { compareGoalProgress, generateDecision, executeDecision } from './decisi
 import { planNextTask } from './planner.js';
 import { emit } from './event-bus.js';
 import { isAllowed, recordSuccess, recordFailure, getAllStates } from './circuit-breaker.js';
+import { handleFailedTask } from './retry-analyzer.js';
 
 // Tick configuration
 const TICK_INTERVAL_MINUTES = 5;
@@ -452,6 +453,26 @@ async function autoFailTimedOutTasks(inProgressTasks) {
         title: task.title,
         elapsed_minutes: Math.round(elapsed)
       });
+
+      // Auto-retry analysis
+      try {
+        const runResult = {
+          status: 'timeout',
+          result_summary: `Auto-failed after ${Math.round(elapsed)} minutes`,
+          elapsed_minutes: Math.round(elapsed)
+        };
+        const retryResult = await handleFailedTask(task, runResult);
+        if (retryResult.retryTask) {
+          actions.push({
+            action: 'auto-retry',
+            original_task_id: task.id,
+            retry_task_id: retryResult.retryTask.id,
+            failure_type: retryResult.analysis.failureType
+          });
+        }
+      } catch (retryErr) {
+        console.error(`[tick-loop] Retry analysis error for ${task.id}: ${retryErr.message}`);
+      }
     }
   }
   return actions;
