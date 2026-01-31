@@ -1,0 +1,15 @@
+Decision: PASS
+Reviewed at: 2026-02-01T06:40:00+08:00
+Reviewed by: gate:test subagent
+
+Findings:
+- [PASS] DoD↔测试覆盖率：10/10 验收项有测试
+- [PASS] 边界用例：全面覆盖
+- [PASS] 反例测试：充分
+- [PASS] 测试质量：优秀
+
+Evidence:
+- intent.test.js: 93 个测试用例（单元测试）
+- intent.test.ts: 30+ 个测试用例（集成测试）
+- 覆盖：意图分类、实体提取、API响应、错误处理、性能测试
+- Quality: 准确率 > 80%, 覆盖率 > 70%, p95 < 500ms

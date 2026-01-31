@@ -1,11 +1,10 @@
 ---
-id: qa-decision-kr2-advance
-version: 1.1.0
+id: qa-decision-kr1-advance
+version: 1.0.0
 created: 2026-02-01
 updated: 2026-02-01
 changelog:
-  - 1.1.0: 修正测试引用（.ts → .js，auto → manual），RCI 决策改为 NO_RCI（调查任务）
-  - 1.0.0: 初始版本（KR2 PRD/TRD 生成验证与修复）
+  - 1.0.0: 初始版本（KR1 意图识别功能开发）
 ---
 
 # QA Decision
@@ -15,72 +14,88 @@ Priority: P0
 RepoType: Business
 
 Tests:
-  - dod_item: "找到 Brain 中 PRD/TRD 生成的代码位置，定位到具体文件和函数"
-    method: manual
-    location: manual:检查 apps/core/src/brain/templates.js 和 planner.js，确认 generateTrdFromGoalKR 或相关函数存在
-
-  - dod_item: "手动测试生成功能：创建测试 Goal，验证生成的 TRD 包含 title、requirements、success_criteria"
-    method: manual
-    location: manual:创建测试 Goal 并验证生成结果
-
-  - dod_item: "运行自动化测试，90% 以上通过率"
+  - dod_item: "能够识别创建任务的意图"
     method: auto
-    location: apps/core/src/brain/__tests__/*.test.js
+    location: apps/core/src/brain/__tests__/intent.test.js
 
-  - dod_item: "查看 Brain decision_log，找到最近 10 次 'Advance KR2' 相关的失败记录"
-    method: manual
-    location: manual:查询 Core API `/api/brain/decisions` 或直接查询 decision_log 表
-
-  - dod_item: "识别共同失败模式：记录错误堆栈、错误消息、失败步骤到文档"
-    method: manual
-    location: manual:分析日志并记录到 docs/KR2-FAILURE-ANALYSIS.md
-
-  - dod_item: "定位根本原因：确定是代码 bug、配置问题、依赖缺失还是逻辑错误"
-    method: manual
-    location: manual:代码审查和调试分析
-
-  - dod_item: "如果发现代码 bug，修复后重新测试通过"
-    method: manual
-    location: manual:修复后重新运行相关测试验证
-
-  - dod_item: "如果是配置问题，更新配置并验证"
-    method: manual
-    location: manual:检查配置文件和环境变量
-
-  - dod_item: "添加或修复相关单元测试，确保覆盖失败场景"
-    method: manual
-    location: manual:检查 apps/core/src/brain/__tests__/templates.test.js，验证包含失败场景测试用例
-
-  - dod_item: "使用 Brain API 更新失败任务状态为 completed"
-    method: manual
-    location: manual:验证 API 调用响应 200
-
-  - dod_item: "验证 `GET /api/brain/status` 中 p0 任务列表不再包含 'Advance KR2' 的 failed 任务"
-    method: manual
-    location: manual:检查 API 响应中 p0 数组
-
-  - dod_item: "确认 Brain system_health 中 stale_tasks = 0"
-    method: manual
-    location: manual:检查 status 响应中的 system_health 字段
-
-  - dod_item: "如果 KR2 确实已完成，验证功能正常工作"
-    method: manual
-    location: manual:端到端验证 PRD/TRD 生成流程
-
-  - dod_item: "如果 KR2 未完成，更新 Brain 中的 KR2 progress 为正确值"
-    method: manual
-    location: manual:验证 API 更新结果
-
-  - dod_item: "记录验证结果到文档 `docs/KR2-VERIFICATION.md`"
-    method: manual
-    location: manual:检查文件是否存在且包含验证结果
-
-  - dod_item: "相关单元测试通过（如果有修改代码）"
+  - dod_item: "能够识别创建目标的意图"
     method: auto
-    location: apps/core/src/brain/__tests__/*.test.js
+    location: apps/core/src/brain/__tests__/intent.test.js
+
+  - dod_item: "能够识别创建项目的意图"
+    method: auto
+    location: apps/core/src/brain/__tests__/intent.test.js
+
+  - dod_item: "分类准确率：在测试集上达到 80% 以上"
+    method: auto
+    location: apps/core/src/brain/__tests__/intent.test.js
+
+  - dod_item: "能够提取标题"
+    method: auto
+    location: apps/core/src/brain/__tests__/intent.test.js
+
+  - dod_item: "能够提取描述"
+    method: auto
+    location: apps/core/src/brain/__tests__/intent.test.js
+
+  - dod_item: "能够提取优先级"
+    method: auto
+    location: apps/core/src/brain/__tests__/intent.test.js
+
+  - dod_item: "能够提取时间范围"
+    method: auto
+    location: apps/core/src/brain/__tests__/intent.test.js
+
+  - dod_item: "实体提取覆盖率：至少 70% 的输入能成功提取标题"
+    method: auto
+    location: apps/core/src/brain/__tests__/intent.test.js
+
+  - dod_item: "POST /api/intent/parse 端点正常响应"
+    method: auto
+    location: apps/core/src/routes/api/__tests__/intent.test.ts
+
+  - dod_item: "返回格式包含 type/entities/confidence"
+    method: auto
+    location: apps/core/src/routes/api/__tests__/intent.test.ts
+
+  - dod_item: "错误情况返回合理的错误信息和状态码"
+    method: auto
+    location: apps/core/src/routes/api/__tests__/intent.test.ts
+
+  - dod_item: "API 响应时间 < 500ms (p95)"
+    method: auto
+    location: apps/core/src/routes/api/__tests__/intent.test.ts
+
+  - dod_item: "单元测试通过率 > 90%"
+    method: auto
+    location: apps/core/src/brain/__tests__/intent.test.js
+
+  - dod_item: "集成测试覆盖主要场景"
+    method: auto
+    location: apps/core/src/routes/api/__tests__/intent.test.ts
+
+  - dod_item: "至少包含 10 个真实场景的测试用例"
+    method: manual
+    location: manual:检查 apps/core/src/brain/__tests__/intent.test.js 和 apps/core/src/routes/api/__tests__/intent.test.ts 总共包含至少 10 个测试用例
+
+  - dod_item: "npm run qa 通过"
+    method: auto
+    location: CI pipeline
+
+  - dod_item: "在 docs/ 目录创建 INTENT-RECOGNITION.md 文档"
+    method: manual
+    location: manual:检查文件 /home/xx/dev/cecelia-workspace-wt--Retry-Advance-KR1-OKR-Project/docs/INTENT-RECOGNITION.md 存在
+
+  - dod_item: "文档包含功能说明、API使用示例、支持的短语模式、扩展方法"
+    method: manual
+    location: manual:审查 docs/INTENT-RECOGNITION.md 内容完整性
+
+  - dod_item: "代码中关键函数有清晰的 JSDoc 注释"
+    method: manual
+    location: manual:审查 apps/core/src/brain/intent.js 和 apps/core/src/routes/api/intent.ts 的代码注释质量
 
 RCI:
   new: []
   update: []
 
-Reason: P0 核心功能验证任务。本任务为调查分析性质，重点是验证现有功能状态和清理失败任务，不涉及新功能开发，因此不新增 RCI。如果发现 bug 需要修复，将在修复 PR 中评估是否需要添加回归契约。
+Reason: 此任务是业务功能开发（意图识别API），不涉及核心引擎（Hook/Gate/CI），所有验收标准均可通过单元测试和集成测试自动化验证，文档相关项目通过人工审查，无需新增或更新回归契约。

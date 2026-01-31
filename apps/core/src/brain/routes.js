@@ -665,23 +665,99 @@ async function executeQueryStatus(parsedIntent) {
  *     }
  *   }
  */
+/**
+ * POST /api/brain/intent/parse
+ * Parse natural language input and return structured intent information
+ *
+ * Request body:
+ *   { input: "帮我做个登录功能" }
+ *
+ * Response (KR1 format):
+ *   {
+ *     type: 'task' | 'goal' | 'project',
+ *     entities: {
+ *       title: string,
+ *       description?: string,
+ *       priority?: 'P0'|'P1'|'P2',
+ *       timeframe?: string,
+ *       ...
+ *     },
+ *     confidence: number (0-1)
+ *   }
+ */
 router.post('/intent/parse', async (req, res) => {
+  const startTime = Date.now();
+
   try {
     const { input } = req.body;
 
-    if (!input || typeof input !== 'string') {
+    // L2-001 fix: Validate at API boundary
+    if (!input || typeof input !== 'string' || input.trim().length === 0) {
       return res.status(400).json({
         success: false,
-        error: 'input is required and must be a string'
+        error: 'input is required and must be a non-empty string'
       });
     }
 
+    // L2-003 fix: Check length limit at API boundary
+    if (input.trim().length > 10000) {
+      return res.status(400).json({
+        success: false,
+        error: 'Input too long, maximum 10000 characters allowed'
+      });
+    }
+
+    // Parse intent using existing function
     const parsed = await parseIntent(input);
+
+    // Map intent type to simplified format (KR1 requirement)
+    const typeMap = {
+      'create_task': 'task',
+      'create_feature': 'task',
+      'fix_bug': 'task',
+      'refactor': 'task',
+      'create_goal': 'goal',
+      'create_project': 'project',
+      'query_status': 'query',
+      'explore': 'query',
+      'question': 'query',
+      'unknown': 'unknown'
+    };
+
+    const simplifiedType = typeMap[parsed.intentType] || 'unknown';
+
+    // Build structured response (KR1 format)
+    const response = {
+      type: simplifiedType,
+      entities: {
+        title: parsed.entities.module || parsed.entities.feature || parsed.projectName || input.slice(0, 50),
+        description: input,
+        priority: parsed.entities.priority || null,
+        timeframe: parsed.entities.timeframe || null,
+        module: parsed.entities.module || null,
+        feature: parsed.entities.feature || null,
+        filePath: parsed.entities.filePath || null,
+        apiEndpoint: parsed.entities.apiEndpoint || null,
+        component: parsed.entities.component || null,
+        dependency: parsed.entities.dependency || null
+      },
+      confidence: parsed.confidence
+    };
+
+    // Calculate response time
+    const responseTime = Date.now() - startTime;
 
     res.json({
       success: true,
-      parsed,
-      intent_types: INTENT_TYPES
+      ...response,
+      // Include metadata for debugging (optional)
+      _meta: {
+        responseTime,
+        confidenceLevel: parsed.confidenceLevel,
+        originalIntentType: parsed.intentType,
+        keywords: parsed.keywords,
+        matchedPhrases: parsed.matchedPhrases
+      }
     });
   } catch (err) {
     res.status(500).json({
