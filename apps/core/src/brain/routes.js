@@ -796,11 +796,24 @@ router.post('/execution-callback', async (req, res) => {
 
     console.log(`[execution-callback] Task ${task_id} updated to ${newStatus}`);
 
+    // 5. Event-driven: Trigger next task immediately after completion
+    let nextTickResult = null;
+    if (newStatus === 'completed') {
+      console.log(`[execution-callback] Task completed, triggering next tick...`);
+      try {
+        nextTickResult = await executeTick();
+        console.log(`[execution-callback] Next tick triggered, actions: ${nextTickResult.actions_taken?.length || 0}`);
+      } catch (tickErr) {
+        console.error(`[execution-callback] Failed to trigger next tick: ${tickErr.message}`);
+      }
+    }
+
     res.json({
       success: true,
       task_id,
       new_status: newStatus,
-      message: `Task updated to ${newStatus}`
+      message: `Task updated to ${newStatus}`,
+      next_tick: nextTickResult
     });
 
   } catch (err) {
