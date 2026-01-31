@@ -506,6 +506,138 @@ function generatePrdFromGoalKR(params) {
 }
 
 /**
+ * Common action verbs for acceptance criteria validation
+ */
+const ACTION_VERBS = [
+  '显示', '返回', '创建', '检查', '支持', '调用', '发送', '接收',
+  '验证', '生成', '删除', '更新', '修改', '添加', '移除', '触发',
+  '启动', '停止', '重启', '加载', '保存', '导出', '导入', '解析',
+  '渲染', '跳转', '提交', '取消', '确认', '拒绝', '通过', '失败',
+  '运行', '执行', '完成', '响应', '处理', '过滤', '排序', '搜索',
+  '输入', '输出', '点击', '选择', '切换', '展开', '折叠', '刷新',
+  'display', 'return', 'create', 'check', 'support', 'call', 'send',
+  'receive', 'validate', 'generate', 'delete', 'update', 'modify',
+  'add', 'remove', 'trigger', 'start', 'stop', 'load', 'save',
+  'export', 'import', 'parse', 'render', 'submit', 'cancel', 'run',
+  'execute', 'respond', 'filter', 'sort', 'search', 'click', 'select'
+];
+
+/**
+ * Extract section content from markdown by header
+ * @param {string} content - Markdown content
+ * @param {string} header - Section header text
+ * @returns {string|null} Section content or null
+ */
+function extractSection(content, header) {
+  const escapedHeader = header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`^##\\s+${escapedHeader}\\s*$`, 'm');
+  const match = content.search(regex);
+  if (match === -1) return null;
+
+  const afterHeader = content.slice(match);
+  const lines = afterHeader.split('\n');
+  const bodyLines = lines.slice(1);
+  const endIdx = bodyLines.findIndex(line => /^##\s/.test(line));
+  const sectionLines = endIdx === -1 ? bodyLines : bodyLines.slice(0, endIdx);
+  return sectionLines.join('\n').trim();
+}
+
+/**
+ * Validate PRD content quality
+ * @param {string} prdContent - PRD markdown content
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+function validatePrd(prdContent) {
+  const errors = [];
+
+  const requiredSections = PRD_TEMPLATE.sections.filter(s => s.required);
+  for (const section of requiredSections) {
+    const content = extractSection(prdContent, section.title);
+    if (content === null) {
+      errors.push(`Missing required section: ${section.title}`);
+    }
+  }
+
+  const objectives = extractSection(prdContent, '目标');
+  if (objectives !== null && !/^[-*]\s/m.test(objectives)) {
+    errors.push('目标 section must contain at least 1 bullet point');
+  }
+
+  const funcReq = extractSection(prdContent, '功能需求');
+  if (funcReq !== null && funcReq.length < 50) {
+    errors.push('功能需求 section must be at least 50 characters');
+  }
+
+  const criteria = extractSection(prdContent, '验收标准');
+  if (criteria !== null) {
+    const bullets = criteria.split('\n').filter(line => /^[-*]\s|\[.\]/.test(line.trim()));
+    for (const bullet of bullets) {
+      const hasVerb = ACTION_VERBS.some(verb => bullet.includes(verb));
+      if (!hasVerb) {
+        errors.push(`Acceptance criterion lacks action verb: "${bullet.trim().slice(0, 60)}"`);
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Validate TRD content quality
+ * @param {string} trdContent - TRD markdown content
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+function validateTrd(trdContent) {
+  const errors = [];
+
+  const requiredHeaders = ['技术背景', '架构设计', '测试策略'];
+  for (const header of requiredHeaders) {
+    const content = extractSection(trdContent, header);
+    if (content === null) {
+      errors.push(`Missing required section: ${header}`);
+    } else if (content.trim().length === 0) {
+      errors.push(`Section is empty: ${header}`);
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Parse PRD markdown into structured JSON
+ * @param {string} prdContent - PRD markdown content
+ * @returns {Object} Structured PRD object
+ */
+function prdToJson(prdContent) {
+  const titleMatch = prdContent.match(/^#\s+(.+)$/m);
+  const title = titleMatch ? titleMatch[1].replace(/^PRD\s*-\s*/, '') : '';
+
+  const sections = {};
+  for (const section of PRD_TEMPLATE.sections) {
+    sections[section.id] = extractSection(prdContent, section.title) || '';
+  }
+
+  return { title, sections };
+}
+
+/**
+ * Parse TRD markdown into structured JSON
+ * @param {string} trdContent - TRD markdown content
+ * @returns {Object} Structured TRD object
+ */
+function trdToJson(trdContent) {
+  const titleMatch = trdContent.match(/^#\s+(.+)$/m);
+  const title = titleMatch ? titleMatch[1].replace(/^TRD\s*-\s*/, '') : '';
+
+  const sections = {};
+  for (const section of TRD_TEMPLATE.sections) {
+    sections[section.id] = extractSection(trdContent, section.title) || '';
+  }
+
+  return { title, sections };
+}
+
+/**
  * Get template by name
  * @param {string} templateName - Template name ('prd' or 'trd')
  * @returns {Object|null} Template object
@@ -541,5 +673,10 @@ export {
   generateTrdFromGoal,
   getTemplate,
   listTemplates,
-  getCurrentDate
+  getCurrentDate,
+  validatePrd,
+  validateTrd,
+  prdToJson,
+  trdToJson,
+  extractSection
 };
