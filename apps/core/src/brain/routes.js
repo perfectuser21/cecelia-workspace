@@ -8,7 +8,7 @@ import { getTickStatus, enableTick, disableTick, executeTick, runTickSafe } from
 import { parseIntent, parseAndCreate, INTENT_TYPES, INTENT_ACTION_MAP, extractEntities, classifyIntent, getSuggestedAction } from './intent.js';
 import pool from '../task-system/db.js';
 import { decomposeTRD, getTRDProgress, listTRDs } from './decomposer.js';
-import { generatePrdFromTask, generateTrdFromGoal, PRD_TYPE_MAP } from './templates.js';
+import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, PRD_TYPE_MAP } from './templates.js';
 import { compareGoalProgress, generateDecision, executeDecision, getDecisionHistory, rollbackDecision } from './decision.js';
 import { planNextTask, getPlanStatus, handlePlanInput } from './planner.js';
 import { ensureEventsTable, queryEvents, getEventCounts } from './event-bus.js';
@@ -17,6 +17,7 @@ import { emit as emitEvent } from './event-bus.js';
 import { recordSuccess as cbSuccess, recordFailure as cbFailure } from './circuit-breaker.js';
 import { notifyTaskCompleted, notifyTaskFailed } from './notifier.js';
 import { runDiagnosis } from './self-diagnosis.js';
+import { getRetrySummary } from './retry-analyzer.js';
 import crypto from 'crypto';
 
 const router = Router();
@@ -115,13 +116,14 @@ router.get('/status', async (req, res) => {
     // 支持 ?mode=interactive|scheduled|incident
     const decisionMode = req.query.mode || 'interactive';
 
-    const [policy, workingMemory, topTasks, recentDecisions, snapshot, dailyFocus] = await Promise.all([
+    const [policy, workingMemory, topTasks, recentDecisions, snapshot, dailyFocus, retrySummary] = await Promise.all([
       getActivePolicy(),
       getWorkingMemory(),
       getTopTasks(10),
       getRecentDecisions(5),
       getLatestSnapshot(),
-      getFocusSummary()
+      getFocusSummary(),
+      getRetrySummary().catch(() => ({ failed_count: 0, retrying_count: 0, abandoned_count: 0 }))
     ]);
 
     const now = new Date();
@@ -218,7 +220,8 @@ router.get('/status', async (req, res) => {
           in_progress: topTasks.filter(t => t.status === 'in_progress').length,
           queued: topTasks.filter(t => t.status === 'queued').length,
           overdue: topTasks.filter(t => t.due_at && new Date(t.due_at) < now && t.status !== 'completed').length
-        }
+        },
+        retry_summary: retrySummary
       }
     };
 
@@ -1206,12 +1209,54 @@ router.get('/executor/status', async (req, res) => {
  */
 router.post('/generate/prd', async (req, res) => {
   try {
-    const { title, description, type = 'feature' } = req.body;
+    const { title, description, type = 'feature', goal_id } = req.body;
 
     if (!title) {
       return res.status(400).json({
         success: false,
         error: 'title is required'
+      });
+    }
+
+    if (goal_id) {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(goal_id)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid goal_id format (must be UUID)'
+        });
+      }
+
+      const goalResult = await pool.query('SELECT * FROM goals WHERE id = $1', [goal_id]);
+      const goal = goalResult.rows[0];
+
+      let projectData = null;
+      if (goal) {
+        const linkResult = await pool.query(
+          'SELECT p.* FROM projects p JOIN project_kr_links l ON p.id = l.project_id WHERE l.kr_id = $1 LIMIT 1',
+          [goal_id]
+        );
+        if (linkResult.rows[0]) {
+          projectData = { name: linkResult.rows[0].name, repo_path: linkResult.rows[0].repo_path };
+        }
+      }
+
+      const prd = generatePrdFromGoalKR({
+        title,
+        description: description || '',
+        kr: goal ? { title: goal.title, progress: goal.progress, priority: goal.priority } : undefined,
+        project: projectData || undefined
+      });
+
+      return res.json({
+        success: true,
+        prd,
+        metadata: {
+          title,
+          goal_id,
+          goal_found: !!goal,
+          generated_at: new Date().toISOString()
+        }
       });
     }
 
