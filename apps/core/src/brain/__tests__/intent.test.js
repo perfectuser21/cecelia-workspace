@@ -8,6 +8,7 @@ import pg from 'pg';
 import {
   INTENT_TYPES,
   classifyIntent,
+  extractEntities,
   extractProjectName,
   generateTasks,
   generatePrdDraft,
@@ -109,6 +110,36 @@ describe('Intent Recognition Module', () => {
 
       expect(result.type).toBe(INTENT_TYPES.CREATE_PROJECT);
       expect(result.keywords).toContain('create');
+    });
+  });
+
+  describe('extractEntities', () => {
+    it('extracts module name from Chinese input', () => {
+      const entities = extractEntities('给用户管理模块添加批量导入功能');
+
+      expect(entities.module).toBeTruthy();
+      expect(entities.module).toContain('用户管理');
+    });
+
+    it('extracts feature name from input', () => {
+      const entities = extractEntities('添加批量导入功能');
+
+      expect(entities.feature).toBeTruthy();
+      expect(entities.feature).toContain('批量导入');
+    });
+
+    it('extracts file path from input', () => {
+      const entities = extractEntities('修改 src/brain/intent.js 文件');
+
+      expect(entities.filePath).toBe('src/brain/intent.js');
+    });
+
+    it('returns falsy values for missing entities', () => {
+      const entities = extractEntities('hello world');
+
+      expect(entities.module).toBeFalsy();
+      expect(entities.feature).toBeFalsy();
+      expect(entities.filePath).toBeFalsy();
     });
   });
 

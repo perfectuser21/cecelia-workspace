@@ -55,14 +55,110 @@ const INTENT_KEYWORDS = {
 };
 
 /**
+ * Phrase patterns for more accurate intent classification
+ * Each pattern has a weight that adds to the confidence score
+ */
+const INTENT_PHRASES = {
+  [INTENT_TYPES.CREATE_PROJECT]: [
+    { pattern: /我想做一个(.+)/, weight: 0.3 },
+    { pattern: /帮我创建一个(.+)/, weight: 0.3 },
+    { pattern: /开发一个(.+)系统/, weight: 0.3 },
+    { pattern: /搭建(.+)平台/, weight: 0.3 },
+    { pattern: /build\s+a\s+(.+)/i, weight: 0.3 },
+    { pattern: /create\s+(.+)\s+project/i, weight: 0.3 }
+  ],
+  [INTENT_TYPES.CREATE_FEATURE]: [
+    { pattern: /给(.+)加一个(.+)功能/, weight: 0.4 },
+    { pattern: /给(.+)添加(.+)/, weight: 0.3 },
+    { pattern: /在(.+)中增加(.+)/, weight: 0.3 },
+    { pattern: /为(.+)实现(.+)/, weight: 0.3 },
+    { pattern: /add\s+(.+)\s+to\s+(.+)/i, weight: 0.3 },
+    { pattern: /implement\s+(.+)\s+feature/i, weight: 0.3 }
+  ],
+  [INTENT_TYPES.FIX_BUG]: [
+    { pattern: /修复(.+)的(.+)问题/, weight: 0.4 },
+    { pattern: /解决(.+)bug/, weight: 0.4 },
+    { pattern: /(.+)报错/, weight: 0.3 },
+    { pattern: /(.+)不工作/, weight: 0.3 },
+    { pattern: /fix\s+(.+)\s+bug/i, weight: 0.4 },
+    { pattern: /resolve\s+(.+)\s+issue/i, weight: 0.3 }
+  ],
+  [INTENT_TYPES.REFACTOR]: [
+    { pattern: /重构(.+)代码/, weight: 0.4 },
+    { pattern: /优化(.+)性能/, weight: 0.4 },
+    { pattern: /改进(.+)结构/, weight: 0.3 },
+    { pattern: /refactor\s+(.+)/i, weight: 0.4 },
+    { pattern: /optimize\s+(.+)/i, weight: 0.3 }
+  ],
+  [INTENT_TYPES.EXPLORE]: [
+    { pattern: /帮我看看(.+)/, weight: 0.3 },
+    { pattern: /了解一下(.+)/, weight: 0.3 },
+    { pattern: /分析(.+)怎么/, weight: 0.3 },
+    { pattern: /investigate\s+(.+)/i, weight: 0.3 },
+    { pattern: /analyze\s+(.+)/i, weight: 0.3 }
+  ],
+  [INTENT_TYPES.QUESTION]: [
+    { pattern: /为什么(.+)[?？]/, weight: 0.4 },
+    { pattern: /怎么(.+)[?？]/, weight: 0.4 },
+    { pattern: /如何(.+)[?？]/, weight: 0.4 },
+    { pattern: /(.+)是什么/, weight: 0.3 },
+    { pattern: /why\s+(.+)\?/i, weight: 0.4 },
+    { pattern: /how\s+(.+)\?/i, weight: 0.4 }
+  ]
+};
+
+/**
+ * Entity extraction patterns
+ * Extract specific entities from the input text
+ */
+const ENTITY_PATTERNS = {
+  // Project/Module name patterns
+  module: [
+    /(.+)模块/,
+    /(.+)系统/,
+    /(.+)平台/,
+    /(.+)服务/,
+    /(\w+)\s+module/i,
+    /(\w+)\s+service/i
+  ],
+  // Feature name patterns
+  feature: [
+    /(.+)功能/,
+    /(.+)特性/,
+    /(\w+)\s+feature/i,
+    /(\w+)\s+capability/i
+  ],
+  // File path patterns
+  filePath: [
+    /(src\/[\w\/.-]+)/,
+    /(apps\/[\w\/.-]+)/,
+    /([\w-]+\.(js|ts|tsx|jsx|py|go|rs))/
+  ],
+  // API endpoint patterns
+  apiEndpoint: [
+    /\/api\/[\w\/-]+/,
+    /POST\s+(\/[\w\/-]+)/i,
+    /GET\s+(\/[\w\/-]+)/i
+  ],
+  // Component name patterns
+  component: [
+    /([A-Z][a-zA-Z]+)(组件|Component)/,
+    /<([A-Z][a-zA-Z]+)/
+  ]
+};
+
+/**
  * Classify intent from natural language input
+ * Enhanced with phrase pattern matching for better accuracy
  * @param {string} input - Natural language input
- * @returns {{ type: string, confidence: number, keywords: string[] }}
+ * @returns {{ type: string, confidence: number, keywords: string[], matchedPhrases: string[] }}
  */
 function classifyIntent(input) {
   const inputLower = input.toLowerCase();
   const matchedKeywords = {};
+  const matchedPhrases = {};
 
+  // Step 1: Keyword matching
   for (const [intentType, keywords] of Object.entries(INTENT_KEYWORDS)) {
     const matches = keywords.filter(kw => inputLower.includes(kw.toLowerCase()));
     if (matches.length > 0) {
@@ -70,27 +166,98 @@ function classifyIntent(input) {
     }
   }
 
-  // Find intent with most keyword matches
-  let bestIntent = INTENT_TYPES.UNKNOWN;
-  let bestScore = 0;
-  let bestKeywords = [];
-
-  for (const [intentType, matches] of Object.entries(matchedKeywords)) {
-    if (matches.length > bestScore) {
-      bestScore = matches.length;
-      bestIntent = intentType;
-      bestKeywords = matches;
+  // Step 2: Phrase pattern matching (adds confidence weight)
+  for (const [intentType, phrases] of Object.entries(INTENT_PHRASES)) {
+    for (const { pattern, weight } of phrases) {
+      const match = input.match(pattern);
+      if (match) {
+        if (!matchedPhrases[intentType]) {
+          matchedPhrases[intentType] = { patterns: [], totalWeight: 0 };
+        }
+        matchedPhrases[intentType].patterns.push(pattern.source);
+        matchedPhrases[intentType].totalWeight += weight;
+      }
     }
   }
 
-  // Calculate confidence (0-1)
-  const confidence = Math.min(bestScore / 3, 1);
+  // Step 3: Calculate combined score
+  let bestIntent = INTENT_TYPES.UNKNOWN;
+  let bestScore = 0;
+  let bestKeywords = [];
+  let bestPhrasePatterns = [];
+
+  // Combine keyword and phrase scores
+  const allIntentTypes = new Set([
+    ...Object.keys(matchedKeywords),
+    ...Object.keys(matchedPhrases)
+  ]);
+
+  for (const intentType of allIntentTypes) {
+    const keywordScore = matchedKeywords[intentType]?.length || 0;
+    const phraseData = matchedPhrases[intentType] || { patterns: [], totalWeight: 0 };
+
+    // Combined score: keyword matches (normalized) + phrase weight bonus
+    const combinedScore = (keywordScore / 3) + phraseData.totalWeight;
+
+    if (combinedScore > bestScore) {
+      bestScore = combinedScore;
+      bestIntent = intentType;
+      bestKeywords = matchedKeywords[intentType] || [];
+      bestPhrasePatterns = phraseData.patterns;
+    }
+  }
+
+  // Calculate confidence (0-1), capped at 1.0
+  const confidence = Math.min(bestScore, 1);
 
   return {
     type: bestIntent,
     confidence,
-    keywords: bestKeywords
+    keywords: bestKeywords,
+    matchedPhrases: bestPhrasePatterns
   };
+}
+
+/**
+ * Extract entities from natural language input
+ * @param {string} input - Natural language input
+ * @returns {Object} - Extracted entities
+ */
+function extractEntities(input) {
+  const entities = {
+    module: null,
+    feature: null,
+    filePath: null,
+    apiEndpoint: null,
+    component: null
+  };
+
+  for (const [entityType, patterns] of Object.entries(ENTITY_PATTERNS)) {
+    for (const pattern of patterns) {
+      const match = input.match(pattern);
+      if (match && match[1]) {
+        // Clean up the extracted value
+        let value = match[1].trim();
+
+        // For module/feature, remove common suffixes that are part of the pattern
+        if (entityType === 'module') {
+          value = value.replace(/(模块|系统|平台|服务)$/, '').trim();
+        }
+        if (entityType === 'feature') {
+          value = value.replace(/(功能|特性)$/, '').trim();
+        }
+
+        if (value && !entities[entityType]) {
+          entities[entityType] = value;
+        }
+      }
+    }
+  }
+
+  // Remove null values
+  return Object.fromEntries(
+    Object.entries(entities).filter(([, v]) => v !== null)
+  );
 }
 
 /**
@@ -125,16 +292,20 @@ function extractProjectName(input, _intentType) {
 
 /**
  * Generate tasks for a project based on intent
+ * Enhanced with entity-aware task generation
  * @param {string} projectName - Project name
  * @param {string} intentType - Intent type
  * @param {string} input - Original input
+ * @param {Object} entities - Extracted entities
  * @returns {Array<{title: string, description: string, priority: string}>}
  */
-function generateTasks(projectName, intentType, _input) {
+function generateTasks(projectName, intentType, _input, entities = {}) {
   const tasks = [];
+  const featureName = entities.feature || projectName;
+  const moduleName = entities.module || projectName;
 
-  if (intentType === INTENT_TYPES.CREATE_PROJECT || intentType === INTENT_TYPES.CREATE_FEATURE) {
-    // Standard project/feature tasks
+  if (intentType === INTENT_TYPES.CREATE_PROJECT) {
+    // Full project creation tasks
     tasks.push(
       {
         title: `设计 ${projectName} 架构`,
@@ -162,15 +333,40 @@ function generateTasks(projectName, intentType, _input) {
         priority: 'P2'
       }
     );
-  } else if (intentType === INTENT_TYPES.FIX_BUG) {
+  } else if (intentType === INTENT_TYPES.CREATE_FEATURE) {
+    // Feature-specific tasks (more targeted)
     tasks.push(
       {
-        title: `分析问题根因`,
+        title: `设计 ${featureName} 接口`,
+        description: `在 ${moduleName} 中设计 ${featureName} 的 API 接口`,
+        priority: 'P0'
+      },
+      {
+        title: `实现 ${featureName} 后端逻辑`,
+        description: `开发 ${featureName} 的后端业务逻辑`,
+        priority: 'P0'
+      },
+      {
+        title: `实现 ${featureName} 前端组件`,
+        description: `在 ${moduleName} 中添加 ${featureName} 的 UI 组件`,
+        priority: 'P1'
+      },
+      {
+        title: `编写 ${featureName} 测试`,
+        description: `为 ${featureName} 编写单元测试`,
+        priority: 'P1'
+      }
+    );
+  } else if (intentType === INTENT_TYPES.FIX_BUG) {
+    const target = entities.component || entities.module || '目标模块';
+    tasks.push(
+      {
+        title: `分析 ${target} 问题根因`,
         description: `定位 bug 原因，分析影响范围`,
         priority: 'P0'
       },
       {
-        title: `修复问题`,
+        title: `修复 ${target} 问题`,
         description: `实现修复方案`,
         priority: 'P0'
       },
@@ -181,26 +377,41 @@ function generateTasks(projectName, intentType, _input) {
       }
     );
   } else if (intentType === INTENT_TYPES.REFACTOR) {
+    const target = entities.module || entities.component || projectName;
     tasks.push(
       {
-        title: `分析现有代码结构`,
+        title: `分析 ${target} 现有代码结构`,
         description: `梳理现有实现，识别优化点`,
         priority: 'P1'
       },
       {
-        title: `设计重构方案`,
+        title: `设计 ${target} 重构方案`,
         description: `制定重构计划，确保向后兼容`,
         priority: 'P1'
       },
       {
-        title: `实施重构`,
+        title: `实施 ${target} 重构`,
         description: `按计划重构代码`,
         priority: 'P1'
       },
       {
-        title: `验证重构结果`,
+        title: `验证 ${target} 重构结果`,
         description: `运行测试，确保功能正常`,
         priority: 'P1'
+      }
+    );
+  } else if (intentType === INTENT_TYPES.EXPLORE) {
+    const target = entities.module || entities.apiEndpoint || projectName;
+    tasks.push(
+      {
+        title: `调研 ${target}`,
+        description: `了解 ${target} 的功能和用法`,
+        priority: 'P1'
+      },
+      {
+        title: `整理 ${target} 文档`,
+        description: `记录调研结果和使用示例`,
+        priority: 'P2'
       }
     );
   } else {
@@ -272,8 +483,9 @@ ${tasks.map((t, i) => `### Task ${i + 1}: ${t.title}
 
 /**
  * Parse natural language input and generate structured output
+ * Enhanced with entity extraction
  * @param {string} input - Natural language input
- * @returns {Promise<Object>} - Parsed intent with project, tasks, and PRD draft
+ * @returns {Promise<Object>} - Parsed intent with project, tasks, entities, and PRD draft
  */
 async function parseIntent(input) {
   if (!input || typeof input !== 'string' || input.trim().length === 0) {
@@ -282,27 +494,37 @@ async function parseIntent(input) {
 
   const trimmedInput = input.trim();
 
-  // Step 1: Classify intent
+  // L2-001: Input length limit to prevent performance issues
+  if (trimmedInput.length > 10000) {
+    throw new Error('Input too long, maximum 10000 characters allowed');
+  }
+
+  // Step 1: Classify intent (enhanced with phrase matching)
   const classification = classifyIntent(trimmedInput);
 
-  // Step 2: Extract project name
-  const projectName = extractProjectName(trimmedInput, classification.type);
+  // Step 2: Extract entities
+  const entities = extractEntities(trimmedInput);
 
-  // Step 3: Generate tasks
-  const tasks = generateTasks(projectName, classification.type, trimmedInput);
+  // Step 3: Extract project name (use entity if available)
+  const projectName = entities.module || extractProjectName(trimmedInput, classification.type);
 
-  // Step 4: Build parsed intent object
+  // Step 4: Generate tasks (context-aware)
+  const tasks = generateTasks(projectName, classification.type, trimmedInput, entities);
+
+  // Step 5: Build parsed intent object
   const parsedIntent = {
     originalInput: trimmedInput,
     intentType: classification.type,
     confidence: classification.confidence,
     keywords: classification.keywords,
+    matchedPhrases: classification.matchedPhrases || [],
+    entities,
     projectName,
     tasks,
     prdDraft: null
   };
 
-  // Step 5: Generate PRD draft
+  // Step 6: Generate PRD draft
   parsedIntent.prdDraft = generatePrdDraft(parsedIntent);
 
   return parsedIntent;
@@ -389,7 +611,10 @@ async function parseAndCreate(input, options = {}) {
 
 export {
   INTENT_TYPES,
+  INTENT_PHRASES,
+  ENTITY_PATTERNS,
   classifyIntent,
+  extractEntities,
   extractProjectName,
   generateTasks,
   generatePrdDraft,

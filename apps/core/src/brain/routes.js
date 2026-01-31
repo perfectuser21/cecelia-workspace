@@ -5,7 +5,7 @@ import { createSnapshot, getRecentSnapshots, getLatestSnapshot } from './percept
 import { createTask, updateTask, createGoal, updateGoal, triggerN8n, setMemory, batchUpdateTasks } from './actions.js';
 import { getDailyFocus, setDailyFocus, clearDailyFocus, getFocusSummary } from './focus.js';
 import { getTickStatus, enableTick, disableTick, executeTick } from './tick.js';
-import { parseIntent, parseAndCreate, INTENT_TYPES } from './intent.js';
+import { parseIntent, parseAndCreate, INTENT_TYPES, extractEntities, classifyIntent } from './intent.js';
 import pool from '../task-system/db.js';
 import { decomposeTRD, getTRDProgress, listTRDs } from './decomposer.js';
 import { compareGoalProgress, generateDecision, executeDecision, getDecisionHistory, rollbackDecision } from './decision.js';
@@ -704,6 +704,132 @@ router.get('/intent/types', (req, res) => {
       unknown: '无法识别的意图'
     }
   });
+});
+
+// ==================== Enhanced Intent API (PRD: Intent Enhancement) ====================
+
+/**
+ * POST /api/brain/parse-intent
+ * Parse natural language input and return structured intent with entities
+ * Enhanced version with phrase matching and entity extraction
+ *
+ * Request body:
+ *   { input: "我想给用户管理模块添加批量导入功能" }
+ *
+ * Response:
+ *   {
+ *     success: true,
+ *     intentType: "create_feature",
+ *     confidence: 0.85,
+ *     entities: { module: "用户管理", feature: "批量导入" },
+ *     suggestedTasks: [...]
+ *   }
+ */
+router.post('/parse-intent', async (req, res) => {
+  try {
+    const { input } = req.body;
+
+    if (!input || typeof input !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'input is required and must be a string'
+      });
+    }
+
+    const parsed = await parseIntent(input);
+
+    // Format response according to PRD specification
+    res.json({
+      success: true,
+      intentType: parsed.intentType,
+      confidence: parsed.confidence,
+      keywords: parsed.keywords,
+      matchedPhrases: parsed.matchedPhrases,
+      entities: parsed.entities,
+      projectName: parsed.projectName,
+      suggestedTasks: parsed.tasks.map(t => ({
+        title: t.title,
+        priority: t.priority,
+        description: t.description
+      })),
+      prdDraft: parsed.prdDraft
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to parse intent',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * POST /api/brain/intent-to-tasks
+ * Convert intent directly to tasks in database
+ *
+ * Request body:
+ *   {
+ *     input: "我想给用户管理模块添加批量导入功能",
+ *     options: {
+ *       createProject: false,
+ *       projectId: "uuid",
+ *       goalId: "uuid"
+ *     }
+ *   }
+ *
+ * Response:
+ *   {
+ *     success: true,
+ *     intent: { type, confidence, entities },
+ *     tasksCreated: [{ id, title, priority, status }]
+ *   }
+ */
+router.post('/intent-to-tasks', async (req, res) => {
+  try {
+    const { input, options = {} } = req.body;
+
+    if (!input || typeof input !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'input is required and must be a string'
+      });
+    }
+
+    // Parse and create in database
+    const result = await parseAndCreate(input, {
+      createProject: options.createProject !== false,
+      createTasks: true,
+      projectId: options.projectId || null,
+      goalId: options.goalId || null
+    });
+
+    res.json({
+      success: true,
+      intent: {
+        type: result.parsed.intentType,
+        confidence: result.parsed.confidence,
+        entities: result.parsed.entities,
+        keywords: result.parsed.keywords
+      },
+      projectUsed: result.created.project ? {
+        id: result.created.project.id,
+        name: result.created.project.name,
+        created: result.created.project.created
+      } : null,
+      tasksCreated: result.created.tasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        priority: t.priority,
+        status: t.status
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to convert intent to tasks',
+      details: err.message
+    });
+  }
 });
 
 // ==================== Execution Callback API ====================
