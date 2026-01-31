@@ -139,15 +139,15 @@ const ENTITY_PATTERNS = {
   ],
   // File path patterns
   filePath: [
-    /(src\/[\w\/.-]+)/,
-    /(apps\/[\w\/.-]+)/,
+    new RegExp('(src/[\\w/.-]+)'),
+    new RegExp('(apps/[\\w/.-]+)'),
     /([\w-]+\.(js|ts|tsx|jsx|py|go|rs))/
   ],
   // API endpoint patterns
   apiEndpoint: [
-    /\/api\/[\w\/-]+/,
-    /POST\s+(\/[\w\/-]+)/i,
-    /GET\s+(\/[\w\/-]+)/i
+    new RegExp('/api/[\\w/-]+'),
+    new RegExp('POST\\s+(/[\\w/-]+)', 'i'),
+    new RegExp('GET\\s+(/[\\w/-]+)', 'i')
   ],
   // Component name patterns
   component: [
