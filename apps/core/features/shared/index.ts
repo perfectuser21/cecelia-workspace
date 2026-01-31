@@ -16,3 +16,6 @@ export * from './hooks/useRealtimeVoice';
 export * from './components/StatusBadge';
 export * from './components/StatsCard';
 export * from './components/LoadingState';
+
+// Widgets
+export * from './widgets';

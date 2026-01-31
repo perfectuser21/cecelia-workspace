@@ -1,5 +1,5 @@
 ---
-id: qa-decision-prd-template-engine
+id: qa-decision-widget-dashboard
 version: 1.0.0
 created: 2026-01-31
 updated: 2026-01-31
@@ -11,21 +11,24 @@ changelog:
 
 Decision: NO_RCI
 Priority: P1
-RepoType: Engine
+RepoType: Frontend
 
 Tests:
-  - dod_item: "generatePrdFromGoalKR 输出包含完整字段"
+  - dod_item: "WidgetRegistry register/getAll/getById/getByCategory"
     method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
-  - dod_item: "planner.js 调用 generatePrdFromGoalKR"
+    location: apps/core/features/shared/widgets/__tests__/registry.test.ts
+  - dod_item: "WidgetCard 错误边界"
     method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
-  - dod_item: "现有测试全部通过"
+    location: apps/core/features/shared/widgets/__tests__/WidgetCard.test.tsx
+  - dod_item: "WidgetDashboardPage 渲染 3 个 widget"
+    method: manual
+    location: /widgets 页面
+  - dod_item: "TypeScript 编译无错误"
     method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
+    location: npm run build
 
 RCI:
   new: []
   update: []
 
-Reason: 模板引擎增强，不涉及核心 Hook/Gate/CI 流程，通过单元测试覆盖。
+Reason: 新增前端架构模块，不影响现有功能，通过单元测试 + 手动验证覆盖。
