@@ -506,6 +506,67 @@ function generatePrdFromGoalKR(params) {
 }
 
 /**
+ * Validate PRD content against required fields
+ * @param {string} content - PRD markdown content
+ * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
+ */
+function validatePrd(content) {
+  const errors = [];
+  const warnings = [];
+
+  const requiredFields = ['需求来源', '功能描述', '成功标准'];
+  const recommendedFields = ['非目标', '涉及文件'];
+
+  for (const field of requiredFields) {
+    const pattern = new RegExp(`(##\\s+${field}|\\*\\*${field}\\*\\*)`);
+    if (!pattern.test(content)) {
+      errors.push(`缺少必需字段: ${field}`);
+    }
+  }
+
+  for (const field of recommendedFields) {
+    const pattern = new RegExp(`(##\\s+${field}|\\*\\*${field}\\*\\*)`);
+    if (!pattern.test(content)) {
+      warnings.push(`缺少推荐字段: ${field}`);
+    }
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
+/**
+ * Validate TRD content against required sections
+ * @param {string} content - TRD markdown content
+ * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
+ */
+function validateTrd(content) {
+  const errors = [];
+  const warnings = [];
+
+  const requiredSections = TRD_TEMPLATE.sections
+    .filter(s => s.required)
+    .map(s => s.title);
+
+  const recommendedSections = ['实施计划'];
+
+  for (const section of requiredSections) {
+    const pattern = new RegExp(`##\\s+${section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
+    if (!pattern.test(content)) {
+      errors.push(`缺少必需 section: ${section}`);
+    }
+  }
+
+  for (const section of recommendedSections) {
+    const pattern = new RegExp(`##\\s+${section}`);
+    if (!pattern.test(content)) {
+      warnings.push(`缺少推荐 section: ${section}`);
+    }
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
+/**
  * Get template by name
  * @param {string} templateName - Template name ('prd' or 'trd')
  * @returns {Object|null} Template object
@@ -539,6 +600,8 @@ export {
   generatePrdFromTask,
   generatePrdFromGoalKR,
   generateTrdFromGoal,
+  validatePrd,
+  validateTrd,
   getTemplate,
   listTemplates,
   getCurrentDate

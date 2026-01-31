@@ -1,5 +1,5 @@
 ---
-id: qa-decision-prd-template-engine
+id: qa-decision-kr2-validation
 version: 1.0.0
 created: 2026-01-31
 updated: 2026-01-31
@@ -7,25 +7,18 @@ changelog:
   - 1.0.0: 初始版本
 ---
 
-# QA Decision
+# QA Decision - PRD/TRD Validation
 
-Decision: NO_RCI
-Priority: P1
-RepoType: Engine
+## 测试策略
 
-Tests:
-  - dod_item: "generatePrdFromGoalKR 输出包含完整字段"
-    method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
-  - dod_item: "planner.js 调用 generatePrdFromGoalKR"
-    method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
-  - dod_item: "现有测试全部通过"
-    method: auto
-    location: apps/core/src/brain/__tests__/templates.test.js
+| 类型 | 决策 | 理由 |
+|------|------|------|
+| 单元测试 | ✅ 必须 | validatePrd/validateTrd 是纯函数，易于测试 |
+| API 测试 | ⚠️ 手动 | validate 端点简单，手动 curl 验证 |
+| 集成测试 | ⚠️ 日志 | planner 集成通过日志验证 |
+| E2E 测试 | ❌ 跳过 | 无前端变更 |
 
-RCI:
-  new: []
-  update: []
+## 风险评估
 
-Reason: 模板引擎增强，不涉及核心 Hook/Gate/CI 流程，通过单元测试覆盖。
+- **低风险**: 新增函数，不修改现有逻辑
+- **回归风险**: 低 — 仅添加新 export 和新路由

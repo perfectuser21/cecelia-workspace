@@ -9,7 +9,7 @@ import pool from '../task-system/db.js';
 import { getDailyFocus } from './focus.js';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
-import { generatePrdFromGoalKR } from './templates.js';
+import { generatePrdFromGoalKR, validatePrd } from './templates.js';
 
 /**
  * Get global state for planning decisions
@@ -415,6 +415,10 @@ function generateTaskPRD(taskTitle, taskDescription, kr, project) {
   });
 
   writeFileSync(prdPath, prdContent, 'utf-8');
+
+  const validation = validatePrd(prdContent);
+  console.log(`[PRD-VALIDATE] valid=${validation.valid} errors=[${validation.errors.join(', ')}] warnings=[${validation.warnings.join(', ')}]`);
+
   return prdPath;
 }
 
