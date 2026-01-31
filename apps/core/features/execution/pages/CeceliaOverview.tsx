@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { usePolling } from '../../shared/hooks/usePolling';
 import {
   Bot,
   RefreshCw,
@@ -43,11 +44,17 @@ export default function CeceliaOverviewPage() {
     }
   };
 
+  usePolling(loadData, { interval: 30000, immediate: true });
+
+  // Re-fetch immediately when timeRange changes
+  const isFirstRender = useRef(true);
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     setLoading(true);
     loadData();
-    const interval = setInterval(loadData, 30000);
-    return () => clearInterval(interval);
   }, [timeRange]);
 
   const getTimeRangeLabel = (range: TimeRange): string => {

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bot, ChevronRight, RefreshCw } from 'lucide-react';
+import { usePolling } from '../../shared/hooks/usePolling';
 import { getStatusIcon } from '../../shared/utils/statusHelpers';
 import { formatDateTime } from '../../shared/utils/formatters';
 import { LoadingState, ErrorState } from '../../shared/components/LoadingState';
@@ -54,11 +55,7 @@ export default function CeceliaRuns() {
     }
   };
 
-  useEffect(() => {
-    fetchOverview();
-    const interval = setInterval(fetchOverview, 5000);
-    return () => clearInterval(interval);
-  }, []);
+  usePolling(fetchOverview, { interval: 5000, immediate: true });
 
   if (loading) {
     return <LoadingState height="h-64" />;

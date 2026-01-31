@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import { usePolling } from '../../shared/hooks/usePolling';
 import {
   RefreshCw,
   Target,
@@ -203,7 +204,7 @@ export default function OrchestratorPage() {
     }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  usePolling(fetchData, { interval: 10000, immediate: true });
 
   const toggleOKR = (id: string) => {
     setExpandedOKRs(prev => {
