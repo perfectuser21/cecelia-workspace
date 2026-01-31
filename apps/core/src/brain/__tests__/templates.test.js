@@ -8,12 +8,15 @@ import {
   PRD_TEMPLATE,
   TRD_TEMPLATE,
   PRD_TYPE_MAP,
+  PRD_TYPE_SECTIONS,
+  PRD_COMMON_SECTIONS,
   generateFrontmatter,
   renderPrd,
   renderTrd,
   generatePrdFromTask,
   generatePrdFromGoalKR,
   generateTrdFromGoal,
+  validatePrd,
   getTemplate,
   listTemplates,
   getCurrentDate
@@ -503,6 +506,115 @@ describe('Templates Module', () => {
 
       expect(prd).toContain('## 功能描述');
       expect(prd).toContain('Fallback test');
+    });
+  });
+
+  describe('renderPrd type-specific sections', () => {
+    const baseIntent = {
+      projectName: 'test',
+      intentType: 'create_feature',
+      tasks: [],
+      originalInput: 'test input',
+      entities: {}
+    };
+
+    it('includes user stories and impact analysis for feature type', () => {
+      const prd = renderPrd(baseIntent, { type: 'feature' });
+      expect(prd).toContain('## 用户故事');
+      expect(prd).toContain('## 影响分析');
+    });
+
+    it('includes reproduction steps and root cause for bugfix type', () => {
+      const prd = renderPrd(baseIntent, { type: 'bugfix' });
+      expect(prd).toContain('## 复现步骤');
+      expect(prd).toContain('## 根因分析');
+    });
+
+    it('includes scope of changes and rollback plan for refactor type', () => {
+      const prd = renderPrd(baseIntent, { type: 'refactor' });
+      expect(prd).toContain('## 变更范围');
+      expect(prd).toContain('## 回滚计划');
+    });
+
+    it('defaults to feature type sections', () => {
+      const prd = renderPrd(baseIntent);
+      expect(prd).toContain('## 用户故事');
+    });
+  });
+
+  describe('generatePrdFromTask passes type to renderPrd', () => {
+    it('bugfix type generates bugfix-specific sections', () => {
+      const prd = generatePrdFromTask({ title: 'Fix bug', type: 'bugfix' });
+      expect(prd).toContain('## 复现步骤');
+      expect(prd).toContain('## 根因分析');
+      expect(prd).not.toContain('## 用户故事');
+    });
+
+    it('refactor type generates refactor-specific sections', () => {
+      const prd = generatePrdFromTask({ title: 'Refactor code', type: 'refactor' });
+      expect(prd).toContain('## 变更范围');
+      expect(prd).toContain('## 回滚计划');
+    });
+  });
+
+  describe('validatePrd', () => {
+    it('validates a complete feature PRD as valid', () => {
+      const prd = generatePrdFromTask({ title: 'Test', type: 'feature' });
+      const result = validatePrd(prd, 'feature');
+      expect(result.valid).toBe(true);
+      expect(result.score).toBeGreaterThanOrEqual(0.6);
+    });
+
+    it('detects missing frontmatter', () => {
+      const result = validatePrd('## 背景\ntest\n## 功能需求\ntest');
+      expect(result.valid).toBe(false);
+      expect(result.missing_fields).toContain('frontmatter');
+    });
+
+    it('detects missing bugfix-specific sections', () => {
+      const prd = '---\nid: test\nversion: 1.0.0\ncreated: 2026-01-31\n---\n## 背景\ntest\n## 功能描述\ntest\n## 成功标准\ntest\n## 非目标\ntest';
+      const result = validatePrd(prd, 'bugfix');
+      expect(result.valid).toBe(false);
+      expect(result.missing_fields).toContain('复现步骤');
+      expect(result.missing_fields).toContain('根因分析');
+    });
+
+    it('validates without type (common sections only)', () => {
+      const prd = generatePrdFromTask({ title: 'Test', type: 'feature' });
+      const result = validatePrd(prd);
+      expect(result.valid).toBe(true);
+      expect(result.missing_fields).not.toContain('用户故事');
+    });
+
+    it('returns score between 0 and 1', () => {
+      const prd = generatePrdFromTask({ title: 'Test', type: 'bugfix' });
+      const result = validatePrd(prd, 'bugfix');
+      expect(result.score).toBeGreaterThanOrEqual(0);
+      expect(result.score).toBeLessThanOrEqual(1);
+    });
+
+    it('accepts alternative section names', () => {
+      const prd = '---\nid: test\nversion: 1.0.0\ncreated: 2026-01-31\n---\n## 背景\ntest\n## 目标\ntest\n## 验收标准\ntest\n## 非目标\ntest';
+      const result = validatePrd(prd);
+      expect(result.missing_fields).not.toContain('需求来源');
+      expect(result.missing_fields).not.toContain('功能描述');
+      expect(result.missing_fields).not.toContain('成功标准');
+    });
+  });
+
+  describe('PRD_TYPE_SECTIONS', () => {
+    it('defines sections for feature, bugfix, refactor', () => {
+      expect(PRD_TYPE_SECTIONS.feature).toEqual(['用户故事', '影响分析']);
+      expect(PRD_TYPE_SECTIONS.bugfix).toEqual(['复现步骤', '根因分析']);
+      expect(PRD_TYPE_SECTIONS.refactor).toEqual(['变更范围', '回滚计划']);
+    });
+  });
+
+  describe('PRD_COMMON_SECTIONS', () => {
+    it('defines 4 common required sections', () => {
+      expect(PRD_COMMON_SECTIONS).toHaveLength(4);
+      expect(PRD_COMMON_SECTIONS).toContain('需求来源');
+      expect(PRD_COMMON_SECTIONS).toContain('成功标准');
     });
   });
 

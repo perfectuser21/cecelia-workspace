@@ -141,7 +141,8 @@ function renderPrd(parsedIntent, options = {}) {
 
   const {
     includeFrontmatter = true,
-    version = '1.0.0'
+    version = '1.0.0',
+    type = 'feature'
   } = options;
 
   const docId = `prd-${projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
@@ -194,6 +195,24 @@ function renderPrd(parsedIntent, options = {}) {
     prd += `- [ ] 代码审查完成\n\n`;
   } else {
     prd += `待定义。\n\n`;
+  }
+
+  // Type-specific sections
+  if (type === 'bugfix') {
+    prd += `## 复现步骤\n\n`;
+    prd += `1. 待补充\n\n`;
+    prd += `## 根因分析\n\n`;
+    prd += `待分析。\n\n`;
+  } else if (type === 'refactor') {
+    prd += `## 变更范围\n\n`;
+    prd += `待定义。\n\n`;
+    prd += `## 回滚计划\n\n`;
+    prd += `待定义。\n\n`;
+  } else if (type === 'feature') {
+    prd += `## 用户故事\n\n`;
+    prd += `待定义。\n\n`;
+    prd += `## 影响分析\n\n`;
+    prd += `待分析。\n\n`;
   }
 
   // Milestones
@@ -416,7 +435,7 @@ function generatePrdFromTask(params, options = {}) {
     entities: {}
   };
 
-  return renderPrd(parsedIntent, options);
+  return renderPrd(parsedIntent, { ...options, type });
 }
 
 /**
@@ -506,6 +525,82 @@ function generatePrdFromGoalKR(params) {
 }
 
 /**
+ * Type-specific required sections for PRD validation
+ */
+const PRD_TYPE_SECTIONS = {
+  feature: ['用户故事', '影响分析'],
+  bugfix: ['复现步骤', '根因分析'],
+  refactor: ['变更范围', '回滚计划']
+};
+
+const PRD_COMMON_SECTIONS = ['需求来源', '功能描述', '成功标准', '非目标'];
+
+/**
+ * Validate a PRD document
+ * @param {string} content - PRD markdown content
+ * @param {string} [type] - PRD type: feature | bugfix | refactor
+ * @returns {{ valid: boolean, score: number, missing_fields: string[] }}
+ */
+function validatePrd(content, type) {
+  const missing = [];
+
+  // Check frontmatter
+  const hasFrontmatter = /^---\n[\s\S]*?\n---/.test(content);
+  const frontmatterFields = ['id:', 'version:', 'created:'];
+  if (hasFrontmatter) {
+    const fmBlock = content.match(/^---\n([\s\S]*?)\n---/)[1];
+    for (const field of frontmatterFields) {
+      if (!fmBlock.includes(field)) {
+        missing.push(`frontmatter:${field.replace(':', '')}`);
+      }
+    }
+  } else {
+    missing.push('frontmatter');
+  }
+
+  // Check common sections
+  for (const section of PRD_COMMON_SECTIONS) {
+    const regex = new RegExp(`##\\s+${section}`, 'i');
+    if (!regex.test(content)) {
+      // Also check alternative names
+      const altNames = {
+        '需求来源': ['背景', 'background'],
+        '功能描述': ['目标', '功能需求'],
+        '成功标准': ['验收标准', 'acceptance'],
+        '非目标': ['non-target', 'out of scope']
+      };
+      const alts = altNames[section] || [];
+      const found = alts.some(alt => new RegExp(`##\\s+${alt}`, 'i').test(content));
+      if (!found) {
+        missing.push(section);
+      }
+    }
+  }
+
+  // Check type-specific sections
+  const requiredSections = [...PRD_COMMON_SECTIONS];
+  if (type && PRD_TYPE_SECTIONS[type]) {
+    for (const section of PRD_TYPE_SECTIONS[type]) {
+      requiredSections.push(section);
+      const regex = new RegExp(`##\\s+${section}`, 'i');
+      if (!regex.test(content)) {
+        missing.push(section);
+      }
+    }
+  }
+
+  const missingTypeSections = type && PRD_TYPE_SECTIONS[type]
+    ? PRD_TYPE_SECTIONS[type].filter(s => missing.includes(s))
+    : [];
+
+  const totalRequired = requiredSections.length + (hasFrontmatter ? 0 : 1);
+  const score = totalRequired > 0 ? (totalRequired - missing.length) / totalRequired : 0;
+  const valid = score >= 0.6 && hasFrontmatter && missingTypeSections.length === 0;
+
+  return { valid, score: Math.round(score * 100) / 100, missing_fields: missing };
+}
+
+/**
  * Get template by name
  * @param {string} templateName - Template name ('prd' or 'trd')
  * @returns {Object|null} Template object
@@ -533,12 +628,15 @@ export {
   PRD_TEMPLATE,
   TRD_TEMPLATE,
   PRD_TYPE_MAP,
+  PRD_TYPE_SECTIONS,
+  PRD_COMMON_SECTIONS,
   generateFrontmatter,
   renderPrd,
   renderTrd,
   generatePrdFromTask,
   generatePrdFromGoalKR,
   generateTrdFromGoal,
+  validatePrd,
   getTemplate,
   listTemplates,
   getCurrentDate

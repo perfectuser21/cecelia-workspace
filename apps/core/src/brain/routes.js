@@ -8,7 +8,7 @@ import { getTickStatus, enableTick, disableTick, executeTick, runTickSafe } from
 import { parseIntent, parseAndCreate, INTENT_TYPES, INTENT_ACTION_MAP, extractEntities, classifyIntent, getSuggestedAction } from './intent.js';
 import pool from '../task-system/db.js';
 import { decomposeTRD, getTRDProgress, listTRDs } from './decomposer.js';
-import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, PRD_TYPE_MAP } from './templates.js';
+import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, validatePrd, PRD_TYPE_MAP } from './templates.js';
 import { compareGoalProgress, generateDecision, executeDecision, getDecisionHistory, rollbackDecision } from './decision.js';
 import { planNextTask, getPlanStatus, handlePlanInput } from './planner.js';
 import { ensureEventsTable, queryEvents, getEventCounts } from './event-bus.js';
@@ -1265,7 +1265,7 @@ router.post('/generate/prd', async (req, res) => {
       });
     }
 
-    const prd = generatePrdFromTask({ title, description, type });
+    const prd = generatePrdFromTask({ title, description, type }, { type });
 
     res.json({
       success: true,
@@ -1280,6 +1280,36 @@ router.post('/generate/prd', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to generate PRD',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * POST /api/brain/validate/prd
+ * Validate a PRD document
+ */
+router.post('/validate/prd', async (req, res) => {
+  try {
+    const { content, type } = req.body;
+
+    if (!content) {
+      return res.status(400).json({
+        success: false,
+        error: 'content is required'
+      });
+    }
+
+    const result = validatePrd(content, type);
+
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to validate PRD',
       details: err.message
     });
   }
