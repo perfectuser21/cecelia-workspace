@@ -12,6 +12,7 @@ import {
   renderPrd,
   renderTrd,
   generatePrdFromTask,
+  generateTrdFromGoal,
   getTemplate,
   listTemplates,
   getCurrentDate
@@ -350,6 +351,65 @@ describe('Templates Module', () => {
       const trd = renderTrd(intent);
 
       expect(trd).toContain('- user-auth 模块');
+    });
+  });
+
+  describe('generateTrdFromGoal', () => {
+    it('generates TRD with title only', () => {
+      const trd = generateTrdFromGoal({ title: 'Brain System v2' });
+
+      expect(trd).toContain('# TRD - Brain System v2');
+      expect(trd).toContain('## 技术背景');
+      expect(trd).toContain('## 架构设计');
+    });
+
+    it('generates TRD with title and description', () => {
+      const trd = generateTrdFromGoal({
+        title: 'Task Intelligence',
+        description: 'Build an intelligent task management system'
+      });
+
+      expect(trd).toContain('# TRD - Task Intelligence');
+      expect(trd).toContain('Build an intelligent task management system');
+    });
+
+    it('includes milestones as tasks in implementation plan', () => {
+      const trd = generateTrdFromGoal({
+        title: 'My Goal',
+        description: 'Goal description',
+        milestones: [
+          { title: 'Phase 1: Setup', description: 'Initial setup' },
+          { title: 'Phase 2: Core', description: 'Core features' }
+        ]
+      });
+
+      expect(trd).toContain('1. **Phase 1: Setup** (P0)');
+      expect(trd).toContain('2. **Phase 2: Core** (P1)');
+      expect(trd).toContain('- [ ] Phase 1: Setup 测试');
+      expect(trd).toContain('- [ ] Phase 2: Core 测试');
+    });
+
+    it('handles empty milestones', () => {
+      const trd = generateTrdFromGoal({ title: 'Simple Goal', milestones: [] });
+
+      expect(trd).toContain('- [ ] 核心功能测试');
+      expect(trd).toContain('1. 需求分析');
+    });
+
+    it('uses title as fallback for description', () => {
+      const trd = generateTrdFromGoal({ title: 'My Goal' });
+
+      expect(trd).toContain('My Goal');
+    });
+
+    it('passes rendering options through', () => {
+      const trd = generateTrdFromGoal(
+        { title: 'Test' },
+        { includeFrontmatter: false }
+      );
+
+      expect(trd).not.toMatch(/^---/);
+      expect(trd).toMatch(/^# TRD/);
     });
   });
 
