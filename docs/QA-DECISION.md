@@ -1,5 +1,5 @@
 ---
-id: qa-decision-cecelia-chat-api
+id: qa-decision-kr2-prd-trd-validation
 version: 1.0.0
 created: 2026-01-31
 updated: 2026-01-31
@@ -14,27 +14,24 @@ Priority: P1
 RepoType: Business
 
 Tests:
-  - dod_item: "POST /api/cecelia/chat 返回 200 含 success/reply/intent/action_result"
+  - dod_item: "validatePrd returns valid for complete PRD"
     method: auto
-    location: tests/cecelia-chat.test.ts
-  - dod_item: "创建类意图写入数据库"
+    location: apps/core/src/brain/__tests__/templates.test.js
+  - dod_item: "validatePrd returns invalid for missing sections"
     method: auto
-    location: tests/cecelia-chat.test.ts
-  - dod_item: "查询类意图返回任务列表"
+    location: apps/core/src/brain/__tests__/templates.test.js
+  - dod_item: "validateTrd returns valid for complete TRD"
     method: auto
-    location: tests/cecelia-chat.test.ts
-  - dod_item: "未知意图返回友好提示"
-    method: auto
-    location: tests/cecelia-chat.test.ts
-  - dod_item: "缺少 message 返回 400"
-    method: auto
-    location: tests/cecelia-chat.test.ts
-  - dod_item: "现有端点不受影响"
+    location: apps/core/src/brain/__tests__/templates.test.js
+  - dod_item: "API endpoints return validation results"
     method: manual
-    location: "manual:curl 验证 /api/brain/parse-intent 行为不变"
+    location: manual:curl POST to /api/brain/validate/prd and /trd
+  - dod_item: "Decomposer uses renderPrd"
+    method: auto
+    location: apps/core/src/brain/__tests__/templates.test.js
 
 RCI:
   new: []
   update: []
 
-Reason: 新增独立 API 端点，不修改现有代码，无回归风险，自动化测试覆盖主要场景
+Reason: Brain 模板系统属于业务逻辑层，非核心 Engine hook/gate，不需要 RCI。单元测试覆盖即可。
