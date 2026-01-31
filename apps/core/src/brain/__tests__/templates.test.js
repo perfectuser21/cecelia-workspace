@@ -14,9 +14,16 @@ import {
   generatePrdFromTask,
   generatePrdFromGoalKR,
   generateTrdFromGoal,
+  validatePrd,
+  validateTrd,
   getTemplate,
   listTemplates,
-  getCurrentDate
+  getCurrentDate,
+  validatePrd,
+  validateTrd,
+  prdToJson,
+  trdToJson,
+  extractSection
 } from '../templates.js';
 
 describe('Templates Module', () => {
@@ -506,6 +513,125 @@ describe('Templates Module', () => {
     });
   });
 
+  describe('validatePrd', () => {
+    it('returns valid:true for a complete PRD', () => {
+      const prd = generatePrdFromGoalKR({
+        title: 'Test',
+        description: 'Test desc',
+        kr: { title: 'KR1', progress: 50, priority: 'P0' },
+        project: { name: 'proj', repo_path: '/repo' }
+      });
+      const result = validatePrd(prd);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('returns valid:false when 需求来源 is missing', () => {
+      const prd = '## 功能描述\nSomething\n## 成功标准\n- item';
+      const result = validatePrd(prd);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Missing required field: 需求来源');
+    });
+
+    it('returns valid:false when 功能描述 is missing', () => {
+      const prd = '## 需求来源\nSomething\n## 成功标准\n- item';
+      const result = validatePrd(prd);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Missing required field: 功能描述');
+    });
+
+    it('returns valid:false when 成功标准 is missing', () => {
+      const prd = '## 需求来源\nSomething\n## 功能描述\nSomething';
+      const result = validatePrd(prd);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Missing required field: 成功标准');
+    });
+
+    it('returns valid:false for empty content', () => {
+      const result = validatePrd('');
+      expect(result.valid).toBe(false);
+    });
+
+    it('returns valid:false for null content', () => {
+      const result = validatePrd(null);
+      expect(result.valid).toBe(false);
+    });
+
+    it('warns when 非目标 is missing', () => {
+      const prd = '## 需求来源\nX\n## 功能描述\nY\n## 成功标准\n- item\n## 涉及文件\nZ';
+      const result = validatePrd(prd);
+      expect(result.valid).toBe(true);
+      expect(result.warnings).toContain('Missing recommended field: 非目标');
+    });
+
+    it('recognizes bold-style field markers', () => {
+      const prd = '**需求来源**: X\n**功能描述**: Y\n**成功标准**:\n- item';
+      const result = validatePrd(prd);
+      expect(result.valid).toBe(true);
+    });
+
+    it('accepts renderPrd output as valid', () => {
+      const prd = renderPrd({
+        projectName: 'test',
+        intentType: 'create_feature',
+        tasks: [{ title: 'Task 1', description: 'Desc', priority: 'P0' }],
+        originalInput: 'Test input',
+        entities: {}
+      });
+      const result = validatePrd(prd);
+      // renderPrd uses 背景/功能需求/验收标准 which map to our required fields
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  describe('validateTrd', () => {
+    it('returns valid:true for a complete TRD', () => {
+      const trd = renderTrd({
+        projectName: 'test',
+        intentType: 'create_project',
+        tasks: [],
+        originalInput: 'Test',
+        entities: {}
+      });
+      const result = validateTrd(trd);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('returns valid:false when required sections are missing', () => {
+      const trd = '## 技术背景\nSomething\n## 架构设计\nSomething';
+      const result = validateTrd(trd);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Missing required section: API 设计');
+      expect(result.errors).toContain('Missing required section: 数据模型');
+      expect(result.errors).toContain('Missing required section: 测试策略');
+    });
+
+    it('returns valid:false for empty content', () => {
+      const result = validateTrd('');
+      expect(result.valid).toBe(false);
+    });
+
+    it('returns valid:false for null content', () => {
+      const result = validateTrd(null);
+      expect(result.valid).toBe(false);
+    });
+
+    it('warns when 实施计划 is missing', () => {
+      const trd = '## 技术背景\nA\n## 架构设计\nB\n## API 设计\nC\n## 数据模型\nD\n## 测试策略\nE';
+      const result = validateTrd(trd);
+      expect(result.valid).toBe(true);
+      expect(result.warnings).toContain('Missing recommended section: 实施计划');
+    });
+
+    it('accepts generateTrdFromGoal output as valid', () => {
+      const trd = generateTrdFromGoal({ title: 'Test Goal', description: 'Desc' });
+      const result = validateTrd(trd);
+      expect(result.valid).toBe(true);
+      expect(result.warnings).toHaveLength(0);
+    });
+  });
+
   describe('Integration: Document rendering flow', () => {
     it('generates consistent PRD structure', () => {
       const intent = {
@@ -553,6 +679,252 @@ describe('Templates Module', () => {
       expect(trd).toContain('### 现有技术栈');
       expect(trd).toContain('CREATE TABLE user_service');
       expect(trd).toContain('- user 模块');
+    });
+  });
+
+  describe('extractSection', () => {
+    it('extracts section content by header', () => {
+      const md = '## 背景\n\n这是背景内容\n\n## 目标\n\n- 目标1';
+      expect(extractSection(md, '背景')).toBe('这是背景内容');
+      expect(extractSection(md, '目标')).toBe('- 目标1');
+    });
+
+    it('returns null for missing section', () => {
+      expect(extractSection('## 背景\n\n内容', '目标')).toBeNull();
+    });
+  });
+
+  describe('validatePrd', () => {
+    const validPrd = `# PRD - Test
+
+## 背景
+
+需求来源说明
+
+## 目标
+
+- 实现功能A
+- 实现功能B
+
+## 功能需求
+
+This is a sufficiently long functional requirements description that includes detailed implementation specifics and concrete feature specifications to ensure it exceeds fifty characters in length.
+
+## 验收标准
+
+- [ ] 用户能点击登录按钮完成认证
+- [ ] 系统显示成功提示消息
+`;
+
+    it('passes for valid PRD', () => {
+      const result = validatePrd(validPrd);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('fails when missing required fields', () => {
+      const result = validatePrd('# PRD\n\n## 背景\n\n内容');
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.includes('Missing required field'))).toBe(true);
+    });
+
+    it('fails when objectives lacks bullet points', () => {
+      const prd = `# PRD
+
+## 背景
+
+内容
+
+## 目标
+
+这里没有列表
+
+## 功能需求
+
+${'这是一段足够长的功能需求描述内容'.repeat(5)}
+
+## 验收标准
+
+- [ ] 系统显示结果
+`;
+      const result = validatePrd(prd);
+      expect(result.warnings.some(e => e.includes('bullet point'))).toBe(true);
+    });
+
+    it('warns when functional requirements too short', () => {
+      const prd = `# PRD
+
+## 背景
+
+内容
+
+## 目标
+
+- 目标1
+
+## 功能需求
+
+短
+
+## 验收标准
+
+- [ ] 系统显示结果
+`;
+      const result = validatePrd(prd);
+      expect(result.warnings.some(e => e.includes('50 characters'))).toBe(true);
+    });
+
+    it('warns when acceptance criteria lack action verbs', () => {
+      const prd = `# PRD
+
+## 背景
+
+内容
+
+## 目标
+
+- 目标1
+
+## 功能需求
+
+${'这是一段足够长的功能需求描述'.repeat(5)}
+
+## 验收标准
+
+- [ ] 好的代码质量
+- [ ] 优雅的架构
+`;
+      const result = validatePrd(prd);
+      expect(result.warnings.some(e => e.includes('action verb'))).toBe(true);
+    });
+  });
+
+  describe('validateTrd (enhanced)', () => {
+    const validTrd = `# TRD - Test
+
+## 技术背景
+
+Node.js + Express 架构
+
+## 架构设计
+
+微服务架构设计方案
+
+## API 设计
+
+RESTful 接口
+
+## 数据模型
+
+PostgreSQL
+
+## 测试策略
+
+单元测试 + 集成测试
+`;
+
+    it('passes for valid TRD', () => {
+      const result = validateTrd(validTrd);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('fails when missing required sections', () => {
+      const result = validateTrd('# TRD\n\n## API 设计\n\n内容');
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.includes('技术背景'))).toBe(true);
+    });
+
+    it('warns when required section is empty', () => {
+      const trd = `# TRD
+
+## 技术背景
+
+## 架构设计
+
+内容
+
+## API 设计
+
+内容
+
+## 数据模型
+
+内容
+
+## 测试策略
+
+内容
+`;
+      const result = validateTrd(trd);
+      expect(result.warnings.some(e => e.includes('empty'))).toBe(true);
+    });
+  });
+
+  describe('prdToJson', () => {
+    it('parses PRD markdown into JSON', () => {
+      const prd = `# PRD - 用户登录
+
+## 背景
+
+需要用户认证
+
+## 目标
+
+- 实现登录
+
+## 功能需求
+
+实现完整的登录流程
+
+## 验收标准
+
+- [ ] 登录成功
+`;
+      const result = prdToJson(prd);
+      expect(result.title).toBe('用户登录');
+      expect(result.sections.background).toContain('需要用户认证');
+      expect(result.sections.objectives).toContain('实现登录');
+      expect(result.sections.functional_requirements).toContain('登录流程');
+      expect(result.sections.acceptance_criteria).toContain('登录成功');
+    });
+
+    it('returns empty strings for missing sections', () => {
+      const result = prdToJson('# PRD - Test');
+      expect(result.sections.background).toBe('');
+      expect(result.sections.milestones).toBe('');
+    });
+  });
+
+  describe('trdToJson', () => {
+    it('parses TRD markdown into JSON', () => {
+      const trd = `# TRD - 认证系统
+
+## 技术背景
+
+JWT 认证
+
+## 架构设计
+
+微服务
+
+## API 设计
+
+REST
+
+## 数据模型
+
+users 表
+
+## 测试策略
+
+vitest
+`;
+      const result = trdToJson(trd);
+      expect(result.title).toBe('认证系统');
+      expect(result.sections.technical_background).toContain('JWT');
+      expect(result.sections.architecture_design).toContain('微服务');
+      expect(result.sections.test_strategy).toContain('vitest');
     });
   });
 });
