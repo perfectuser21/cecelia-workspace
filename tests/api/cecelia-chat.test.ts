@@ -70,4 +70,42 @@ describe('Cecelia Chat API', () => {
     const body = await res.json();
     expect(body.success).toBe(false);
   });
+
+  it('should return reply as natural language string, not JSON', async () => {
+    const res = await chat('帮我创建一个测试任务');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(typeof body.reply).toBe('string');
+    expect(body.reply.length).toBeGreaterThan(0);
+    // Should not start with JSON markers
+    expect(body.reply).not.toMatch(/^[\[{]/);
+  });
+
+  it('integration test: create task, query status, and handle unknown intent', async () => {
+    // Scenario 1: Create task
+    const createRes = await chat('创建任务：集成测试任务');
+    expect(createRes.status).toBe(200);
+    const createBody = await createRes.json();
+    expect(createBody.success).toBe(true);
+    expect(createBody.action_result?.type).toBe('created');
+    expect(typeof createBody.reply).toBe('string');
+
+    // Scenario 2: Query status
+    const queryRes = await chat('查询任务状态');
+    expect(queryRes.status).toBe(200);
+    const queryBody = await queryRes.json();
+    expect(queryBody.success).toBe(true);
+    expect(queryBody.intent.type).toBe('query_status');
+    expect(queryBody.action_result?.type).toBe('query');
+    expect(Array.isArray(queryBody.action_result?.data)).toBe(true);
+
+    // Scenario 3: Unknown intent
+    const unknownRes = await chat('random gibberish xyz123');
+    expect(unknownRes.status).toBe(200);
+    const unknownBody = await unknownRes.json();
+    expect(unknownBody.success).toBe(true);
+    expect(unknownBody.reply).toMatch(/不太理解|换个方式/);
+    expect(unknownBody.action_result).toBeNull();
+  });
 });
