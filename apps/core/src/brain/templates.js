@@ -506,91 +506,180 @@ function generatePrdFromGoalKR(params) {
 }
 
 /**
- * Fuzzy/vague words that indicate low-quality PRD content
+ * Placeholder patterns that indicate incomplete content
  */
-const FUZZY_WORDS = ['优化', '改进', '提升', '完善', '增强', '更好', '更优', '改善', 'improve', 'optimize', 'enhance', 'better'];
+const PLACEHOLDER_PATTERNS = [
+  '待定义', '待定', 'TBD', 'TODO', 'FIXME', '待实现', '待补充', 'N/A', 'TBA'
+];
+
+/**
+ * Parse markdown into sections by ## headers
+ * @param {string} markdown - Markdown content
+ * @returns {Map<string, string>} Map of section title to content
+ */
+function parseSections(markdown) {
+  const sections = new Map();
+  const lines = markdown.split('\n');
+  let currentSection = null;
+  let currentContent = [];
+
+  for (const line of lines) {
+    const match = line.match(/^##\s+(.+)/);
+    if (match) {
+      if (currentSection) {
+        sections.set(currentSection, currentContent.join('\n').trim());
+      }
+      currentSection = match[1].trim();
+      currentContent = [];
+    } else if (currentSection) {
+      currentContent.push(line);
+    }
+  }
+  if (currentSection) {
+    sections.set(currentSection, currentContent.join('\n').trim());
+  }
+
+  return sections;
+}
+
+/**
+ * Check if content contains placeholder text
+ * @param {string} content - Section content
+ * @returns {string[]} Found placeholder patterns
+ */
+function findPlaceholders(content) {
+  const found = [];
+  for (const pattern of PLACEHOLDER_PATTERNS) {
+    if (content.toLowerCase().includes(pattern.toLowerCase())) {
+      found.push(pattern);
+    }
+  }
+  return found;
+}
 
 /**
  * Validate a PRD markdown document
- * Checks required sections and content quality
  * @param {string} markdown - PRD markdown content
- * @returns {{ valid: boolean, score: number, errors: string[] }}
+ * @returns {{valid: boolean, errors: string[], warnings: string[], score: number}}
  */
 function validatePrd(markdown) {
   const errors = [];
-  let score = 100;
+  const warnings = [];
+  const sections = parseSections(markdown);
 
-  if (!markdown || typeof markdown !== 'string' || markdown.trim().length === 0) {
-    return { valid: false, score: 0, errors: ['PRD content is empty'] };
-  }
+  const requiredSections = PRD_TEMPLATE.sections
+    .filter(s => s.required)
+    .map(s => s.title);
 
-  const requiredFields = [
-    { pattern: /\*\*需求来源\*\*|## 需求来源|## 背景/, label: '需求来源/背景' },
-    { pattern: /\*\*功能描述\*\*|## 功能[需求描述]|## 功能需求|## 功能描述/, label: '功能描述' },
-    { pattern: /\*\*成功标准\*\*|## 成功标准|## 验收标准/, label: '成功标准/验收标准' },
-    { pattern: /\*\*非目标\*\*|## 非目标/, label: '非目标' }
-  ];
+  let foundRequired = 0;
 
-  for (const field of requiredFields) {
-    if (!field.pattern.test(markdown)) {
-      errors.push(`Missing required section: ${field.label}`);
-      score -= 20;
-    }
-  }
-
-  // Check for fuzzy words in success criteria section
-  const criteriaMatch = markdown.match(/(?:\*\*成功标准\*\*|## 成功标准|## 验收标准)([\s\S]*?)(?=\n## |\n\*\*[^*]+\*\*:|$)/);
-  if (criteriaMatch) {
-    const criteriaText = criteriaMatch[1];
-    for (const word of FUZZY_WORDS) {
-      if (criteriaText.includes(word)) {
-        errors.push(`Fuzzy word "${word}" found in success criteria`);
-        score -= 5;
+  for (const title of requiredSections) {
+    const content = sections.get(title);
+    if (!content || content.length === 0) {
+      errors.push(`缺少必需 section: ${title}`);
+    } else {
+      foundRequired++;
+      const placeholders = findPlaceholders(content);
+      if (placeholders.length > 0) {
+        warnings.push(`"${title}" 包含占位符内容: ${placeholders.join(', ')}`);
       }
     }
-    // Check if criteria are testable (have checkboxes or specific items)
-    const checkboxCount = (criteriaText.match(/- \[[ x]\]/g) || []).length;
-    if (checkboxCount === 0 && criteriaText.trim().length > 0) {
-      errors.push('Success criteria lack checkable items (no "- [ ]" found)');
-      score -= 10;
+  }
+
+  // Also check common PRD header variants
+  const prdAltHeaders = {
+    '需求来源': '背景',
+    '功能描述': '功能需求',
+    '成功标准': '验收标准'
+  };
+
+  for (const [alt, original] of Object.entries(prdAltHeaders)) {
+    if (!sections.has(original) && sections.has(alt)) {
+      const content = sections.get(alt);
+      if (content && content.length > 0) {
+        const idx = errors.findIndex(e => e.includes(original));
+        if (idx !== -1) {
+          errors.splice(idx, 1);
+          foundRequired++;
+          const placeholders = findPlaceholders(content);
+          if (placeholders.length > 0) {
+            warnings.push(`"${alt}" 包含占位符内容: ${placeholders.join(', ')}`);
+          }
+        }
+      }
     }
   }
 
-  score = Math.max(0, score);
-  return { valid: errors.filter(e => e.startsWith('Missing')).length === 0, score, errors };
+  // Check non-required sections for placeholders
+  for (const [title, content] of sections) {
+    if (!requiredSections.includes(title)) {
+      const placeholders = findPlaceholders(content);
+      if (placeholders.length > 0) {
+        warnings.push(`"${title}" 包含占位符内容: ${placeholders.join(', ')}`);
+      }
+    }
+  }
+
+  const score = requiredSections.length > 0
+    ? Math.round((foundRequired / requiredSections.length) * 100)
+    : 0;
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    score
+  };
 }
 
 /**
  * Validate a TRD markdown document
- * Checks required sections
  * @param {string} markdown - TRD markdown content
- * @returns {{ valid: boolean, score: number, errors: string[] }}
+ * @returns {{valid: boolean, errors: string[], warnings: string[], score: number}}
  */
 function validateTrd(markdown) {
   const errors = [];
-  let score = 100;
+  const warnings = [];
+  const sections = parseSections(markdown);
 
-  if (!markdown || typeof markdown !== 'string' || markdown.trim().length === 0) {
-    return { valid: false, score: 0, errors: ['TRD content is empty'] };
-  }
+  const requiredSections = TRD_TEMPLATE.sections
+    .filter(s => s.required)
+    .map(s => s.title);
 
-  const requiredSections = [
-    { pattern: /## 技术背景/, label: '技术背景' },
-    { pattern: /## 架构设计/, label: '架构设计' },
-    { pattern: /## API 设计|## API设计/, label: 'API 设计' },
-    { pattern: /## 数据模型/, label: '数据模型' },
-    { pattern: /## 测试策略/, label: '测试策略' }
-  ];
+  let foundRequired = 0;
 
-  for (const section of requiredSections) {
-    if (!section.pattern.test(markdown)) {
-      errors.push(`Missing required section: ${section.label}`);
-      score -= 20;
+  for (const title of requiredSections) {
+    const content = sections.get(title);
+    if (!content || content.length === 0) {
+      errors.push(`缺少必需 section: ${title}`);
+    } else {
+      foundRequired++;
+      const placeholders = findPlaceholders(content);
+      if (placeholders.length > 0) {
+        warnings.push(`"${title}" 包含占位符内容: ${placeholders.join(', ')}`);
+      }
     }
   }
 
-  score = Math.max(0, score);
-  return { valid: errors.length === 0, score, errors };
+  for (const [title, content] of sections) {
+    if (!requiredSections.includes(title)) {
+      const placeholders = findPlaceholders(content);
+      if (placeholders.length > 0) {
+        warnings.push(`"${title}" 包含占位符内容: ${placeholders.join(', ')}`);
+      }
+    }
+  }
+
+  const score = requiredSections.length > 0
+    ? Math.round((foundRequired / requiredSections.length) * 100)
+    : 0;
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    score
+  };
 }
 
 /**
@@ -621,7 +710,7 @@ export {
   PRD_TEMPLATE,
   TRD_TEMPLATE,
   PRD_TYPE_MAP,
-  FUZZY_WORDS,
+  PLACEHOLDER_PATTERNS,
   generateFrontmatter,
   renderPrd,
   renderTrd,
