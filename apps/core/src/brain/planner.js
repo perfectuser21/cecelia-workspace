@@ -9,7 +9,7 @@ import pool from '../task-system/db.js';
 import { getDailyFocus } from './focus.js';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
-import { generatePrdFromGoalKR } from './templates.js';
+import { generatePrdFromGoalKR, validatePrd } from './templates.js';
 
 /**
  * Get global state for planning decisions
@@ -413,6 +413,11 @@ function generateTaskPRD(taskTitle, taskDescription, kr, project) {
     kr,
     project
   });
+
+  const validation = validatePrd(prdContent);
+  if (validation.score < 60) {
+    console.warn(`[Planner] Generated PRD has low quality score: ${validation.score}/100, missing: ${validation.missing_fields.join(', ')}`, { prdPath });
+  }
 
   writeFileSync(prdPath, prdContent, 'utf-8');
   return prdPath;

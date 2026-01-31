@@ -506,6 +506,132 @@ function generatePrdFromGoalKR(params) {
 }
 
 /**
+ * Fuzzy words that indicate vague/unmeasurable criteria
+ */
+const FUZZY_WORDS = ['优化', '改进', '提升', '更好', '优雅', '合理', '适当', '尽量'];
+
+/**
+ * Validate a PRD document
+ * @param {string} content - PRD markdown content
+ * @param {string} [type='feature'] - PRD type: feature | bugfix | refactor
+ * @returns {{ valid: boolean, score: number, missing_fields: string[] }}
+ */
+function validatePrd(content, type = 'feature') {
+  if (!content || typeof content !== 'string' || content.trim().length === 0) {
+    return { valid: false, score: 0, missing_fields: ['all'] };
+  }
+
+  const missing = [];
+  let score = 0;
+  const maxScore = 100;
+
+  // Check required sections (each worth 15 points, 4 sections = 60)
+  const requiredSections = [
+    { pattern: /##\s*(背景|需求来源|Background)/i, name: 'background' },
+    { pattern: /##\s*(功能[需描]|Functional|目标)/i, name: 'functionality' },
+    { pattern: /##\s*(验收|成功标准|Acceptance)/i, name: 'acceptance_criteria' },
+    { pattern: /##\s*(涉及文件|影响范围|Scope)/i, name: 'scope' }
+  ];
+
+  for (const section of requiredSections) {
+    if (section.pattern.test(content)) {
+      score += 15;
+    } else {
+      missing.push(section.name);
+    }
+  }
+
+  // Check frontmatter (10 points)
+  if (/^---\n[\s\S]*?\n---/.test(content)) {
+    score += 10;
+  } else {
+    missing.push('frontmatter');
+  }
+
+  // Check non-targets section (10 points)
+  if (/##\s*(非目标|Non.?target|不做)/i.test(content)) {
+    score += 10;
+  } else {
+    missing.push('non_targets');
+  }
+
+  // Check acceptance criteria quality (20 points)
+  const criteriaMatch = content.match(/##\s*(验收|成功标准|Acceptance)[\s\S]*?(?=##|$)/i);
+  if (criteriaMatch) {
+    const criteriaText = criteriaMatch[0];
+    const checkboxes = (criteriaText.match(/- \[[ x]\]/g) || []).length;
+    if (checkboxes >= 1) score += 10;
+    // Check for fuzzy words in criteria
+    const hasFuzzy = FUZZY_WORDS.some(w => criteriaText.includes(w));
+    if (!hasFuzzy) score += 10;
+    if (hasFuzzy) missing.push('criteria_has_fuzzy_words');
+  }
+
+  return {
+    valid: score >= 60 && missing.filter(f => f !== 'criteria_has_fuzzy_words' && f !== 'frontmatter' && f !== 'non_targets').length === 0,
+    score: Math.min(score, maxScore),
+    missing_fields: missing
+  };
+}
+
+/**
+ * Validate a TRD document
+ * @param {string} content - TRD markdown content
+ * @returns {{ valid: boolean, score: number, missing_fields: string[] }}
+ */
+function validateTrd(content) {
+  if (!content || typeof content !== 'string' || content.trim().length === 0) {
+    return { valid: false, score: 0, missing_fields: ['all'] };
+  }
+
+  const missing = [];
+  let score = 0;
+  const maxScore = 100;
+
+  // Check required TRD sections (each worth 15 points, 5 sections = 75)
+  const requiredSections = [
+    { pattern: /##\s*(技术背景|Technical Background)/i, name: 'technical_background' },
+    { pattern: /##\s*(架构设计|Architecture)/i, name: 'architecture_design' },
+    { pattern: /##\s*(API\s*设计|API\s*Design|接口)/i, name: 'api_design' },
+    { pattern: /##\s*(数据模型|Data Model|数据库)/i, name: 'data_model' },
+    { pattern: /##\s*(测试策略|Test Strategy|测试方案)/i, name: 'test_strategy' }
+  ];
+
+  for (const section of requiredSections) {
+    if (section.pattern.test(content)) {
+      score += 15;
+    } else {
+      missing.push(section.name);
+    }
+  }
+
+  // Check frontmatter (10 points)
+  if (/^---\n[\s\S]*?\n---/.test(content)) {
+    score += 10;
+  } else {
+    missing.push('frontmatter');
+  }
+
+  // Check implementation plan section (10 points)
+  if (/##\s*(实施计划|Implementation Plan|任务分解)/i.test(content)) {
+    score += 10;
+  } else {
+    missing.push('implementation_plan');
+  }
+
+  // Check for code blocks or diagrams indicating technical detail (5 points)
+  if (/```/.test(content)) {
+    score += 5;
+  }
+
+  return {
+    valid: score >= 60 && missing.filter(f => f !== 'frontmatter').length === 0,
+    score: Math.min(score, maxScore),
+    missing_fields: missing
+  };
+}
+
+/**
  * Get template by name
  * @param {string} templateName - Template name ('prd' or 'trd')
  * @returns {Object|null} Template object
@@ -533,12 +659,15 @@ export {
   PRD_TEMPLATE,
   TRD_TEMPLATE,
   PRD_TYPE_MAP,
+  FUZZY_WORDS,
   generateFrontmatter,
   renderPrd,
   renderTrd,
   generatePrdFromTask,
   generatePrdFromGoalKR,
   generateTrdFromGoal,
+  validatePrd,
+  validateTrd,
   getTemplate,
   listTemplates,
   getCurrentDate
