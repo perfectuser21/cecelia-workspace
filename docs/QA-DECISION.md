@@ -1,86 +1,116 @@
 ---
-id: qa-decision-kr2-advance
-version: 1.1.0
+id: qa-decision-kr1-intent-recognition
+version: 1.0.0
 created: 2026-02-01
 updated: 2026-02-01
 changelog:
-  - 1.1.0: 修正测试引用（.ts → .js，auto → manual），RCI 决策改为 NO_RCI（调查任务）
-  - 1.0.0: 初始版本（KR2 PRD/TRD 生成验证与修复）
+  - 1.0.0: 初始版本（KR1 意图识别功能）
 ---
 
 # QA Decision
 
-Decision: NO_RCI
+Decision: MUST_ADD_RCI
 Priority: P0
 RepoType: Business
 
 Tests:
-  - dod_item: "找到 Brain 中 PRD/TRD 生成的代码位置，定位到具体文件和函数"
-    method: manual
-    location: manual:检查 apps/core/src/brain/templates.js 和 planner.js，确认 generateTrdFromGoalKR 或相关函数存在
-
-  - dod_item: "手动测试生成功能：创建测试 Goal，验证生成的 TRD 包含 title、requirements、success_criteria"
-    method: manual
-    location: manual:创建测试 Goal 并验证生成结果
-
-  - dod_item: "运行自动化测试，90% 以上通过率"
+  - dod_item: "实现至少 5 种基本意图识别：create_goal, create_task, query_goal, update_task, query_status"
     method: auto
-    location: apps/core/src/brain/__tests__/*.test.js
+    location: apps/core/src/brain/__tests__/intent-recognizer.test.js
 
-  - dod_item: "查看 Brain decision_log，找到最近 10 次 'Advance KR2' 相关的失败记录"
-    method: manual
-    location: manual:查询 Core API `/api/brain/decisions` 或直接查询 decision_log 表
-
-  - dod_item: "识别共同失败模式：记录错误堆栈、错误消息、失败步骤到文档"
-    method: manual
-    location: manual:分析日志并记录到 docs/KR2-FAILURE-ANALYSIS.md
-
-  - dod_item: "定位根本原因：确定是代码 bug、配置问题、依赖缺失还是逻辑错误"
-    method: manual
-    location: manual:代码审查和调试分析
-
-  - dod_item: "如果发现代码 bug，修复后重新测试通过"
-    method: manual
-    location: manual:修复后重新运行相关测试验证
-
-  - dod_item: "如果是配置问题，更新配置并验证"
-    method: manual
-    location: manual:检查配置文件和环境变量
-
-  - dod_item: "添加或修复相关单元测试，确保覆盖失败场景"
-    method: manual
-    location: manual:检查 apps/core/src/brain/__tests__/templates.test.js，验证包含失败场景测试用例
-
-  - dod_item: "使用 Brain API 更新失败任务状态为 completed"
-    method: manual
-    location: manual:验证 API 调用响应 200
-
-  - dod_item: "验证 `GET /api/brain/status` 中 p0 任务列表不再包含 'Advance KR2' 的 failed 任务"
-    method: manual
-    location: manual:检查 API 响应中 p0 数组
-
-  - dod_item: "确认 Brain system_health 中 stale_tasks = 0"
-    method: manual
-    location: manual:检查 status 响应中的 system_health 字段
-
-  - dod_item: "如果 KR2 确实已完成，验证功能正常工作"
-    method: manual
-    location: manual:端到端验证 PRD/TRD 生成流程
-
-  - dod_item: "如果 KR2 未完成，更新 Brain 中的 KR2 progress 为正确值"
-    method: manual
-    location: manual:验证 API 更新结果
-
-  - dod_item: "记录验证结果到文档 `docs/KR2-VERIFICATION.md`"
-    method: manual
-    location: manual:检查文件是否存在且包含验证结果
-
-  - dod_item: "相关单元测试通过（如果有修改代码）"
+  - dod_item: "单元测试准确率 >= 85%（20 个测试用例，覆盖 5 种意图）"
     method: auto
-    location: apps/core/src/brain/__tests__/*.test.js
+    location: apps/core/src/brain/__tests__/intent-recognizer.test.js
+
+  - dod_item: "API 调用返回正确意图"
+    method: auto
+    location: apps/core/src/brain/__tests__/intent-api.test.js
+
+  - dod_item: "能从自然语言中提取 title、priority、deadline、status 等关键字段"
+    method: auto
+    location: apps/core/src/brain/__tests__/entity-extractor.test.js
+
+  - dod_item: "测试用例验证：提取实体准确性"
+    method: auto
+    location: apps/core/src/brain/__tests__/entity-extractor.test.js
+
+  - dod_item: "优先级识别：支持 '重要/紧急' → P0, '普通' → P1, '不急' → P2 的映射"
+    method: auto
+    location: apps/core/src/brain/__tests__/entity-extractor.test.js
+
+  - dod_item: "实现简单的上下文存储：保存最近提到的 goal/task ID"
+    method: auto
+    location: apps/core/src/brain/__tests__/context-manager.test.js
+
+  - dod_item: "代词解析：用户说 '那个目标' 时，能从上下文找到最近提到的 goal_id"
+    method: auto
+    location: apps/core/src/brain/__tests__/context-manager.test.js
+
+  - dod_item: "测试：连续两次调用 API，第二次输入 '给它加个任务' 能正确关联第一次创建的 goal"
+    method: auto
+    location: apps/core/src/brain/__tests__/intent-integration.test.js
+
+  - dod_item: "POST /api/brain/intent 端点实现并通过手动测试"
+    method: auto
+    location: apps/core/src/brain/__tests__/intent-api.test.js
+
+  - dod_item: "返回格式包含 intent、entities、confidence 字段"
+    method: auto
+    location: apps/core/src/brain/__tests__/intent-api.test.js
+
+  - dod_item: "错误处理：无法识别时返回 { intent: 'unknown', confidence: 0, suggestions: [...] }"
+    method: auto
+    location: apps/core/src/brain/__tests__/intent-api.test.js
+
+  - dod_item: "添加 docs/KR1-INTENT-RECOGNITION.md 说明设计和使用方法"
+    method: manual
+    location: manual:验证文档存在且内容完整（包含设计说明、API 使用示例、测试方法）
+
+  - dod_item: "单元测试覆盖率 >= 80%"
+    method: auto
+    location: npm test -- apps/core/src/brain/__tests__/intent-recognizer.test.js --coverage
+
+  - dod_item: "在 Brain status 中更新 KR1 progress 到 >= 50%"
+    method: manual
+    location: manual:调用 GET /api/brain/status 验证 KR1 进度更新
+
+  - dod_item: "npm run qa 通过"
+    method: auto
+    location: npm run qa
 
 RCI:
-  new: []
+  new:
+    - contract_id: intent_recognition_basic
+      description: 意图识别核心功能回归测试
+      test_cases:
+        - "识别创建目标意图：'创建一个高优先级目标：完成用户系统' → create_goal"
+        - "识别查询意图：'认证系统目标进展怎么样？' → query_goal"
+        - "识别创建任务意图：'添加一个任务：优化登录 API 性能' → create_task"
+        - "识别更新意图：'把那个任务改成已完成' → update_task"
+        - "识别状态查询：'当前有哪些进行中的任务？' → query_status"
+
+    - contract_id: entity_extraction_core
+      description: 实体提取核心功能回归测试
+      test_cases:
+        - "提取标题和优先级：'本月完成 P0 的认证重构' → {title: '认证重构', priority: 'P0', deadline: '2026-02-28'}"
+        - "优先级关键词映射：'这个很重要' → priority: P0"
+        - "时间解析：'本月' → deadline: 当月最后一天"
+        - "状态关键词：'已完成' → status: 'completed'"
+
+    - contract_id: context_management_basic
+      description: 上下文管理基础功能回归测试
+      test_cases:
+        - "上下文存储：连续两次调用，第二次能引用第一次创建的实体"
+        - "代词解析：'那个目标' → 解析为最近提到的 goal_id"
+        - "会话隔离：不同 session_id 不共享上下文"
+
+    - contract_id: intent_api_contract
+      description: Intent API 接口契约测试
+      test_cases:
+        - "POST /api/brain/intent 返回 {intent, entities, confidence}"
+        - "无法识别时返回 {intent: 'unknown', confidence: 0, suggestions: [...]}"
+        - "API 响应时间 < 2s（简单规则匹配）"
+
   update: []
 
-Reason: P0 核心功能验证任务。本任务为调查分析性质，重点是验证现有功能状态和清理失败任务，不涉及新功能开发，因此不新增 RCI。如果发现 bug 需要修复，将在修复 PR 中评估是否需要添加回归契约。
+Reason: KR1 是核心 Brain 功能（意图识别），P0 优先级，涉及新增 API 端点和核心逻辑，必须建立回归契约确保未来修改不破坏基础能力。

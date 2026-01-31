@@ -1,8 +1,8 @@
 dev
-branch: cp-02010518--Retry-Advance-KR2-PRD-TRD-for
-session_id: a06a4b1eed02
+branch: cp-02010654--Retry-Advance-KR1-OKR-Project
+session_id: 6be3afb3c682
 tty: not a tty
 not a tty
 prd: .prd.md
-started: 2026-02-01T05:23:18+08:00
+started: 2026-02-01T06:58:25+08:00
 tasks_created: true
