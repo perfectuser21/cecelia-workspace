@@ -9,8 +9,7 @@ import pool from '../task-system/db.js';
 import { getDailyFocus } from './focus.js';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
-import { shouldRetryTask } from './retry-analyzer.js';
-import { generatePrdFromGoalKR } from './templates.js';
+import { generatePrdFromGoalKR, validatePrd } from './templates.js';
 
 /**
  * Get global state for planning decisions
@@ -180,50 +179,30 @@ async function autoGenerateTask(kr, project, state, options = {}) {
     ORDER BY updated_at DESC LIMIT 5
   `, [kr.id, project.id]);
 
-  // Strategy 1: Retry most recent failed task (with intelligent analysis)
+  // Strategy 1: Retry most recent failed task (with retry count check)
   for (const failed of failedResult.rows) {
-    const { shouldRetry, analysis } = shouldRetryTask(failed);
-
-    if (!shouldRetry) {
-      // Mark as abandoned if not already
-      if (failed.payload?.status !== 'abandoned') {
-        await pool.query(
-          `UPDATE tasks SET status = 'abandoned', payload = COALESCE(payload, '{}'::jsonb) || $2::jsonb WHERE id = $1`,
-          [failed.id, JSON.stringify({ failure_analysis: analysis })]
-        );
-      }
-      continue;
-    }
-
     const retries = failed.payload?.retry_count || 0;
-    const retryTitle = failed.title.startsWith('[Retry]') ? failed.title : `[Retry] ${failed.title}`;
+    if (retries < 2) {
+      const retryTitle = failed.title.startsWith('[Retry]') ? failed.title : `[Retry] ${failed.title}`;
 
-    const retryPayload = {
-      retry_of: failed.id,
-      retry_count: retries + 1,
-      auto_generated: true,
-      failure_analysis: analysis,
-      dispatch_timeout: analysis.adjustments.dispatch_timeout,
-      retry_delay_ms: analysis.adjustments.retry_delay_ms,
-    };
+      if (options.dryRun) {
+        return { id: null, title: retryTitle, priority: failed.priority, goal_id: kr.id, project_id: project.id, _generated: true, _strategy: 'retry' };
+      }
 
-    if (options.dryRun) {
-      return { id: null, title: retryTitle, priority: failed.priority, goal_id: kr.id, project_id: project.id, _generated: true, _strategy: 'retry', payload: retryPayload };
+      const insertResult = await pool.query(`
+        INSERT INTO tasks (title, description, priority, project_id, goal_id, status, payload)
+        VALUES ($1, $2, $3, $4, $5, 'queued', $6) RETURNING *
+      `, [
+        retryTitle,
+        failed.description || '',
+        failed.priority || 'P1',
+        project.id,
+        kr.id,
+        JSON.stringify({ retry_of: failed.id, retry_count: retries + 1, auto_generated: true })
+      ]);
+
+      return insertResult.rows[0];
     }
-
-    const insertResult = await pool.query(`
-      INSERT INTO tasks (title, description, priority, project_id, goal_id, status, payload)
-      VALUES ($1, $2, $3, $4, $5, 'queued', $6) RETURNING *
-    `, [
-      retryTitle,
-      failed.description || '',
-      failed.priority || 'P1',
-      project.id,
-      kr.id,
-      JSON.stringify(retryPayload)
-    ]);
-
-    return insertResult.rows[0];
   }
 
   // Strategy 2: V3 - Generate concrete task from KR decomposition
@@ -234,8 +213,11 @@ async function autoGenerateTask(kr, project, state, options = {}) {
 
   // Generate PRD file for the task
   let prdPath = null;
+  let prdValidation = null;
   try {
-    prdPath = generateTaskPRD(taskCandidate.title, taskCandidate.description, kr, project);
+    const prdResult = generateTaskPRD(taskCandidate.title, taskCandidate.description, kr, project);
+    prdPath = prdResult.path;
+    prdValidation = prdResult.validation;
   } catch (err) {
     console.error('Failed to generate PRD:', err);
   }
@@ -250,7 +232,7 @@ async function autoGenerateTask(kr, project, state, options = {}) {
       project_id: project.id,
       _generated: true,
       _strategy: 'v3_decompose',
-      payload: { prd_path: prdPath, auto_generated: true, kr_progress: kr.progress, kr_gap: gap }
+      payload: { prd_path: prdPath, prd_validation: prdValidation, auto_generated: true, kr_progress: kr.progress, kr_gap: gap }
     };
   }
 
@@ -263,7 +245,7 @@ async function autoGenerateTask(kr, project, state, options = {}) {
     priority,
     project.id,
     kr.id,
-    JSON.stringify({ auto_generated: true, prd_path: prdPath, kr_progress: kr.progress, kr_gap: gap })
+    JSON.stringify({ auto_generated: true, prd_path: prdPath, prd_validation: prdValidation, kr_progress: kr.progress, kr_gap: gap })
   ]);
 
   return insertResult.rows[0];
@@ -435,8 +417,10 @@ function generateTaskPRD(taskTitle, taskDescription, kr, project) {
     project
   });
 
+  const validation = validatePrd(prdContent);
+
   writeFileSync(prdPath, prdContent, 'utf-8');
-  return prdPath;
+  return { path: prdPath, validation };
 }
 
 /**

@@ -506,91 +506,81 @@ function generatePrdFromGoalKR(params) {
 }
 
 /**
- * Fuzzy/vague words that indicate low-quality PRD content
+ * Validate a PRD document string against required fields.
+ * @param {string} prdContent - PRD markdown content
+ * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
  */
-const FUZZY_WORDS = ['优化', '改进', '提升', '完善', '增强', '更好', '更优', '改善', 'improve', 'optimize', 'enhance', 'better'];
-
-/**
- * Validate a PRD markdown document
- * Checks required sections and content quality
- * @param {string} markdown - PRD markdown content
- * @returns {{ valid: boolean, score: number, errors: string[] }}
- */
-function validatePrd(markdown) {
+function validatePrd(prdContent) {
   const errors = [];
-  let score = 100;
+  const warnings = [];
 
-  if (!markdown || typeof markdown !== 'string' || markdown.trim().length === 0) {
-    return { valid: false, score: 0, errors: ['PRD content is empty'] };
+  if (!prdContent || typeof prdContent !== 'string') {
+    return { valid: false, errors: ['PRD content is empty or not a string'], warnings: [] };
   }
 
   const requiredFields = [
-    { pattern: /\*\*需求来源\*\*|## 需求来源|## 背景/, label: '需求来源/背景' },
-    { pattern: /\*\*功能描述\*\*|## 功能[需求描述]|## 功能需求|## 功能描述/, label: '功能描述' },
-    { pattern: /\*\*成功标准\*\*|## 成功标准|## 验收标准/, label: '成功标准/验收标准' },
-    { pattern: /\*\*非目标\*\*|## 非目标/, label: '非目标' }
+    { pattern: /##\s*需求来源|##\s*背景|需求来源\s*[:：]|\*\*需求来源\*\*/, label: '需求来源' },
+    { pattern: /##\s*功能描述|功能描述\s*[:：]|\*\*功能描述\*\*|##\s*功能需求/, label: '功能描述' },
+    { pattern: /##\s*成功标准|成功标准\s*[:：]|\*\*成功标准\*\*|##\s*验收标准/, label: '成功标准' }
   ];
 
   for (const field of requiredFields) {
-    if (!field.pattern.test(markdown)) {
-      errors.push(`Missing required section: ${field.label}`);
-      score -= 20;
+    if (!field.pattern.test(prdContent)) {
+      errors.push(`Missing required field: ${field.label}`);
     }
   }
 
-  // Check for fuzzy words in success criteria section
-  const criteriaMatch = markdown.match(/(?:\*\*成功标准\*\*|## 成功标准|## 验收标准)([\s\S]*?)(?=\n## |\n\*\*[^*]+\*\*:|$)/);
-  if (criteriaMatch) {
-    const criteriaText = criteriaMatch[1];
-    for (const word of FUZZY_WORDS) {
-      if (criteriaText.includes(word)) {
-        errors.push(`Fuzzy word "${word}" found in success criteria`);
-        score -= 5;
-      }
-    }
-    // Check if criteria are testable (have checkboxes or specific items)
-    const checkboxCount = (criteriaText.match(/- \[[ x]\]/g) || []).length;
-    if (checkboxCount === 0 && criteriaText.trim().length > 0) {
-      errors.push('Success criteria lack checkable items (no "- [ ]" found)');
-      score -= 10;
+  if (!/##\s*非目标|非目标\s*[:：]|\*\*非目标\*\*/.test(prdContent)) {
+    warnings.push('Missing recommended field: 非目标');
+  }
+
+  if (!/##\s*涉及文件|涉及文件\s*[:：]|\*\*涉及文件\*\*/.test(prdContent)) {
+    warnings.push('Missing recommended field: 涉及文件');
+  }
+
+  const successMatch = prdContent.match(/(?:##\s*(?:成功标准|验收标准)|\*\*成功标准\*\*)([\s\S]*?)(?=\n##|\n\*\*[^*]|\n---|\n$)/);
+  if (successMatch) {
+    const section = successMatch[1];
+    if (!/[-*]\s|^\d+\./m.test(section)) {
+      warnings.push('成功标准 section has no list items');
     }
   }
 
-  score = Math.max(0, score);
-  return { valid: errors.filter(e => e.startsWith('Missing')).length === 0, score, errors };
+  return { valid: errors.length === 0, errors, warnings };
 }
 
 /**
- * Validate a TRD markdown document
- * Checks required sections
- * @param {string} markdown - TRD markdown content
- * @returns {{ valid: boolean, score: number, errors: string[] }}
+ * Validate a TRD document string against required sections.
+ * @param {string} trdContent - TRD markdown content
+ * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
  */
-function validateTrd(markdown) {
+function validateTrd(trdContent) {
   const errors = [];
-  let score = 100;
+  const warnings = [];
 
-  if (!markdown || typeof markdown !== 'string' || markdown.trim().length === 0) {
-    return { valid: false, score: 0, errors: ['TRD content is empty'] };
+  if (!trdContent || typeof trdContent !== 'string') {
+    return { valid: false, errors: ['TRD content is empty or not a string'], warnings: [] };
   }
 
   const requiredSections = [
-    { pattern: /## 技术背景/, label: '技术背景' },
-    { pattern: /## 架构设计/, label: '架构设计' },
-    { pattern: /## API 设计|## API设计/, label: 'API 设计' },
-    { pattern: /## 数据模型/, label: '数据模型' },
-    { pattern: /## 测试策略/, label: '测试策略' }
+    { pattern: /##\s*技术背景/, label: '技术背景' },
+    { pattern: /##\s*架构设计/, label: '架构设计' },
+    { pattern: /##\s*API\s*设计/, label: 'API 设计' },
+    { pattern: /##\s*数据模型/, label: '数据模型' },
+    { pattern: /##\s*测试策略/, label: '测试策略' }
   ];
 
   for (const section of requiredSections) {
-    if (!section.pattern.test(markdown)) {
+    if (!section.pattern.test(trdContent)) {
       errors.push(`Missing required section: ${section.label}`);
-      score -= 20;
     }
   }
 
-  score = Math.max(0, score);
-  return { valid: errors.length === 0, score, errors };
+  if (!/##\s*实施计划/.test(trdContent)) {
+    warnings.push('Missing recommended section: 实施计划');
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
 }
 
 /**
@@ -621,7 +611,6 @@ export {
   PRD_TEMPLATE,
   TRD_TEMPLATE,
   PRD_TYPE_MAP,
-  FUZZY_WORDS,
   generateFrontmatter,
   renderPrd,
   renderTrd,
