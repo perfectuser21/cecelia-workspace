@@ -14,17 +14,22 @@ const TICK_INTERVAL_MINUTES = 5;
 const TICK_LOOP_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes between loop ticks
 const TICK_TIMEOUT_MS = 60 * 1000; // 60 seconds max execution time
 const STALE_THRESHOLD_HOURS = 24; // Tasks in_progress for more than 24h are stale
+const DISPATCH_TIMEOUT_MINUTES = 30; // Auto-fail dispatched tasks after 30 min
+const DISPATCH_COOLDOWN_MS = 60 * 1000; // 1 minute cooldown after dispatch
+const MAX_CONCURRENT_TASKS = 1; // Max concurrent cecelia-run executions
 const AUTO_EXECUTE_CONFIDENCE = 0.8; // Auto-execute decisions with confidence >= this
 
 // Working memory keys
 const TICK_ENABLED_KEY = 'tick_enabled';
 const TICK_LAST_KEY = 'tick_last';
 const TICK_ACTIONS_TODAY_KEY = 'tick_actions_today';
+const TICK_LAST_DISPATCH_KEY = 'tick_last_dispatch';
 
 // Loop state (in-memory)
 let _loopTimer = null;
 let _tickRunning = false;
 let _tickLockTime = null;
+let _lastDispatchTime = 0; // in-memory cooldown tracker
 
 /**
  * Get tick status
@@ -32,8 +37,8 @@ let _tickLockTime = null;
 async function getTickStatus() {
   const result = await pool.query(`
     SELECT key, value_json FROM working_memory
-    WHERE key IN ($1, $2, $3)
-  `, [TICK_ENABLED_KEY, TICK_LAST_KEY, TICK_ACTIONS_TODAY_KEY]);
+    WHERE key IN ($1, $2, $3, $4)
+  `, [TICK_ENABLED_KEY, TICK_LAST_KEY, TICK_ACTIONS_TODAY_KEY, TICK_LAST_DISPATCH_KEY]);
 
   const memory = {};
   for (const row of result.rows) {
@@ -53,6 +58,8 @@ async function getTickStatus() {
     nextTick = new Date(Date.now() + TICK_INTERVAL_MINUTES * 60 * 1000).toISOString();
   }
 
+  const lastDispatch = memory[TICK_LAST_DISPATCH_KEY] || null;
+
   return {
     enabled,
     loop_running: _loopTimer !== null,
@@ -61,7 +68,10 @@ async function getTickStatus() {
     last_tick: lastTick,
     next_tick: nextTick,
     actions_today: actionsToday,
-    tick_running: _tickRunning
+    tick_running: _tickRunning,
+    last_dispatch: lastDispatch,
+    max_concurrent: MAX_CONCURRENT_TASKS,
+    dispatch_timeout_minutes: DISPATCH_TIMEOUT_MINUTES
   };
 }
 
@@ -245,14 +255,183 @@ async function incrementActionsToday(count = 1) {
 }
 
 /**
+ * Select the next dispatchable task from queued tasks.
+ * Skips tasks with unmet dependencies (payload.depends_on).
+ * Returns null if no dispatchable task found.
+ *
+ * @param {string[]} goalIds - Goal IDs to scope the query
+ * @returns {Object|null} - The next task to dispatch, or null
+ */
+async function selectNextDispatchableTask(goalIds) {
+  // Query queued tasks with payload for dependency checking
+  const result = await pool.query(`
+    SELECT t.id, t.title, t.status, t.priority, t.started_at, t.updated_at, t.payload
+    FROM tasks t
+    WHERE t.goal_id = ANY($1)
+      AND t.status = 'queued'
+    ORDER BY
+      CASE t.priority WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 ELSE 3 END,
+      t.created_at ASC
+  `, [goalIds]);
+
+  for (const task of result.rows) {
+    const dependsOn = task.payload?.depends_on;
+    if (Array.isArray(dependsOn) && dependsOn.length > 0) {
+      // Check if all dependencies are completed
+      const depResult = await pool.query(
+        "SELECT COUNT(*) FROM tasks WHERE id = ANY($1) AND status != 'completed'",
+        [dependsOn]
+      );
+      if (parseInt(depResult.rows[0].count) > 0) {
+        continue; // Skip: has unmet dependencies
+      }
+    }
+    return task;
+  }
+  return null;
+}
+
+/**
+ * Dispatch the next queued task for execution.
+ * Checks concurrency limit, cooldown, executor availability, and dependencies.
+ *
+ * @param {string[]} goalIds - Goal IDs to scope the dispatch
+ * @returns {Object} - Dispatch result with actions taken
+ */
+async function dispatchNextTask(goalIds) {
+  const actions = [];
+
+  // 1. Check concurrency
+  const activeResult = await pool.query(
+    "SELECT COUNT(*) FROM tasks WHERE goal_id = ANY($1) AND status = 'in_progress'",
+    [goalIds]
+  );
+  const activeCount = parseInt(activeResult.rows[0].count);
+  if (activeCount >= MAX_CONCURRENT_TASKS) {
+    return { dispatched: false, reason: 'max_concurrent_reached', active: activeCount, actions };
+  }
+
+  // 2. Check cooldown
+  if ((Date.now() - _lastDispatchTime) <= DISPATCH_COOLDOWN_MS) {
+    return { dispatched: false, reason: 'cooldown_active', actions };
+  }
+
+  // 3. Select next task (with dependency check)
+  const nextTask = await selectNextDispatchableTask(goalIds);
+  if (!nextTask) {
+    return { dispatched: false, reason: 'no_dispatchable_task', actions };
+  }
+
+  // 4. Update task status to in_progress
+  const updateResult = await updateTask({
+    task_id: nextTask.id,
+    status: 'in_progress'
+  });
+
+  if (!updateResult.success) {
+    return { dispatched: false, reason: 'update_failed', task_id: nextTask.id, actions };
+  }
+
+  actions.push({
+    action: 'update-task',
+    task_id: nextTask.id,
+    title: nextTask.title,
+    status: 'in_progress'
+  });
+
+  // 5. Check executor availability and trigger
+  const ceceliaAvailable = await checkCeceliaRunAvailable();
+  if (!ceceliaAvailable.available) {
+    await logTickDecision(
+      'tick',
+      `cecelia-run not available, task status updated only`,
+      { action: 'no-executor', task_id: nextTask.id, reason: ceceliaAvailable.error },
+      { success: true, warning: 'cecelia-run not available' }
+    );
+    return { dispatched: true, reason: 'no_executor', task_id: nextTask.id, actions };
+  }
+
+  const fullTaskResult = await pool.query('SELECT * FROM tasks WHERE id = $1', [nextTask.id]);
+  if (fullTaskResult.rows.length === 0) {
+    return { dispatched: false, reason: 'task_not_found', task_id: nextTask.id, actions };
+  }
+
+  const execResult = await triggerCeceliaRun(fullTaskResult.rows[0]);
+
+  _lastDispatchTime = Date.now();
+
+  // Record dispatch info in working_memory
+  await pool.query(`
+    INSERT INTO working_memory (key, value_json, updated_at)
+    VALUES ($1, $2, NOW())
+    ON CONFLICT (key) DO UPDATE SET value_json = $2, updated_at = NOW()
+  `, [TICK_LAST_DISPATCH_KEY, {
+    task_id: nextTask.id,
+    task_title: nextTask.title,
+    run_id: execResult.runId,
+    dispatched_at: new Date().toISOString(),
+    success: execResult.success
+  }]);
+
+  await logTickDecision(
+    'tick',
+    `Dispatched cecelia-run for task: ${nextTask.title}`,
+    { action: 'dispatch', task_id: nextTask.id, run_id: execResult.runId },
+    execResult
+  );
+
+  actions.push({
+    action: 'dispatch',
+    task_id: nextTask.id,
+    title: nextTask.title,
+    run_id: execResult.runId,
+    success: execResult.success
+  });
+
+  return { dispatched: true, task_id: nextTask.id, run_id: execResult.runId, actions };
+}
+
+/**
+ * Auto-fail tasks that have been in_progress longer than DISPATCH_TIMEOUT_MINUTES.
+ *
+ * @param {Object[]} inProgressTasks - Tasks currently in_progress (must include payload, started_at)
+ * @returns {Object[]} - Actions taken
+ */
+async function autoFailTimedOutTasks(inProgressTasks) {
+  const actions = [];
+  for (const task of inProgressTasks) {
+    const triggeredAt = task.payload?.run_triggered_at || task.started_at;
+    if (!triggeredAt) continue;
+
+    const elapsed = (Date.now() - new Date(triggeredAt).getTime()) / (1000 * 60);
+    if (elapsed > DISPATCH_TIMEOUT_MINUTES) {
+      await updateTask({ task_id: task.id, status: 'failed' });
+      await logTickDecision(
+        'tick',
+        `Auto-failed timed-out task: ${task.title} (${Math.round(elapsed)}min)`,
+        { action: 'auto-fail-timeout', task_id: task.id },
+        { success: true, elapsed_minutes: Math.round(elapsed) }
+      );
+      actions.push({
+        action: 'auto-fail-timeout',
+        task_id: task.id,
+        title: task.title,
+        elapsed_minutes: Math.round(elapsed)
+      });
+    }
+  }
+  return actions;
+}
+
+/**
  * Execute a tick - the core self-driving loop
  *
  * 1. Compare goal progress (Decision Engine)
  * 2. Generate and execute high-confidence decisions
  * 3. Get daily focus OKR
  * 4. Check related task status
- * 5. Decide next action
- * 6. Execute action via cecelia-run
+ * 5. Auto-fail timed-out tasks
+ * 6. Dispatch next task via dispatchNextTask()
  * 7. Log decision
  */
 async function executeTick() {
@@ -264,7 +443,6 @@ async function executeTick() {
   try {
     const comparison = await compareGoalProgress();
 
-    // Log comparison result
     await logTickDecision(
       'tick',
       `Goal comparison: ${comparison.overall_health}, ${comparison.goals.length} goals analyzed`,
@@ -283,7 +461,6 @@ async function executeTick() {
         { success: true, confidence: decision.confidence }
       );
 
-      // Auto-execute high-confidence decisions
       if (decision.confidence >= AUTO_EXECUTE_CONFIDENCE && decision.actions.length > 0) {
         const execResult = await executeDecision(decision.decision_id);
 
@@ -301,7 +478,6 @@ async function executeTick() {
           confidence: decision.confidence
         });
       } else if (decision.actions.length > 0) {
-        // Low confidence - log but don't execute
         await logTickDecision(
           'tick',
           `Decision pending approval: confidence ${decision.confidence} < ${AUTO_EXECUTE_CONFIDENCE}`,
@@ -318,7 +494,6 @@ async function executeTick() {
       };
     }
   } catch (err) {
-    // Decision engine error should not stop the tick
     await logTickDecision(
       'tick',
       `Decision engine error: ${err.message}`,
@@ -349,12 +524,12 @@ async function executeTick() {
   const { focus } = focusResult;
   const objectiveId = focus.objective.id;
 
-  // 4. Get tasks related to focus objective
+  // 4. Get tasks related to focus objective (include payload for timeout check)
   const krIds = focus.key_results.map(kr => kr.id);
   const allGoalIds = [objectiveId, ...krIds];
 
   const tasksResult = await pool.query(`
-    SELECT id, title, status, priority, started_at, updated_at
+    SELECT id, title, status, priority, started_at, updated_at, payload
     FROM tasks
     WHERE goal_id = ANY($1)
       AND status NOT IN ('completed', 'cancelled')
@@ -364,12 +539,14 @@ async function executeTick() {
   `, [allGoalIds]);
 
   const tasks = tasksResult.rows;
-
-  // 5. Decision logic
   const inProgress = tasks.filter(t => t.status === 'in_progress');
   const queued = tasks.filter(t => t.status === 'queued');
 
-  // Check for stale tasks
+  // 5. Auto-fail timed-out dispatched tasks
+  const timeoutActions = await autoFailTimedOutTasks(inProgress);
+  actionsTaken.push(...timeoutActions);
+
+  // Check for stale tasks (long-running, not dispatched)
   const staleTasks = tasks.filter(t => isStale(t));
   for (const task of staleTasks) {
     await logTickDecision(
@@ -386,82 +563,15 @@ async function executeTick() {
     });
   }
 
-  // 6. Execute action: Start next task if nothing in progress
-  if (inProgress.length === 0 && queued.length > 0) {
-    const nextTask = queued[0];
+  // 6. Dispatch next task
+  const dispatchResult = await dispatchNextTask(allGoalIds);
+  actionsTaken.push(...dispatchResult.actions);
 
-    // First, update task status to in_progress
-    const updateResult = await updateTask({
-      task_id: nextTask.id,
-      status: 'in_progress'
-    });
-
-    if (updateResult.success) {
-      await logTickDecision(
-        'tick',
-        `Started task: ${nextTask.title}`,
-        { action: 'update-task', task_id: nextTask.id, status: 'in_progress' },
-        updateResult
-      );
-      actionsTaken.push({
-        action: 'update-task',
-        task_id: nextTask.id,
-        title: nextTask.title,
-        status: 'in_progress'
-      });
-
-      // Then, trigger cecelia-run for execution
-      const ceceliaAvailable = await checkCeceliaRunAvailable();
-      if (ceceliaAvailable.available) {
-        // Get full task data for execution
-        const fullTaskResult = await pool.query(
-          'SELECT * FROM tasks WHERE id = $1',
-          [nextTask.id]
-        );
-
-        if (fullTaskResult.rows.length > 0) {
-          const fullTask = fullTaskResult.rows[0];
-          const execResult = await triggerCeceliaRun(fullTask);
-
-          await logTickDecision(
-            'tick',
-            `Triggered cecelia-run for task: ${nextTask.title}`,
-            { action: 'trigger-cecelia', task_id: nextTask.id, run_id: execResult.runId },
-            execResult
-          );
-
-          actionsTaken.push({
-            action: 'trigger-cecelia',
-            task_id: nextTask.id,
-            title: nextTask.title,
-            run_id: execResult.runId,
-            success: execResult.success
-          });
-        }
-      } else {
-        // cecelia-run not available, just log
-        await logTickDecision(
-          'tick',
-          `cecelia-run not available, task status updated only`,
-          { action: 'no-executor', task_id: nextTask.id, reason: ceceliaAvailable.error },
-          { success: true, warning: 'cecelia-run not available' }
-        );
-      }
-    }
-  } else if (inProgress.length > 0) {
-    // Log that we're waiting for in-progress tasks
+  if (!dispatchResult.dispatched && dispatchResult.reason !== 'no_dispatchable_task') {
     await logTickDecision(
       'tick',
-      `Waiting for ${inProgress.length} in-progress task(s)`,
-      { action: 'wait', in_progress_count: inProgress.length },
-      { success: true }
-    );
-  } else if (queued.length === 0) {
-    // No tasks to work on
-    await logTickDecision(
-      'tick',
-      'No queued tasks for focus objective',
-      { action: 'skip', reason: 'no_queued_tasks' },
+      `Dispatch skipped: ${dispatchResult.reason}`,
+      { action: 'dispatch_skip', reason: dispatchResult.reason },
       { success: true }
     );
   }
@@ -473,7 +583,6 @@ async function executeTick() {
     ON CONFLICT (key) DO UPDATE SET value_json = $2, updated_at = NOW()
   `, [TICK_LAST_KEY, { timestamp: now.toISOString() }]);
 
-  // Update actions count
   if (actionsTaken.length > 0) {
     await incrementActionsToday(actionsTaken.length);
   }
@@ -485,6 +594,7 @@ async function executeTick() {
       objective_id: objectiveId,
       objective_title: focus.objective.title
     },
+    dispatch: dispatchResult,
     actions_taken: actionsTaken,
     summary: {
       in_progress: inProgress.length,
@@ -505,7 +615,13 @@ export {
   startTickLoop,
   stopTickLoop,
   initTickLoop,
+  dispatchNextTask,
+  selectNextDispatchableTask,
+  autoFailTimedOutTasks,
   TICK_INTERVAL_MINUTES,
   TICK_LOOP_INTERVAL_MS,
-  TICK_TIMEOUT_MS
+  TICK_TIMEOUT_MS,
+  DISPATCH_TIMEOUT_MINUTES,
+  DISPATCH_COOLDOWN_MS,
+  MAX_CONCURRENT_TASKS
 };
