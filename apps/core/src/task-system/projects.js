@@ -3,21 +3,42 @@ import pool from './db.js';
 
 const router = Router();
 
+// ==================== State Machine ====================
+
+export const VALID_STATUSES = ['planning', 'active', 'reviewing', 'completed'];
+
+export const VALID_TRANSITIONS = {
+  planning: ['active'],
+  active: ['reviewing', 'planning'],
+  reviewing: ['completed', 'active'],
+  completed: [],
+};
+
+export function validateTransition(from, to) {
+  if (!VALID_STATUSES.includes(to)) {
+    return { valid: false, error: `Invalid status '${to}'. Valid statuses: ${VALID_STATUSES.join(', ')}` };
+  }
+  if (!VALID_TRANSITIONS[from]?.includes(to)) {
+    return { valid: false, error: `Invalid transition from '${from}' to '${to}'. Allowed: ${VALID_TRANSITIONS[from]?.join(', ') || 'none'}` };
+  }
+  return { valid: true };
+}
+
 // GET /api/projects - List projects
 router.get('/', async (req, res) => {
   try {
     const { workspace_id } = req.query;
-    
+
     let query = 'SELECT * FROM projects';
     let params = [];
-    
+
     if (workspace_id) {
       query += ' WHERE workspace_id = $1';
       params.push(workspace_id);
     }
-    
+
     query += ' ORDER BY created_at DESC';
-    
+
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
@@ -29,11 +50,11 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM projects WHERE id = $1', [req.params.id]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Project not found' });
     }
-    
+
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Failed to get project', details: err.message });
@@ -45,9 +66,14 @@ router.post('/', async (req, res) => {
   try {
     const { workspace_id, parent_id, name, description, repo_path, icon, color, status, metadata } = req.body;
 
+    const effectiveStatus = status || 'planning';
+    if (!VALID_STATUSES.includes(effectiveStatus)) {
+      return res.status(400).json({ error: `Invalid status '${effectiveStatus}'. Valid statuses: ${VALID_STATUSES.join(', ')}` });
+    }
+
     const result = await pool.query(
       'INSERT INTO projects (workspace_id, parent_id, name, description, repo_path, icon, color, status, metadata) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-      [workspace_id, parent_id || null, name, description, repo_path, icon || '📦', color || '#3b82f6', status || 'active', metadata || {}]
+      [workspace_id, parent_id || null, name, description, repo_path, icon || '📦', color || '#3b82f6', effectiveStatus, metadata || {}]
     );
 
     res.status(201).json(result.rows[0]);
@@ -69,7 +95,19 @@ router.patch('/:id', async (req, res) => {
     if (!name && !description && repo_path === undefined && !icon && !color && !status && !metadata) {
       return res.status(400).json({ error: 'At least one field must be provided for update' });
     }
-    
+
+    // Validate status transition if status is being updated
+    if (status !== undefined) {
+      const current = await pool.query('SELECT status FROM projects WHERE id = $1', [req.params.id]);
+      if (current.rows.length === 0) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      const result = validateTransition(current.rows[0].status, status);
+      if (!result.valid) {
+        return res.status(400).json({ error: result.error });
+      }
+    }
+
     if (name !== undefined) {
       updates.push('name = $' + paramIndex++);
       params.push(name);
@@ -98,20 +136,53 @@ router.patch('/:id', async (req, res) => {
       updates.push('metadata = $' + paramIndex++);
       params.push(metadata);
     }
-    
+
     updates.push('updated_at = NOW()');
     params.push(req.params.id);
-    
+
     const query = 'UPDATE projects SET ' + updates.join(', ') + ' WHERE id = $' + paramIndex + ' RETURNING *';
-    const result = await pool.query(query, params);
-    
-    if (result.rows.length === 0) {
+    const updateResult = await pool.query(query, params);
+
+    if (updateResult.rows.length === 0) {
       return res.status(404).json({ error: 'Project not found' });
     }
-    
-    res.json(result.rows[0]);
+
+    res.json(updateResult.rows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Failed to update project', details: err.message });
+  }
+});
+
+// POST /api/projects/:id/transition - Transition project status
+router.post('/:id/transition', async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!status) {
+      return res.status(400).json({ error: 'status is required' });
+    }
+
+    const current = await pool.query('SELECT * FROM projects WHERE id = $1', [req.params.id]);
+    if (current.rows.length === 0) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    const project = current.rows[0];
+    const result = validateTransition(project.status, status);
+    if (!result.valid) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    const updated = await pool.query(
+      'UPDATE projects SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+      [status, req.params.id]
+    );
+
+    res.json({
+      project: updated.rows[0],
+      transition: { from: project.status, to: status },
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to transition project status', details: err.message });
   }
 });
 
@@ -119,11 +190,11 @@ router.patch('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const result = await pool.query('DELETE FROM projects WHERE id = $1 RETURNING id', [req.params.id]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Project not found' });
     }
-    
+
     res.json({ message: 'Project deleted', id: result.rows[0].id });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete project', details: err.message });
@@ -176,11 +247,11 @@ router.get('/:id/stats', async (req, res) => {
       'SELECT COUNT(DISTINCT g.id) as total_goals, COUNT(DISTINCT CASE WHEN g.status = \'completed\' THEN g.id END) as completed_goals, COUNT(DISTINCT t.id) as total_tasks, COUNT(DISTINCT CASE WHEN t.status = \'completed\' THEN t.id END) as completed_tasks, COUNT(DISTINCT CASE WHEN t.status = \'in_progress\' THEN t.id END) as in_progress_tasks, COUNT(DISTINCT CASE WHEN t.status = \'queued\' THEN t.id END) as queued_tasks, COUNT(DISTINCT CASE WHEN t.status = \'failed\' THEN t.id END) as failed_tasks FROM projects p LEFT JOIN goals g ON p.id = g.project_id LEFT JOIN tasks t ON p.id = t.project_id WHERE p.id = $1 GROUP BY p.id',
       [req.params.id]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Project not found' });
     }
-    
+
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Failed to get project stats', details: err.message });
@@ -292,6 +363,115 @@ router.get('/:id/health', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to get project health', details: err.message });
+  }
+});
+
+// GET /api/projects/:id/dashboard - Get project dashboard overview
+router.get('/:id/dashboard', async (req, res) => {
+  try {
+    const projectId = req.params.id;
+
+    // Project basic info
+    const projectResult = await pool.query('SELECT * FROM projects WHERE id = $1', [projectId]);
+    if (projectResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const project = projectResult.rows[0];
+
+    // Stats: task counts by status
+    const statsResult = await pool.query(`
+      SELECT
+        COUNT(*) as total_tasks,
+        COUNT(*) FILTER (WHERE status = 'completed') as completed_tasks,
+        COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress_tasks,
+        COUNT(*) FILTER (WHERE status = 'queued') as queued_tasks,
+        COUNT(*) FILTER (WHERE status = 'failed') as failed_tasks
+      FROM tasks WHERE project_id = $1
+    `, [projectId]);
+
+    const goalCountResult = await pool.query(`
+      SELECT
+        COUNT(*) as total_goals,
+        COUNT(*) FILTER (WHERE status = 'completed') as completed_goals
+      FROM goals WHERE project_id = $1
+    `, [projectId]);
+
+    const stats = {
+      ...statsResult.rows[0],
+      ...goalCountResult.rows[0]
+    };
+
+    // Health score (same logic as /health endpoint)
+    const taskResult = await pool.query(`
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status = 'completed') as completed,
+        COUNT(*) FILTER (WHERE status = 'in_progress' AND updated_at < NOW() - INTERVAL '7 days') as stale,
+        COUNT(*) FILTER (WHERE updated_at >= NOW() - INTERVAL '7 days') as recently_active
+      FROM tasks WHERE project_id = $1
+    `, [projectId]);
+
+    const goalHealthResult = await pool.query(`
+      SELECT
+        COUNT(*) as total,
+        COALESCE(AVG(progress), 0) as avg_progress
+      FROM goals WHERE project_id = $1
+    `, [projectId]);
+
+    const tasks = taskResult.rows[0];
+    const goalsHealth = goalHealthResult.rows[0];
+    const totalTasks = parseInt(tasks.total);
+    const totalGoals = parseInt(goalsHealth.total);
+
+    let healthScore = 0;
+    let healthStatus = 'critical';
+
+    if (totalTasks > 0 || totalGoals > 0) {
+      const taskCompletionScore = totalTasks > 0 ? (parseInt(tasks.completed) / totalTasks) * 100 : 0;
+      const goalProgressScore = parseFloat(goalsHealth.avg_progress);
+      const staleScore = totalTasks > 0 ? (1 - parseInt(tasks.stale) / totalTasks) * 100 : 100;
+      const activityScore = totalTasks > 0 ? (parseInt(tasks.recently_active) / totalTasks) * 100 : 0;
+
+      healthScore = Math.max(0, Math.min(100, Math.round(
+        taskCompletionScore * 0.4 + goalProgressScore * 0.3 + staleScore * 0.2 + activityScore * 0.1
+      )));
+
+      if (healthScore >= 70) healthStatus = 'healthy';
+      else if (healthScore >= 40) healthStatus = 'at_risk';
+    }
+
+    const health = { health_score: healthScore, health_status: healthStatus };
+
+    // Goals list with progress
+    const goalsResult = await pool.query(
+      'SELECT * FROM goals WHERE project_id = $1 ORDER BY created_at DESC',
+      [projectId]
+    );
+
+    // Features (sub-projects)
+    const featuresResult = await pool.query(
+      'SELECT * FROM projects WHERE parent_id = $1 ORDER BY created_at DESC',
+      [projectId]
+    );
+
+    // Recent activity: tasks updated in last 7 days, limit 10
+    const recentActivityResult = await pool.query(`
+      SELECT * FROM tasks
+      WHERE project_id = $1 AND updated_at >= NOW() - INTERVAL '7 days'
+      ORDER BY updated_at DESC
+      LIMIT 10
+    `, [projectId]);
+
+    res.json({
+      project,
+      stats,
+      health,
+      goals: goalsResult.rows,
+      features: featuresResult.rows,
+      recent_activity: recentActivityResult.rows
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get project dashboard', details: err.message });
   }
 });
 
