@@ -10,6 +10,7 @@ import pool from '../task-system/db.js';
 import { decomposeTRD, getTRDProgress, listTRDs } from './decomposer.js';
 import { generatePrdFromTask, generateTrdFromGoal, PRD_TYPE_MAP } from './templates.js';
 import { compareGoalProgress, generateDecision, executeDecision, getDecisionHistory, rollbackDecision } from './decision.js';
+import { planNextTask, getPlanStatus, handlePlanInput } from './planner.js';
 import crypto from 'crypto';
 
 const router = Router();
@@ -1573,6 +1574,73 @@ router.get('/execution-history', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to get execution history',
+      details: err.message
+    });
+  }
+});
+
+// ==================== Planner API ====================
+
+/**
+ * POST /api/brain/plan
+ * Accept input and create resources at the correct OKR level
+ */
+router.post('/plan', async (req, res) => {
+  try {
+    const { input, dry_run = false } = req.body;
+
+    if (!input || typeof input !== 'object') {
+      return res.status(400).json({
+        success: false,
+        error: 'input is required and must be an object containing one of: objective, key_result, project, task'
+      });
+    }
+
+    const result = await handlePlanInput(input, dry_run);
+
+    res.json({
+      success: true,
+      dry_run,
+      ...result
+    });
+  } catch (err) {
+    const status = err.message.startsWith('Hard constraint') ? 400 : 500;
+    res.status(status).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
+/**
+ * GET /api/brain/plan/status
+ * Get current planning status (target KR, project, queued tasks)
+ */
+router.get('/plan/status', async (req, res) => {
+  try {
+    const status = await getPlanStatus();
+    res.json({ success: true, ...status });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get plan status',
+      details: err.message
+    });
+  }
+});
+
+/**
+ * POST /api/brain/plan/next
+ * Trigger planner to select next task (same as what tick does)
+ */
+router.post('/plan/next', async (req, res) => {
+  try {
+    const result = await planNextTask();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to plan next task',
       details: err.message
     });
   }
