@@ -922,7 +922,50 @@ router.post('/execution-callback', async (req, res) => {
 
     console.log(`[execution-callback] Task ${task_id} updated to ${newStatus}`);
 
-    // 5. Event-driven: Trigger next task immediately after completion
+    // 5. Rollup progress to KR and O
+    if (newStatus === 'completed' || newStatus === 'failed') {
+      try {
+        // Get the task's goal_id (which is a KR)
+        const taskRow = await pool.query('SELECT goal_id FROM tasks WHERE id = $1', [task_id]);
+        const krId = taskRow.rows[0]?.goal_id;
+
+        if (krId) {
+          // Calculate KR progress from its tasks
+          const krTasks = await pool.query(
+            "SELECT COUNT(*) as total, COUNT(CASE WHEN status='completed' THEN 1 END) as done FROM tasks WHERE goal_id = $1",
+            [krId]
+          );
+          const { total, done } = krTasks.rows[0];
+          const krProgress = total > 0 ? Math.round((parseInt(done) / parseInt(total)) * 100) : 0;
+
+          await pool.query('UPDATE goals SET progress = $1 WHERE id = $2', [krProgress, krId]);
+          console.log(`[execution-callback] KR ${krId} progress → ${krProgress}%`);
+
+          // Get parent O and rollup from all KRs
+          const krRow = await pool.query('SELECT parent_id FROM goals WHERE id = $1', [krId]);
+          const oId = krRow.rows[0]?.parent_id;
+
+          if (oId) {
+            const allKRs = await pool.query(
+              'SELECT progress, weight FROM goals WHERE parent_id = $1',
+              [oId]
+            );
+            const totalWeight = allKRs.rows.reduce((s, r) => s + parseFloat(r.weight || 1), 0);
+            const weightedProgress = allKRs.rows.reduce(
+              (s, r) => s + (r.progress || 0) * parseFloat(r.weight || 1), 0
+            );
+            const oProgress = totalWeight > 0 ? Math.round(weightedProgress / totalWeight) : 0;
+
+            await pool.query('UPDATE goals SET progress = $1 WHERE id = $2', [oProgress, oId]);
+            console.log(`[execution-callback] O ${oId} progress → ${oProgress}%`);
+          }
+        }
+      } catch (rollupErr) {
+        console.error(`[execution-callback] Progress rollup error: ${rollupErr.message}`);
+      }
+    }
+
+    // 6. Event-driven: Trigger next task immediately after completion
     let nextTickResult = null;
     if (newStatus === 'completed') {
       console.log(`[execution-callback] Task completed, triggering next tick...`);
