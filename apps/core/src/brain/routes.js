@@ -15,6 +15,7 @@ import { ensureEventsTable, queryEvents, getEventCounts } from './event-bus.js';
 import { getState as getCBState, reset as resetCB, getAllStates as getAllCBStates } from './circuit-breaker.js';
 import { emit as emitEvent } from './event-bus.js';
 import { recordSuccess as cbSuccess, recordFailure as cbFailure } from './circuit-breaker.js';
+import { notifyTaskCompleted, notifyTaskFailed } from './notifier.js';
 import crypto from 'crypto';
 
 const router = Router();
@@ -1095,13 +1096,15 @@ router.post('/execution-callback', async (req, res) => {
 
     console.log(`[execution-callback] Task ${task_id} updated to ${newStatus}`);
 
-    // Record to EventBus and Circuit Breaker
+    // Record to EventBus, Circuit Breaker, and Notifier
     if (newStatus === 'completed') {
       await emitEvent('task_completed', 'executor', { task_id, run_id, duration_ms });
       await cbSuccess('cecelia-run');
+      notifyTaskCompleted({ task_id, title: `Task ${task_id}`, run_id, duration_ms }).catch(() => {});
     } else if (newStatus === 'failed') {
       await emitEvent('task_failed', 'executor', { task_id, run_id, status });
       await cbFailure('cecelia-run');
+      notifyTaskFailed({ task_id, title: `Task ${task_id}`, reason: status }).catch(() => {});
     }
 
     // 5. Rollup progress to KR and O
