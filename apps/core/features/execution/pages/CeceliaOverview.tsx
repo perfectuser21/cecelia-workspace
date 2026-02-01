@@ -58,10 +58,8 @@ interface TaskStats {
   cancelled: number;
 }
 
-// Brain API 端点配置
-const BRAIN_API_URL = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-  ? `${window.location.protocol}//${window.location.hostname}:5221`
-  : 'http://localhost:5221';
+// Brain API - use backend proxy to avoid CORS
+const BRAIN_API_URL = '/api/brain';
 
 export default function CeceliaOverviewPage() {
   const [overview, setOverview] = useState<CeceliaOverview | null>(null);
@@ -78,13 +76,19 @@ export default function CeceliaOverviewPage() {
       const [overviewData, timelineData, brainData, tasksData] = await Promise.all([
         fetchCeceliaOverview(timeRange),
         fetchTimelineData(),
-        fetch(`${BRAIN_API_URL}/api/brain/tick/status`).then(r => {
+        fetch(`${BRAIN_API_URL}/tick/status`).then(r => {
           if (!r.ok) throw new Error(`Brain API failed: ${r.status}`);
           return r.json();
+        }).catch(err => {
+          console.warn('Brain API error:', err);
+          return null;
         }),
         fetch('/api/tasks/tasks').then(r => {
           if (!r.ok) throw new Error(`Tasks API failed: ${r.status}`);
           return r.json();
+        }).catch(err => {
+          console.warn('Tasks API error:', err);
+          return [];
         }),
       ]);
       setOverview(overviewData);
