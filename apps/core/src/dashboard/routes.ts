@@ -5,8 +5,58 @@
 
 import { Router, Request, Response } from 'express';
 import { taskTracker } from './services/task-tracker.js';
-// @ts-expect-error - intent.js is untyped
-import { parseIntent, parseAndCreate, INTENT_TYPES } from '../brain/intent.js';
+
+// Brain API client
+const BRAIN_API = process.env.BRAIN_NODE_API || 'http://localhost:5221';
+
+// Type definitions for Brain API responses
+interface ParseIntentResponse {
+  intentType: string;
+  confidence: number;
+  entities?: Record<string, any>;
+}
+
+interface ParseAndCreateResponse {
+  created: {
+    tasks: Array<{ title: string; [key: string]: any }>;
+    [key: string]: any;
+  };
+  [key: string]: any;
+}
+
+export async function parseIntent(message: string): Promise<ParseIntentResponse> {
+  const response = await fetch(`${BRAIN_API}/intent/parse`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ input: message }),
+  });
+  if (!response.ok) throw new Error(`Brain API error: ${response.statusText}`);
+  return response.json() as Promise<ParseIntentResponse>;
+}
+
+export async function parseAndCreate(message: string, options?: any): Promise<ParseAndCreateResponse> {
+  const response = await fetch(`${BRAIN_API}/intent/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ input: message, options }),
+  });
+  if (!response.ok) throw new Error(`Brain API error: ${response.statusText}`);
+  return response.json() as Promise<ParseAndCreateResponse>;
+}
+
+// Intent type constants
+export const INTENT_TYPES = {
+  CREATE_PROJECT: 'create_project',
+  CREATE_FEATURE: 'create_feature',
+  CREATE_GOAL: 'create_goal',
+  CREATE_TASK: 'create_task',
+  QUERY_STATUS: 'query_status',
+  FIX_BUG: 'fix_bug',
+  REFACTOR: 'refactor',
+  EXPLORE: 'explore',
+  QUESTION: 'question',
+  UNKNOWN: 'unknown',
+};
 
 /**
  * Extract error message from unknown error type

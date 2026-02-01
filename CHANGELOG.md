@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-02-01
+
+### Changed
+- **Brain API Migration**: Removed local Brain code, migrated to semantic-brain service
+  - Deleted `apps/core/src/brain/` directory (17 source files + 13 test files)
+  - Updated `apps/core/src/dashboard/routes.ts` to use fetch API calls to semantic-brain service (http://localhost:5221)
+  - Exported `parseIntent`, `parseAndCreate`, and `INTENT_TYPES` from routes.ts for testability
+  - Added comprehensive tests with fetch mocking in `apps/core/src/dashboard/__tests__/routes.test.ts`
+  - Updated build script in `apps/core/package.json` to remove brain directory copy
+  - All functionality preserved, internal implementation changed to API-based architecture
+
 ## [1.5.0] - 2026-02-01
 
 ### Added
