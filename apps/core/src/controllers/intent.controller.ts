@@ -58,7 +58,7 @@ export async function recognizeIntentHandler(req: Request, res: Response): Promi
     }
 
     // Validate context structure (basic validation)
-    if (context !== undefined && typeof context !== 'object') {
+    if (context !== undefined && (context === null || typeof context !== 'object')) {
       const response: RecognizeIntentResponse = {
         success: false,
         error: 'Invalid request',

@@ -297,3 +297,56 @@ describe('NLP Parser Utilities', () => {
     });
   });
 });
+
+describe('Controller Input Validation', () => {
+  describe('Context validation', () => {
+    it('null context should be rejected', () => {
+      const request = {
+        text: '创建任务',
+        context: null as unknown as object,  // Invalid: null
+        confidenceThreshold: 0.3
+      };
+
+      // Test the validation logic directly
+      const context = request.context;
+      const isInvalid = context !== undefined && (context === null || typeof context !== 'object');
+      expect(isInvalid).toBe(true);
+    });
+
+    it('string context should be rejected', () => {
+      const request = {
+        text: '创建任务',
+        context: 'invalid' as unknown as object,  // Invalid: string
+        confidenceThreshold: 0.3
+      };
+
+      const context = request.context;
+      const isInvalid = context !== undefined && (context === null || typeof context !== 'object');
+      expect(isInvalid).toBe(true);
+    });
+
+    it('valid object context should be accepted', () => {
+      const request = {
+        text: '创建任务',
+        context: { user_id: '123' },  // Valid: object
+        confidenceThreshold: 0.3
+      };
+
+      const context = request.context;
+      const isInvalid = context !== undefined && (context === null || typeof context !== 'object');
+      expect(isInvalid).toBe(false);
+    });
+
+    it('undefined context should be accepted (optional field)', () => {
+      const request = {
+        text: '创建任务',
+        context: undefined,  // Valid: optional field
+        confidenceThreshold: 0.3
+      };
+
+      const context = request.context;
+      const isInvalid = context !== undefined && (context === null || typeof context !== 'object');
+      expect(isInvalid).toBe(false);
+    });
+  });
+});

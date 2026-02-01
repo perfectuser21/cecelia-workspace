@@ -1,9 +1,6 @@
-Gate: prd
-Decision: PASS
-Timestamp: 2026-02-01T05:20:00Z
-Agent ID: a933189
-
-PRD审核通过。所有标准满足：
-- 完整性：需求来源、功能描述、成功标准、影响范围全部到位
-- 可验收性：15个具体、可测、独立的成功标准
-- 边界清晰度：非目标明确，范围可控
+{
+  "gate": "prd",
+  "decision": "PASS",
+  "timestamp": "2026-02-01T13:18:00+08:00",
+  "validated_by": "gate:prd subagent"
+}
