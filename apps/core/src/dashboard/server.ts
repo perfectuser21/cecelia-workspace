@@ -28,6 +28,7 @@ import { startMonitor as startWatchdogMonitor } from '../watchdog/service.js';
 // Tick loop migrated to cecelia-semantic-brain
 import { auditMiddleware, initAuditTable } from '../middleware/audit.js';
 import orchestratorQueueRoutes from './orchestrator-queue.js';
+import intentRoutes from '../intent/routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -183,6 +184,9 @@ app.use('/api/watchdog', watchdogRoutes);
 
 // System status API routes (aggregated status from all subsystems)
 app.use('/api/system', systemRoutes);
+
+// Intent Recognition API routes (natural language → OKR/Project/Task)
+app.use('/api/intent', intentRoutes);
 
 // Static frontend files (single frontend, theme switches by hostname in JS)
 // Compiled server is at apps/core/dist/dashboard/server.js

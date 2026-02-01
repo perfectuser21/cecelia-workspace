@@ -1,0 +1,16 @@
+{
+  "branch": "cp-02011142--Retry-Advance-KR1-OKR-Project",
+  "head_sha": "5008dee74",
+  "timestamp": "2026-02-01T12:02:38+08:00",
+  "gates": {
+    "prd": { "status": "pass", "decision": "PASS" },
+    "dod": { "status": "pass", "decision": "PASS" },
+    "qa": { "status": "pass", "decision": "PASS" },
+    "audit": { "status": "pass", "decision": "PASS" },
+    "test": { "status": "pass", "decision": "PASS" }
+  },
+  "env": {
+    "node": "v20.20.0",
+    "platform": "Linux"
+  }
+}
