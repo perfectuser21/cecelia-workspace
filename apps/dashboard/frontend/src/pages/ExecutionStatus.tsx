@@ -96,11 +96,28 @@ export default function ExecutionStatus() {
     try {
       setLoading(true);
 
-      // N8N API (primary - must succeed)
-      const n8nRes = await fetch('/api/v1/n8n-live-status/instances/local/overview');
-      if (!n8nRes.ok) throw new Error('N8N API error');
-      const n8nData = await n8nRes.json();
-      setData(n8nData);
+      // N8N API (with 5s timeout to prevent hanging)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      try {
+        const n8nRes = await fetch('/api/v1/n8n-live-status/instances/local/overview', {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (n8nRes.ok) {
+          const n8nData = await n8nRes.json();
+          setData(n8nData);
+        } else {
+          console.warn('N8N API error:', n8nRes.status);
+          setData(null);
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
+        console.warn('N8N API failed:', err);
+        setData(null);
+      }
 
       // Brain API (optional - non-blocking)
       try {
