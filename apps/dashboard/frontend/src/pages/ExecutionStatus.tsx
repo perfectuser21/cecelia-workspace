@@ -27,10 +27,8 @@ interface Task {
   created_at: string;
 }
 
-// 环境感知的 Brain API URL
-const BRAIN_API_URL = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-  ? `${window.location.protocol}//${window.location.hostname}:5221`
-  : 'http://localhost:5221';
+// Brain API URL - use relative path to avoid CORS
+const BRAIN_API_URL = '/api/brain';
 
 function formatTime(dateStr: string) {
   const date = new Date(dateStr);
