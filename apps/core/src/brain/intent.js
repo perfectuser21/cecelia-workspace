@@ -19,7 +19,9 @@ import { renderPrd, renderTrd } from './templates.js';
 const INTENT_TYPES = {
   CREATE_PROJECT: 'create_project',      // "我想做一个 GMV Dashboard"
   CREATE_FEATURE: 'create_feature',      // "给登录页面加一个忘记密码功能"
-  CREATE_GOAL: 'create_goal',            // "创建一个 P0 目标：提升系统稳定性"
+  CREATE_GOAL: 'create_goal',            // "创建一个 P0 目标：提升系统稳定性" (legacy)
+  CREATE_OBJECTIVE: 'create_objective',  // "创建一个 OKR: 提升用户体验" (KR1 standard)
+  CREATE_KEY_RESULT: 'create_key_result',// "添加 KR: 用户留存率提升 20%" (KR1 standard)
   CREATE_TASK: 'create_task',            // "添加一个任务：修复登录超时"
   QUERY_STATUS: 'query_status',          // "当前有哪些任务？"
   FIX_BUG: 'fix_bug',                    // "修复购物车页面的价格显示问题"
@@ -40,6 +42,16 @@ const INTENT_KEYWORDS = {
   [INTENT_TYPES.CREATE_GOAL]: [
     '目标', '愿景', 'OKR', 'objective', 'goal',
     '设定目标', '创建目标', 'set goal', 'create goal'
+  ],
+  [INTENT_TYPES.CREATE_OBJECTIVE]: [
+    '目标', '愿景', 'OKR', 'objective',
+    '创建目标', '设定目标', '新建目标',
+    'create objective', 'set objective', 'add objective'
+  ],
+  [INTENT_TYPES.CREATE_KEY_RESULT]: [
+    'KR', '关键结果', 'key result',
+    '添加KR', '创建KR', '新增KR',
+    'add KR', 'create key result', 'add key result'
   ],
   [INTENT_TYPES.CREATE_TASK]: [
     '任务', 'task', '待办', 'todo',
@@ -129,6 +141,22 @@ const INTENT_PHRASES = {
     { pattern: /create\s+(.+)\s+goal/i, weight: 0.4 },
     { pattern: /set\s+(.+)\s+objective/i, weight: 0.4 }
   ],
+  [INTENT_TYPES.CREATE_OBJECTIVE]: [
+    { pattern: /创建(.+)OKR/i, weight: 0.5 },
+    { pattern: /创建目标[：:]\s*(.+)/, weight: 0.5 },
+    { pattern: /设定(.+)目标/, weight: 0.4 },
+    { pattern: /新建目标[：:]\s*(.+)/, weight: 0.4 },
+    { pattern: /create\s+(.+)\s+objective/i, weight: 0.5 },
+    { pattern: /create\s+OKR/i, weight: 0.5 }
+  ],
+  [INTENT_TYPES.CREATE_KEY_RESULT]: [
+    { pattern: /添加KR[：:]\s*(.+)/i, weight: 0.5 },
+    { pattern: /新增KR[：:]\s*(.+)/i, weight: 0.5 },
+    { pattern: /创建关键结果[：:]\s*(.+)/, weight: 0.5 },
+    { pattern: /添加关键结果[：:]\s*(.+)/, weight: 0.5 },
+    { pattern: /add\s+KR[：:]\s*(.+)/i, weight: 0.5 },
+    { pattern: /create\s+key\s+result[：:]\s*(.+)/i, weight: 0.5 }
+  ],
   [INTENT_TYPES.CREATE_TASK]: [
     { pattern: /添加(.+)任务/, weight: 0.4 },
     { pattern: /创建(.+)任务/, weight: 0.4 },
@@ -161,6 +189,8 @@ const INTENT_PHRASES = {
  */
 const INTENT_ACTION_MAP = {
   [INTENT_TYPES.CREATE_GOAL]: { action: 'create-goal', requiredParams: ['title'] },
+  [INTENT_TYPES.CREATE_OBJECTIVE]: { action: 'create-goal', requiredParams: ['title'] },
+  [INTENT_TYPES.CREATE_KEY_RESULT]: { action: 'create-goal', requiredParams: ['title', 'goal_id'] },
   [INTENT_TYPES.CREATE_PROJECT]: { action: null, handler: 'parseAndCreate' },
   [INTENT_TYPES.CREATE_FEATURE]: { action: null, handler: 'parseAndCreate' },
   [INTENT_TYPES.CREATE_TASK]: { action: 'create-task', requiredParams: ['title'] },
@@ -794,6 +824,127 @@ async function parseAndCreate(input, options = {}) {
   return result;
 }
 
+/**
+ * Recognize intent from natural language (KR1 standard API)
+ * Returns structured format matching PRD specification
+ * @param {string} text - Natural language input
+ * @param {Object} context - Optional context (current_project, etc.)
+ * @returns {Promise<Object>} - Recognition result with intent, confidence, entities, suggested_action
+ */
+async function recognizeIntent(text, context = {}) {
+  if (!text || typeof text !== 'string') {
+    return {
+      intent: INTENT_TYPES.UNKNOWN,
+      confidence: 0,
+      entities: {},
+      suggested_action: null,
+      ambiguities: ['Input is required and must be a string']
+    };
+  }
+
+  // Classify intent using existing logic
+  const classified = classifyIntent(text);
+  const intentType = classified.type;
+  const confidence = classified.confidence;
+
+  // Extract entities
+  const extractedEntities = extractEntities(text);
+
+  // Build entities object with type field
+  const entities = {
+    ...extractedEntities,
+    type: null
+  };
+
+  // Map intent to entity type
+  if (intentType === INTENT_TYPES.CREATE_TASK || intentType === INTENT_TYPES.FIX_BUG || intentType === INTENT_TYPES.REFACTOR) {
+    entities.type = 'task';
+  } else if (intentType === INTENT_TYPES.CREATE_OBJECTIVE || intentType === INTENT_TYPES.CREATE_GOAL) {
+    entities.type = 'objective';
+  } else if (intentType === INTENT_TYPES.CREATE_KEY_RESULT) {
+    entities.type = 'key_result';
+  } else if (intentType === INTENT_TYPES.CREATE_PROJECT) {
+    entities.type = 'project';
+  }
+
+  // Extract title from input
+  if (!entities.title) {
+    // Use simple heuristics to extract title
+    let title = text
+      .replace(/^(我想|帮我|请|能不能|可以)(做|创建|新建|添加|开发|搭建|实现)(.+)/, '$3')
+      .replace(/，.*$/, '')
+      .replace(/。.*$/, '')
+      .trim();
+
+    // Remove priority mentions from title
+    title = title.replace(/(优先级|很高|紧急|P0|P1|P2)/g, '').trim();
+
+    if (title && title !== text) {
+      entities.title = title;
+    } else {
+      // Fallback: use cleaned input
+      entities.title = text.substring(0, 100);
+    }
+  }
+
+  // Get suggested action
+  const actionMap = INTENT_ACTION_MAP[intentType];
+  let suggestedAction = null;
+
+  if (actionMap && actionMap.action) {
+    const payload = {};
+
+    if (entities.title) {
+      payload.title = entities.title;
+    }
+    if (entities.priority) {
+      payload.priority = entities.priority;
+    }
+    if (entities.description) {
+      payload.description = entities.description;
+    }
+    if (context.current_project) {
+      payload.project_id = context.current_project;
+    }
+
+    suggestedAction = {
+      api: `POST /api/brain/action/${actionMap.action}`,
+      payload
+    };
+  }
+
+  // Determine ambiguities
+  const ambiguities = [];
+  if (confidence < 0.6) {
+    ambiguities.push('Input is not clear enough. Please be more specific.');
+
+    // Suggest possible interpretations based on keywords
+    if (classified.keywords && classified.keywords.length > 0) {
+      const possibleIntents = [];
+      for (const [type, keywords] of Object.entries(INTENT_KEYWORDS)) {
+        const matches = keywords.filter(kw =>
+          text.toLowerCase().includes(kw.toLowerCase())
+        );
+        if (matches.length > 0 && type !== intentType) {
+          possibleIntents.push(type);
+        }
+      }
+
+      if (possibleIntents.length > 0) {
+        ambiguities.push(`Possible interpretations: ${possibleIntents.join(', ')}`);
+      }
+    }
+  }
+
+  return {
+    intent: intentType,
+    confidence,
+    entities,
+    suggested_action: suggestedAction,
+    ambiguities: ambiguities.length > 0 ? ambiguities : undefined
+  };
+}
+
 export {
   INTENT_TYPES,
   INTENT_PHRASES,
@@ -809,5 +960,6 @@ export {
   buildActionParams,
   getSuggestedAction,
   parseIntent,
-  parseAndCreate
+  parseAndCreate,
+  recognizeIntent
 };

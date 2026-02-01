@@ -5,7 +5,7 @@ import { createSnapshot, getRecentSnapshots, getLatestSnapshot } from './percept
 import { createTask, updateTask, createGoal, updateGoal, triggerN8n, setMemory, batchUpdateTasks } from './actions.js';
 import { getDailyFocus, setDailyFocus, clearDailyFocus, getFocusSummary } from './focus.js';
 import { getTickStatus, enableTick, disableTick, executeTick, runTickSafe } from './tick.js';
-import { parseIntent, parseAndCreate, INTENT_TYPES, INTENT_ACTION_MAP, extractEntities, classifyIntent, getSuggestedAction } from './intent.js';
+import { parseIntent, parseAndCreate, INTENT_TYPES, INTENT_ACTION_MAP, extractEntities, classifyIntent, getSuggestedAction, recognizeIntent } from './intent.js';
 import pool from '../task-system/db.js';
 import { decomposeTRD, getTRDProgress, listTRDs } from './decomposer.js';
 import { generatePrdFromTask, generatePrdFromGoalKR, generateTrdFromGoal, generateTrdFromGoalKR, validatePrd, validateTrd, prdToJson, trdToJson, PRD_TYPE_MAP } from './templates.js';
@@ -755,6 +755,8 @@ router.get('/intent/types', (req, res) => {
       create_project: '创建新项目（如：我想做一个 GMV Dashboard）',
       create_feature: '添加新功能（如：给登录页面加一个忘记密码功能）',
       create_goal: '创建目标（如：创建一个 P0 目标：提升系统稳定性）',
+      create_objective: '创建目标（OKR）（如：创建一个 OKR: 提升用户体验）',
+      create_key_result: '创建关键结果（如：添加 KR: 用户留存率提升 20%）',
       create_task: '创建任务（如：添加一个任务：修复登录超时）',
       query_status: '查询状态（如：当前有哪些任务？）',
       fix_bug: '修复 Bug（如：修复购物车页面的价格显示问题）',
@@ -765,6 +767,66 @@ router.get('/intent/types', (req, res) => {
     },
     action_map: INTENT_ACTION_MAP
   });
+});
+
+/**
+ * POST /api/brain/recognize-intent (KR1 Standard API)
+ * Recognize intent from natural language and return structured format
+ *
+ * Request body:
+ *   {
+ *     text: "我想做一个登录功能，优先级很高",
+ *     context: {
+ *       current_project: "cecelia-workspace" // optional
+ *     }
+ *   }
+ *
+ * Response:
+ *   {
+ *     intent: "create_task",
+ *     confidence: 0.95,
+ *     entities: {
+ *       title: "实现用户登录功能",
+ *       type: "task",
+ *       priority: "P0",
+ *       project_id: null
+ *     },
+ *     suggested_action: {
+ *       api: "POST /api/brain/action/create-task",
+ *       payload: {
+ *         title: "实现用户登录功能",
+ *         priority: "P0"
+ *       }
+ *     },
+ *     ambiguities: [] // only present if confidence < 0.6
+ *   }
+ */
+router.post('/recognize-intent', async (req, res) => {
+  try {
+    const { text, context } = req.body;
+
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({
+        error: 'text is required and must be a string'
+      });
+    }
+
+    if (text.trim().length > 10000) {
+      return res.status(400).json({
+        error: 'Input too long, maximum 10000 characters allowed'
+      });
+    }
+
+    const result = await recognizeIntent(text, context);
+
+    res.json(result);
+  } catch (err) {
+    console.error('[recognize-intent] Error:', err);
+    res.status(500).json({
+      error: 'Failed to recognize intent',
+      details: err.message
+    });
+  }
 });
 
 /**

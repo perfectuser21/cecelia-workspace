@@ -18,7 +18,8 @@ import {
   buildActionParams,
   getSuggestedAction,
   parseIntent,
-  parseAndCreate
+  parseAndCreate,
+  recognizeIntent
 } from '../intent.js';
 
 const { Pool } = pg;
@@ -858,5 +859,247 @@ describe('Intent-to-Action Mapping', () => {
     const lowConf = await parseIntent('hello');
     expect(lowConf.confidenceLevel).toBe('low');
     expect(lowConf.confidence).toBeLessThan(0.4);
+  });
+
+  // ========== KR1: recognizeIntent() Tests ==========
+  describe('recognizeIntent (KR1 Standard API)', () => {
+    describe('Basic Intent Recognition', () => {
+      it('recognizes create_objective intent', async () => {
+        const result = await recognizeIntent('创建一个提升用户体验的 OKR');
+
+        expect(result.intent).toBe(INTENT_TYPES.CREATE_OBJECTIVE);
+        expect(result.confidence).toBeGreaterThan(0);
+        expect(result.entities.type).toBe('objective');
+      });
+
+      it('recognizes create_key_result intent', async () => {
+        const result = await recognizeIntent('添加 KR: 用户留存率提升 20%');
+
+        expect(result.intent).toBe(INTENT_TYPES.CREATE_KEY_RESULT);
+        expect(result.confidence).toBeGreaterThan(0);
+        expect(result.entities.type).toBe('key_result');
+      });
+
+      it('recognizes create_project intent', async () => {
+        const result = await recognizeIntent('帮我新建一个项目叫 user-management');
+
+        expect(result.intent).toBe(INTENT_TYPES.CREATE_PROJECT);
+        expect(result.confidence).toBeGreaterThan(0);
+        expect(result.entities.type).toBe('project');
+      });
+
+      it('recognizes create_task intent', async () => {
+        const result = await recognizeIntent('我想做一个登录功能，优先级很高');
+
+        expect(result.intent).toBe(INTENT_TYPES.CREATE_TASK);
+        expect(result.confidence).toBeGreaterThan(0);
+        expect(result.entities.type).toBe('task');
+        expect(result.entities.priority).toBe('P0');
+      });
+
+      it('recognizes query_status intent', async () => {
+        const result = await recognizeIntent('查看当前有哪些任务');
+
+        expect(result.intent).toBe(INTENT_TYPES.QUERY_STATUS);
+        expect(result.confidence).toBeGreaterThan(0);
+      });
+    });
+
+    describe('Entity Extraction', () => {
+      it('extracts title and priority from task intent', async () => {
+        const result = await recognizeIntent('做个紧急任务修复登录 bug');
+
+        expect(result.entities.title).toBeTruthy();
+        expect(result.entities.type).toBe('task');
+        expect(result.entities.priority).toBe('P0');
+      });
+
+      it('extracts title from objective intent', async () => {
+        const result = await recognizeIntent('创建目标：提升系统稳定性');
+
+        expect(result.entities.title).toContain('提升系统稳定性');
+        expect(result.entities.type).toBe('objective');
+      });
+
+      it('extracts title from key result intent', async () => {
+        const result = await recognizeIntent('新增 KR：API 响应时间小于 200ms');
+
+        expect(result.entities.title).toContain('200ms');
+        expect(result.entities.type).toBe('key_result');
+      });
+    });
+
+    describe('Structured Output Format', () => {
+      it('returns correct JSON structure with all required fields', async () => {
+        const result = await recognizeIntent('我想做一个登录功能，优先级很高');
+
+        expect(result).toHaveProperty('intent');
+        expect(result).toHaveProperty('confidence');
+        expect(result).toHaveProperty('entities');
+        expect(result).toHaveProperty('suggested_action');
+
+        expect(typeof result.intent).toBe('string');
+        expect(typeof result.confidence).toBe('number');
+        expect(typeof result.entities).toBe('object');
+      });
+
+      it('confidence is a number between 0 and 1', async () => {
+        const result = await recognizeIntent('创建一个 OKR');
+
+        expect(result.confidence).toBeGreaterThanOrEqual(0);
+        expect(result.confidence).toBeLessThanOrEqual(1);
+      });
+
+      it('suggested_action contains api and payload when applicable', async () => {
+        const result = await recognizeIntent('添加一个任务：修复登录超时');
+
+        expect(result.suggested_action).toBeTruthy();
+        expect(result.suggested_action).toHaveProperty('api');
+        expect(result.suggested_action).toHaveProperty('payload');
+        expect(result.suggested_action.api).toContain('POST /api/brain/action/');
+        expect(result.suggested_action.payload).toHaveProperty('title');
+      });
+    });
+
+    describe('Low Confidence and Ambiguities', () => {
+      it('returns ambiguities when confidence < 0.6', async () => {
+        const result = await recognizeIntent('hello');
+
+        expect(result.confidence).toBeLessThan(0.6);
+        expect(result.ambiguities).toBeDefined();
+        expect(Array.isArray(result.ambiguities)).toBe(true);
+        expect(result.ambiguities.length).toBeGreaterThan(0);
+      });
+
+      it('does not return ambiguities when confidence >= 0.6', async () => {
+        const result = await recognizeIntent('创建一个登录功能的任务');
+
+        if (result.confidence >= 0.6) {
+          expect(result.ambiguities).toBeUndefined();
+        }
+      });
+
+      it('provides helpful message for unclear input', async () => {
+        const result = await recognizeIntent('xyz');
+
+        expect(result.ambiguities).toBeDefined();
+        expect(result.ambiguities.some(a => a.includes('not clear enough'))).toBe(true);
+      });
+    });
+
+    describe('Edge Cases and Error Handling', () => {
+      it('handles empty string gracefully', async () => {
+        const result = await recognizeIntent('');
+
+        expect(result.intent).toBe(INTENT_TYPES.UNKNOWN);
+        expect(result.confidence).toBe(0);
+        expect(result.ambiguities).toBeDefined();
+      });
+
+      it('handles null input gracefully', async () => {
+        const result = await recognizeIntent(null);
+
+        expect(result.intent).toBe(INTENT_TYPES.UNKNOWN);
+        expect(result.confidence).toBe(0);
+      });
+
+      it('handles undefined input gracefully', async () => {
+        const result = await recognizeIntent(undefined);
+
+        expect(result.intent).toBe(INTENT_TYPES.UNKNOWN);
+        expect(result.confidence).toBe(0);
+      });
+
+      it('handles very long input', async () => {
+        const longText = '创建任务'.repeat(1000);
+        const result = await recognizeIntent(longText);
+
+        expect(result.intent).toBeDefined();
+        expect(result.confidence).toBeGreaterThanOrEqual(0);
+      });
+    });
+
+    describe('Context Support', () => {
+      it('accepts optional context parameter', async () => {
+        const result = await recognizeIntent('添加一个任务', {
+          current_project: 'test-project'
+        });
+
+        expect(result.entities).toBeDefined();
+        // Context should be passed through but might not appear in entities
+        // depending on implementation
+      });
+
+      it('works without context parameter', async () => {
+        const result = await recognizeIntent('创建一个新任务');
+
+        expect(result.intent).toBeDefined();
+        expect(result.confidence).toBeGreaterThanOrEqual(0);
+      });
+    });
+
+    describe('10 Manual Test Cases from DoD', () => {
+      it('Test 1: 我想做一个登录功能，优先级很高 → create_task, P0', async () => {
+        const result = await recognizeIntent('我想做一个登录功能，优先级很高');
+
+        expect(result.intent).toBe(INTENT_TYPES.CREATE_TASK);
+        expect(result.entities.priority).toBe('P0');
+      });
+
+      it('Test 2: 创建一个提升用户体验的 OKR → create_objective', async () => {
+        const result = await recognizeIntent('创建一个提升用户体验的 OKR，包含3个 KR');
+
+        expect(result.intent).toBe(INTENT_TYPES.CREATE_OBJECTIVE);
+      });
+
+      it('Test 3: 帮我新建一个项目叫 user-management → create_project', async () => {
+        const result = await recognizeIntent('帮我新建一个项目叫 user-management');
+
+        expect(result.intent).toBe(INTENT_TYPES.CREATE_PROJECT);
+      });
+
+      it('Test 4: 查看当前有哪些任务 → query_status', async () => {
+        const result = await recognizeIntent('查看当前有哪些任务');
+
+        expect(result.intent).toBe(INTENT_TYPES.QUERY_STATUS);
+      });
+
+      it('Test 5: 添加一个关键结果：用户留存率提升 20% → create_key_result', async () => {
+        const result = await recognizeIntent('添加一个关键结果：用户留存率提升 20%');
+
+        expect(result.intent).toBe(INTENT_TYPES.CREATE_KEY_RESULT);
+      });
+
+      it('Test 6: 做个紧急任务修复登录 bug → create_task, P0', async () => {
+        const result = await recognizeIntent('做个紧急任务修复登录 bug');
+
+        expect(result.intent).toBe(INTENT_TYPES.CREATE_TASK);
+        expect(result.entities.priority).toBe('P0');
+      });
+
+      it('Test 7: 创建目标：提升系统稳定性 → create_objective', async () => {
+        const result = await recognizeIntent('创建目标：提升系统稳定性');
+
+        expect(result.intent).toBe(INTENT_TYPES.CREATE_OBJECTIVE);
+      });
+
+      it('Test 8: 新增 KR：API 响应时间小于 200ms → create_key_result', async () => {
+        const result = await recognizeIntent('新增 KR：API 响应时间小于 200ms');
+
+        expect(result.intent).toBe(INTENT_TYPES.CREATE_KEY_RESULT);
+      });
+
+      it('Test 9: 建立一个新项目处理数据分析 → create_project', async () => {
+        const result = await recognizeIntent('建立一个新项目处理数据分析');
+
+        expect(result.intent).toBe(INTENT_TYPES.CREATE_PROJECT);
+      });
+
+      it('Test 10: 看看目前进度怎么样 → query_status', async () => {
+        const result = await recognizeIntent('看看目前进度怎么样');
+
+        expect(result.intent).toBe(INTENT_TYPES.QUERY_STATUS);
+      });
+    });
   });
 });
