@@ -113,6 +113,15 @@ export function extractIntent(text: string): {
   const normalizedText = text.trim();
   let bestMatch = { intent: IntentType.UNKNOWN, confidence: 0, phrases: [] as string[] };
 
+  // Map INTENT_PATTERNS keys to IntentType enum values
+  const intentTypeMap: Record<string, IntentType> = {
+    'CREATE_GOAL': IntentType.CREATE_GOAL,
+    'CREATE_PROJECT': IntentType.CREATE_PROJECT,
+    'CREATE_TASK': IntentType.CREATE_TASK,
+    'QUERY_TASKS': IntentType.QUERY_TASKS,
+    'UPDATE_TASK': IntentType.UPDATE_TASK,
+  };
+
   // Check each intent type
   for (const [intentName, patterns] of Object.entries(INTENT_PATTERNS)) {
     const matchedPhrases: string[] = [];
@@ -134,7 +143,7 @@ export function extractIntent(text: string): {
 
       if (confidence > bestMatch.confidence) {
         bestMatch = {
-          intent: intentName as IntentType,
+          intent: intentTypeMap[intentName] || IntentType.UNKNOWN,
           confidence,
           phrases: matchedPhrases,
         };

@@ -1,6 +1,6 @@
 {
-  "gate": "dod",
+  "gate": "qa",
   "decision": "PASS",
   "timestamp": "2026-02-01T13:20:00+08:00",
-  "validated_by": "gate:dod subagent"
+  "validated_by": "gate:qa subagent"
 }
