@@ -27,6 +27,7 @@ import systemRoutes from '../system/routes.js';
 import { startMonitor as startWatchdogMonitor } from '../watchdog/service.js';
 // Tick loop migrated to cecelia-semantic-brain
 import { auditMiddleware, initAuditTable } from '../middleware/audit.js';
+import intentRoutes from '../intent/routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -159,6 +160,9 @@ app.use('/api/tasks', taskSystemRoutes);
 
 // Areas API routes (PARA alignment)
 app.use('/api/areas', areasRoutes);
+
+// Intent Recognition API routes (KR1: Natural language → OKR/Project/Task)
+app.use('/api/intent', intentRoutes);
 
 // Brain API routes → proxy to cecelia-semantic-brain Node.js service
 const BRAIN_NODE_API = process.env.BRAIN_NODE_API || 'http://localhost:5221';
