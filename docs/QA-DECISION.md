@@ -1,76 +1,57 @@
-# QA Decision - KR1 Intent Recognition API
+# QA Decision
 
-## Metadata
-- **Decision**: NO_RCI
-- **Priority**: P1
-- **RepoType**: Engine
-- **ChangeType**: feature
-- **Date**: 2026-02-01
+Decision: MUST_ADD_RCI
+Priority: P0
+RepoType: Business
 
-## Tests
+Tests:
+  - dod_item: "POST /api/intent/recognize 端点可访问，返回 200 状态码"
+    method: auto
+    location: tests/api/intent-api.test.ts
+  - dod_item: "GET /api/intent/health 端点返回 healthy 状态"
+    method: auto
+    location: tests/api/intent-api.test.ts
+  - dod_item: "curl 测试成功返回 JSON 响应（符合 IntentRecognitionResult 类型）"
+    method: manual
+    location: manual:使用 curl POST /api/intent/recognize -d '{"text":"创建目标"}' 并验证 JSON 格式
+  - dod_item: "能识别 '创建目标：完成 KR1' 并返回 create-goal action"
+    method: auto
+    location: tests/api/intent-api.test.ts
+  - dod_item: "能识别 '查看所有待办任务' 并返回 query-tasks action"
+    method: auto
+    location: tests/api/intent-api.test.ts
+  - dod_item: "API 响应时间 < 500ms"
+    method: manual
+    location: manual:使用 curl 测试并记录响应时间
+  - dod_item: "现有测试通过：npm run test -- intent-recognition.test.ts"
+    method: auto
+    location: apps/core/src/__tests__/intent-recognition.test.ts
+  - dod_item: "集成测试通过：tests/api/intent-api.test.ts 中的所有测试用例通过（包括 POST /recognize、GET /health、意图识别功能验证）"
+    method: auto
+    location: tests/api/intent-api.test.ts
 
-### 自动化测试
-- **dod_item**: "API 端点 POST /api/intent/recognize 实现并可正确识别 Goal/Project/Task 意图"
-  - method: auto
-  - location: apps/core/tests/intent-api.test.ts
+RCI:
+  new:
+    - contract_id: kr1-intent-api-integration
+      description: "KR1 意图识别 API 集成回归测试"
+      priority: P0
+      tests:
+        - tests/api/intent-api.test.ts
+        - apps/core/src/__tests__/intent-recognition.test.ts
+      scenarios:
+        - name: "Intent API 端点可访问性"
+          steps:
+            - "POST /api/intent/recognize 返回 200"
+            - "GET /api/intent/health 返回 healthy 状态"
+        - name: "意图识别功能正确性"
+          steps:
+            - "识别创建目标意图并返回正确 action"
+            - "识别查询任务意图并返回正确 action"
+            - "响应时间符合性能要求 (< 500ms)"
+        - name: "单元测试覆盖"
+          steps:
+            - "Intent Recognition Service 单元测试全部通过"
+            - "NLP Parser 工具函数测试全部通过"
+  update: []
 
-- **dod_item**: "实体提取功能实现"
-  - method: auto
-  - location: apps/core/tests/intent-recognizer.test.ts
-
-- **dod_item**: "置信度评估功能实现"
-  - method: auto
-  - location: apps/core/tests/intent-recognizer.test.ts
-
-- **dod_item**: "关联推理功能实现"
-  - method: auto
-  - location: apps/core/tests/intent-recognizer.test.ts
-
-- **dod_item**: "实体提取准确率 > 85%"
-  - method: auto
-  - location: apps/core/tests/intent-recognizer.test.ts
-
-- **dod_item**: "单元测试覆盖主要场景（至少 10 个测试用例）"
-  - method: auto
-  - location: apps/core/tests/intent-recognizer.test.ts
-
-- **dod_item**: "API 响应格式符合规范"
-  - method: auto
-  - location: apps/core/tests/intent-api.test.ts
-
-- **dod_item**: "错误处理完善"
-  - method: auto
-  - location: apps/core/tests/intent-api.test.ts
-
-### 手动测试
-- **dod_item**: "日志记录完整"
-  - method: manual
-  - location: manual:查看控制台日志输出
-
-- **dod_item**: "npm run typecheck 通过"
-  - method: manual
-  - location: manual:运行命令验证
-
-- **dod_item**: "npm run lint 通过"
-  - method: manual
-  - location: manual:运行命令验证
-
-- **dod_item**: "API 使用说明文档更新"
-  - method: manual
-  - location: manual:检查 docs/ 目录
-
-## RCI
-- **new**: []
-- **update**: []
-
-## Reason
-新增功能且为独立 API 模块，不影响现有回归路径，使用完整单元测试覆盖即可。
-
-## Golden Path Impact
-NO - 此 API 为新增功能，暂不属于关键用户路径，不需要 E2E 测试。
-
-## Test Strategy
-- 使用 Jest 单元测试覆盖核心逻辑
-- 至少 10 个测试用例覆盖各种意图类型和边界情况
-- 测试准确率需要 > 85%
-- 错误处理和边界条件测试
+Reason: KR1 是核心功能（意图识别是整个 Brain 系统的关键能力），P0 优先级，需要添加回归契约确保未来修改不会破坏该功能。

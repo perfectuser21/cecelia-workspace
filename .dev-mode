@@ -1,7 +1,8 @@
 dev
-branch: cp-02011246--Retry-Advance-KR1-OKR-Project
-session_id: kr1-intent-api
+branch: cp-02011214--Retry-Advance-KR1-OKR-Project
+session_id: b4cb52cab405
 tty: not a tty
+not a tty
 prd: .prd.md
-started: 2026-02-01T12:50:09+08:00
+started: 2026-02-01T12:18:47+08:00
 tasks_created: true
