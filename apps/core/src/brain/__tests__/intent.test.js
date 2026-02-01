@@ -49,12 +49,28 @@ describe('Intent Recognition Module', () => {
 
   afterEach(async () => {
     // Cleanup test data
+    const cleanupErrors = [];
+
     for (const taskId of createdTaskIds) {
-      await pool.query('DELETE FROM tasks WHERE id = $1', [taskId]).catch(() => {});
+      try {
+        await pool.query('DELETE FROM tasks WHERE id = $1', [taskId]);
+      } catch (err) {
+        cleanupErrors.push({ type: 'task', id: taskId, error: err.message });
+      }
     }
+
     for (const projectId of createdProjectIds) {
-      await pool.query('DELETE FROM projects WHERE id = $1', [projectId]).catch(() => {});
+      try {
+        await pool.query('DELETE FROM projects WHERE id = $1', [projectId]);
+      } catch (err) {
+        cleanupErrors.push({ type: 'project', id: projectId, error: err.message });
+      }
     }
+
+    if (cleanupErrors.length > 0) {
+      console.warn('Cleanup errors:', cleanupErrors);
+    }
+
     createdTaskIds = [];
     createdProjectIds = [];
   });
@@ -858,5 +874,183 @@ describe('Intent-to-Action Mapping', () => {
     const lowConf = await parseIntent('hello');
     expect(lowConf.confidenceLevel).toBe('low');
     expect(lowConf.confidence).toBeLessThan(0.4);
+  });
+});
+
+// KR1 Accuracy Validation Tests
+describe('KR1 - Intent Recognition Accuracy (90% Target)', () => {
+  /**
+   * Accuracy test dataset for the 3 core intent types
+   * Each entry: [input, expected_intent_type]
+   */
+  const accuracyTestSet = [
+    // CREATE_GOAL - 10 cases
+    ['创建一个目标：提升用户增长', INTENT_TYPES.CREATE_GOAL],
+    ['设定 Q1 的销售目标', INTENT_TYPES.CREATE_GOAL],
+    ['新建 OKR：完成产品迭代', INTENT_TYPES.CREATE_GOAL],
+    ['我想设定一个 P0 目标', INTENT_TYPES.CREATE_GOAL],
+    ['create a goal for team productivity', INTENT_TYPES.CREATE_GOAL],
+    ['set objective: improve customer satisfaction', INTENT_TYPES.CREATE_GOAL],
+    ['建立一个年度目标', INTENT_TYPES.CREATE_GOAL],
+    ['目标：实现收入翻倍', INTENT_TYPES.CREATE_GOAL],
+    ['create goal: reduce churn rate', INTENT_TYPES.CREATE_GOAL],
+    ['设立 P1 目标：优化性能', INTENT_TYPES.CREATE_GOAL],
+
+    // CREATE_PROJECT - 10 cases
+    ['我想做一个用户登录系统', INTENT_TYPES.CREATE_PROJECT],
+    ['创建一个 GMV Dashboard', INTENT_TYPES.CREATE_PROJECT],
+    ['开发一个电商平台', INTENT_TYPES.CREATE_PROJECT],
+    ['搭建一个内容管理系统', INTENT_TYPES.CREATE_PROJECT],
+    ['需要一个数据分析工具', INTENT_TYPES.CREATE_PROJECT],
+    ['build a recommendation engine', INTENT_TYPES.CREATE_PROJECT],
+    ['create payment system project', INTENT_TYPES.CREATE_PROJECT],
+    ['实现一个聊天应用', INTENT_TYPES.CREATE_PROJECT],
+    ['构建一个 API Gateway', INTENT_TYPES.CREATE_PROJECT],
+    ['启动新项目：用户画像系统', INTENT_TYPES.CREATE_PROJECT],
+
+    // CREATE_TASK - 10 cases
+    ['添加一个任务：修复登录bug', INTENT_TYPES.CREATE_TASK],
+    ['创建任务：更新文档', INTENT_TYPES.CREATE_TASK],
+    ['新建待办：代码review', INTENT_TYPES.CREATE_TASK],
+    ['任务：优化数据库查询', INTENT_TYPES.CREATE_TASK],
+    ['create task: write unit tests', INTENT_TYPES.CREATE_TASK],
+    ['add task: refactor auth module', INTENT_TYPES.CREATE_TASK],
+    ['我要创建一个任务', INTENT_TYPES.CREATE_TASK],
+    ['待办事项：更新依赖版本', INTENT_TYPES.CREATE_TASK],
+    ['task: fix responsive layout', INTENT_TYPES.CREATE_TASK],
+    ['新任务：集成第三方API', INTENT_TYPES.CREATE_TASK]
+  ];
+
+  it('achieves >= 90% accuracy on explicit inputs for 3 core intent types', () => {
+    let correctPredictions = 0;
+    const total = accuracyTestSet.length;
+    const results = [];
+
+    for (const [input, expectedType] of accuracyTestSet) {
+      const classification = classifyIntent(input);
+      const isCorrect = classification.type === expectedType;
+
+      if (isCorrect) {
+        correctPredictions++;
+      }
+
+      results.push({
+        input,
+        expected: expectedType,
+        predicted: classification.type,
+        confidence: classification.confidence,
+        correct: isCorrect
+      });
+    }
+
+    const accuracy = (correctPredictions / total) * 100;
+
+    // Log results for debugging if accuracy is below target
+    if (accuracy < 90) {
+      console.log('\n=== Accuracy Test Results ===');
+      console.log(`Accuracy: ${accuracy.toFixed(2)}% (${correctPredictions}/${total})`);
+      console.log('\nFailed cases:');
+      results
+        .filter(r => !r.correct)
+        .forEach(r => {
+          console.log(`  Input: "${r.input}"`);
+          console.log(`  Expected: ${r.expected}, Got: ${r.predicted}`);
+          console.log(`  Confidence: ${r.confidence.toFixed(2)}\n`);
+        });
+    }
+
+    expect(accuracy).toBeGreaterThanOrEqual(90);
+  });
+
+  it('extracts title correctly from explicit inputs', () => {
+    const testCases = [
+      {
+        input: '创建项目：用户登录',
+        expectedFields: ['title']
+      },
+      {
+        input: '新建 P0 目标：提升转化率',
+        expectedFields: ['title', 'priority']
+      },
+      {
+        input: '添加任务：修复支付bug',
+        expectedFields: ['title']
+      }
+    ];
+
+    for (const testCase of testCases) {
+      const entities = extractEntities(testCase.input);
+
+      // Verify at least one of the expected fields was extracted
+      const hasExpectedField = testCase.expectedFields.some(field => {
+        return entities[field] !== undefined && entities[field] !== null;
+      });
+
+      expect(hasExpectedField).toBe(true);
+    }
+  });
+
+  it('extracts description and priority from complex inputs', () => {
+    const complexInputs = [
+      {
+        input: '创建一个 P0 优先级的用户认证系统',
+        expectedPriority: 'P0'
+      },
+      {
+        input: '新建紧急任务：修复生产环境bug',
+        expectedPriority: 'P0'
+      },
+      {
+        input: '添加中优先级功能：忘记密码',
+        expectedPriority: 'P1'
+      }
+    ];
+
+    for (const test of complexInputs) {
+      const entities = extractEntities(test.input);
+
+      if (test.expectedPriority) {
+        expect(entities.priority).toBe(test.expectedPriority);
+      }
+    }
+  });
+
+  it('parseIntent returns all required fields for CREATE_GOAL', async () => {
+    const result = await parseIntent('创建目标：Q1 用户增长');
+
+    expect(result).toHaveProperty('originalInput');
+    expect(result).toHaveProperty('intentType');
+    expect(result).toHaveProperty('confidence');
+    expect(result).toHaveProperty('entities');
+    expect(result).toHaveProperty('suggestedAction');
+
+    expect(result.intentType).toBe(INTENT_TYPES.CREATE_GOAL);
+    expect(result.confidence).toBeGreaterThan(0);
+  });
+
+  it('parseIntent returns all required fields for CREATE_PROJECT', async () => {
+    const result = await parseIntent('我想做一个电商平台');
+
+    expect(result).toHaveProperty('originalInput');
+    expect(result).toHaveProperty('intentType');
+    expect(result).toHaveProperty('confidence');
+    expect(result).toHaveProperty('projectName');
+    expect(result).toHaveProperty('tasks');
+
+    expect(result.intentType).toBe(INTENT_TYPES.CREATE_PROJECT);
+    expect(result.projectName).toBeTruthy();
+  });
+
+  it('parseIntent returns all required fields for CREATE_TASK', async () => {
+    const result = await parseIntent('添加任务：代码review');
+
+    expect(result).toHaveProperty('originalInput');
+    expect(result).toHaveProperty('intentType');
+    expect(result).toHaveProperty('confidence');
+    expect(result).toHaveProperty('suggestedAction');
+
+    expect(result.intentType).toBe(INTENT_TYPES.CREATE_TASK);
+    expect(result.suggestedAction).not.toBeNull();
+    expect(result.suggestedAction.action).toBe('create-task');
   });
 });
