@@ -73,3 +73,24 @@
 4. **QA Decision: NO_RCI for UI refactors**: Frontend-only changes that don't affect business logic can use NO_RCI (No Regression Contract Items). Manual verification of UI/API behavior is sufficient.
 
 5. **Execution history from decision_log**: The decision_log table already captures execution events (trigger='tick', 'cecelia-executor', 'execution-callback'). No new tables needed - just query with appropriate filters.
+
+## 2026-02-01: Cecelia Voice + Orchestrator Queue Integration
+
+### PR #141: feat(orchestrator): add queue management API and voice tools integration
+
+**What was built:**
+- Queue management API in apps/core (GET/PATCH/DELETE /api/orchestrator/queue)
+- Voice tools integration in cecelia-semantic-brain (POST /api/orchestrator/voice/*)
+- Unit tests for queue management functionality
+
+**Key learnings:**
+
+1. **Cross-repo development and PRD requirements**: When a feature spans multiple repositories, each repo's changes need independent PRD/DoD files due to branch-protect hooks checking per-repo git state. Consider using symlinks or a shared documentation approach for multi-repo features.
+
+2. **Proxy routing vs local routes**: When mixing httpProxy and local routes on the same path prefix (e.g., /api/orchestrator/*), Express routing order matters. Register specific routes (like /api/orchestrator/queue) before the proxy catch-all to ensure correct matching.
+
+3. **Architecture discovery before implementation**: Checking server.ts proxy configuration revealed that /api/orchestrator/* was already forwarded to semantic-brain. This led to splitting the implementation: queue management (GET/PATCH/DELETE) in Core, voice tools (POST) in semantic-brain. Grep/Read the codebase first to understand existing architecture.
+
+4. **TypeScript interface-first approach**: Even for quick implementations, defining interfaces (QueuedTask, RunningTask) upfront prevents `any` type usage and makes the code more maintainable.
+
+5. **Force push protection**: The stop hook prevents `git push --force` to protect against accidental code loss. Use new commits instead of amending when updates are needed after push.
