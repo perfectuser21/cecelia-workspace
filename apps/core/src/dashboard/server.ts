@@ -72,11 +72,11 @@ app.use('/api/quality', createProxyMiddleware({
 
 // Local orchestrator queue management routes (registered before proxy)
 // These routes handle queue operations locally: /queue, /execute-now/:id, /pause/:id
-// All other orchestrator routes are proxied to cecelia-brain API
+// All other orchestrator routes are proxied to semantic-brain API
 // No route conflicts: orchestratorQueueRoutes only defines specific paths, no wildcards
 app.use('/api/orchestrator', orchestratorQueueRoutes);
 
-// Proxy remaining /api/orchestrator/* to cecelia-brain API
+// Proxy remaining /api/orchestrator/* to semantic-brain API
 // All other orchestrator routes (chat, voice, state, health, realtime) are in Brain
 // Note: Express strips mount path, so /api/orchestrator/chat becomes /chat
 const orchestratorProxy = createProxyMiddleware({
@@ -87,7 +87,7 @@ const orchestratorProxy = createProxyMiddleware({
 });
 app.use('/api/orchestrator', orchestratorProxy);
 
-// Proxy /api/autumnrice/* to cecelia-brain API (R-cell one-click execution)
+// Proxy /api/autumnrice/* to semantic-brain API (R-cell one-click execution)
 app.use('/api/autumnrice', createProxyMiddleware({
   target: BRAIN_API,
   changeOrigin: true,
