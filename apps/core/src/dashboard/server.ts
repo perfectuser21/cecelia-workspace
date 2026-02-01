@@ -27,6 +27,7 @@ import systemRoutes from '../system/routes.js';
 import { startMonitor as startWatchdogMonitor } from '../watchdog/service.js';
 // Tick loop migrated to cecelia-semantic-brain
 import { auditMiddleware, initAuditTable } from '../middleware/audit.js';
+import orchestratorQueueRoutes from './orchestrator-queue.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -68,8 +69,14 @@ app.use('/api/quality', createProxyMiddleware({
   pathRewrite: (path) => `/api${path}`  // /state → /api/state
 }));
 
-// Proxy all /api/orchestrator/* to cecelia-brain API
-// All orchestrator routes (chat, voice, state, health) are now in Brain
+// Local orchestrator queue management routes (registered before proxy)
+// These routes handle queue operations locally: /queue, /execute-now/:id, /pause/:id
+// All other orchestrator routes are proxied to cecelia-brain API
+// No route conflicts: orchestratorQueueRoutes only defines specific paths, no wildcards
+app.use('/api/orchestrator', orchestratorQueueRoutes);
+
+// Proxy remaining /api/orchestrator/* to cecelia-brain API
+// All other orchestrator routes (chat, voice, state, health, realtime) are in Brain
 // Note: Express strips mount path, so /api/orchestrator/chat becomes /chat
 const orchestratorProxy = createProxyMiddleware({
   target: BRAIN_API,
