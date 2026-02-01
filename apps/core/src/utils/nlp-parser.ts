@@ -26,6 +26,14 @@ const INTENT_PATTERNS = {
     /P0.*目标/i,
     /P1.*目标/i,
     /P2.*目标/i,
+    /帮我.*系统/i,
+    /搞个.*系统/i,
+    /建个.*目标/i,
+    /整个.*系统/i,
+    /加个.*目标/i,
+    /create.*goal/i,
+    /new.*goal/i,
+    /set.*goal/i,
   ],
 
   // Project patterns
@@ -36,6 +44,15 @@ const INTENT_PATTERNS = {
     /新项目/i,
     /new project/i,
     /create project/i,
+    /帮我.*项目/i,
+    /搞个.*项目/i,
+    /弄个.*项目/i,
+    /加个.*项目/i,
+    /建个.*项目/i,
+    /setup.*project/i,
+    /init.*project/i,
+    /start.*project/i,
+    /make.*project/i,
   ],
 
   // Task patterns (specific implementations)
@@ -53,6 +70,16 @@ const INTENT_PATTERNS = {
     /add.*feature/i,
     /create.*task/i,
     /build/i,
+    /帮我.*任务/i,
+    /帮我做/i,
+    /搞个.*任务/i,
+    /弄个.*功能/i,
+    /加个.*功能/i,
+    /整个.*功能/i,
+    /来个.*任务/i,
+    /给我.*任务/i,
+    /new.*task/i,
+    /make.*task/i,
   ],
 
   // Query patterns
@@ -66,6 +93,13 @@ const INTENT_PATTERNS = {
     /list.*tasks/i,
     /show.*tasks/i,
     /查询/i,
+    /看看.*任务/i,
+    /给我.*任务列表/i,
+    /帮我查.*任务/i,
+    /有啥任务/i,
+    /show me.*tasks/i,
+    /get.*tasks/i,
+    /fetch.*tasks/i,
   ],
 
   // Update patterns
@@ -78,6 +112,14 @@ const INTENT_PATTERNS = {
     /mark.*complete/i,
     /update.*status/i,
     /set.*status/i,
+    /帮我.*完成/i,
+    /搞定.*任务/i,
+    /弄完.*任务/i,
+    /改成.*状态/i,
+    /完成.*任务/i,
+    /finish.*task/i,
+    /complete.*task/i,
+    /done.*task/i,
   ],
 };
 

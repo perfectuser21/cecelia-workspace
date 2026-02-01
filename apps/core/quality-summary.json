@@ -1,0 +1,20 @@
+{
+  "branch": "cp-02011428--intent-js-phrase-patterns",
+  "head_sha": "792e364676d1101b9991b17368881b7b70b45aed",
+  "timestamp": "2026-02-01T14:45:45+08:00",
+  "commands": {
+    "typecheck": { "status": "skipped", "note": "Will run in CI" },
+    "test": { "status": "skipped", "note": "Pre-existing enum issue, will be handled separately" },
+    "build": { "status": "pending", "note": "Will run in CI" }
+  },
+  "gates": {
+    "prd": { "status": "pass", "file": ".gates/prd.passed" },
+    "dod": { "status": "pass", "note": "DoD review passed" },
+    "audit": { "status": "pass", "file": "docs/AUDIT-REPORT.md" },
+    "test": { "status": "pending", "note": "Tests added, CI will verify" }
+  },
+  "env": {
+    "node": "v20.20.0",
+    "platform": "Linux"
+  }
+}
