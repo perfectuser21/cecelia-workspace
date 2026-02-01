@@ -1,49 +1,40 @@
----
-id: qa-decision-kr1-intent-recognition
-version: 1.0.0
-created: 2026-02-01
-updated: 2026-02-01
-changelog:
-  - 1.0.0: 初始版本（KR1 意图识别功能）
----
-
 # QA Decision
 
-Decision: NO_RCI
-Priority: P1
-RepoType: Business
+**Decision**: NO_RCI  
+**Priority**: P2  
+**RepoType**: Business
 
-Tests:
-  - dod_item: "API 端点接受自然语言输入并返回结构化结果"
-    method: auto
-    location: apps/core/src/brain/__tests__/intent.test.js
+## Tests
 
-  - dod_item: "能正确识别三种意图类型：create-okr、create-project、create-task"
-    method: auto
-    location: apps/core/src/brain/__tests__/intent.test.js
+- **dod_item**: "routes.ts 改用 fetch 调用 semantic-brain API"
+  - **method**: auto
+  - **location**: apps/core/src/dashboard/__tests__/routes.test.ts
 
-  - dod_item: "提取信息包含 title、description、priority、parent"
-    method: auto
-    location: apps/core/src/brain/__tests__/intent.test.js
+- **dod_item**: "INTENT_TYPES 常量在 routes.ts 中本地定义"
+  - **method**: auto
+  - **location**: apps/core/src/dashboard/__tests__/routes.test.ts
 
-  - dod_item: "测试覆盖至少 5 种典型场景"
-    method: auto
-    location: apps/core/src/brain/__tests__/intent.test.js
+- **dod_item**: "测试中 fetch 被 mock，测试通过"
+  - **method**: auto
+  - **location**: apps/core/src/dashboard/__tests__/routes.test.ts
 
-  - dod_item: "返回 ParsedIntent 对象包含 confidence 分数（0-1 范围）"
-    method: auto
-    location: apps/core/src/brain/__tests__/intent.test.js
+- **dod_item**: "apps/core/src/brain/ 目录已删除"
+  - **method**: manual
+  - **location**: manual:验证目录不存在（ls apps/core/src/brain）
 
-  - dod_item: "对于低置信度结果（< 0.6），返回建议的追问问题"
-    method: auto
-    location: apps/core/src/brain/__tests__/intent.test.js
+- **dod_item**: "无其他文件引用 brain 目录"
+  - **method**: auto
+  - **location**: manual:grep -r "from.*brain/" apps/core/src/ 返回空
 
-  - dod_item: "核心模块测试通过"
-    method: manual
-    location: manual:cd apps/core && npm test
+- **dod_item**: "npm test 通过"
+  - **method**: auto
+  - **location**: CI 自动运行
 
-RCI:
-  new: []
-  update: []
+## RCI
 
-Reason: Business repo 新增业务功能（Brain 意图识别），无核心 Hook/Gate/CI 变更，不需要添加或更新回归契约。
+**new**: []  
+**update**: []
+
+## Reason
+
+架构重构任务，删除旧代码改用新 API。仅影响内部实现，不改变外部接口或用户行为，无需纳入回归契约。测试通过后风险可控。
