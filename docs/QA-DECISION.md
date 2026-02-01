@@ -1,128 +1,57 @@
 # QA Decision
 
-**Decision**: NO_RCI
-**Priority**: P0
-**RepoType**: Business
+Decision: MUST_ADD_RCI
+Priority: P0
+RepoType: Business
 
-## Tests
+Tests:
+  - dod_item: "POST /api/intent/recognize 端点可访问，返回 200 状态码"
+    method: auto
+    location: tests/api/intent-api.test.ts
+  - dod_item: "GET /api/intent/health 端点返回 healthy 状态"
+    method: auto
+    location: tests/api/intent-api.test.ts
+  - dod_item: "curl 测试成功返回 JSON 响应（符合 IntentRecognitionResult 类型）"
+    method: manual
+    location: manual:使用 curl POST /api/intent/recognize -d '{"text":"创建目标"}' 并验证 JSON 格式
+  - dod_item: "能识别 '创建目标：完成 KR1' 并返回 create-goal action"
+    method: auto
+    location: tests/api/intent-api.test.ts
+  - dod_item: "能识别 '查看所有待办任务' 并返回 query-tasks action"
+    method: auto
+    location: tests/api/intent-api.test.ts
+  - dod_item: "API 响应时间 < 500ms"
+    method: manual
+    location: manual:使用 curl 测试并记录响应时间
+  - dod_item: "现有测试通过：npm run test -- intent-recognition.test.ts"
+    method: auto
+    location: apps/core/src/__tests__/intent-recognition.test.ts
+  - dod_item: "集成测试通过：tests/api/intent-api.test.ts 中的所有测试用例通过（包括 POST /recognize、GET /health、意图识别功能验证）"
+    method: auto
+    location: tests/api/intent-api.test.ts
 
-- **dod_item**: "API 端点 POST /api/intent/recognize 接收自然语言输入并返回结构化 JSON"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
+RCI:
+  new:
+    - contract_id: kr1-intent-api-integration
+      description: "KR1 意图识别 API 集成回归测试"
+      priority: P0
+      tests:
+        - tests/api/intent-api.test.ts
+        - apps/core/src/__tests__/intent-recognition.test.ts
+      scenarios:
+        - name: "Intent API 端点可访问性"
+          steps:
+            - "POST /api/intent/recognize 返回 200"
+            - "GET /api/intent/health 返回 healthy 状态"
+        - name: "意图识别功能正确性"
+          steps:
+            - "识别创建目标意图并返回正确 action"
+            - "识别查询任务意图并返回正确 action"
+            - "响应时间符合性能要求 (< 500ms)"
+        - name: "单元测试覆盖"
+          steps:
+            - "Intent Recognition Service 单元测试全部通过"
+            - "NLP Parser 工具函数测试全部通过"
+  update: []
 
-- **dod_item**: "正确识别创建 Task 意图"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "正确识别创建 Goal 意图"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "正确识别创建 Project 意图"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "正确识别查询任务意图"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "正确识别更新任务意图"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "从自然语言中提取标题/名称"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "从自然语言中提取优先级（P0/P1/P2）"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "从自然语言中提取状态（pending/in_progress/completed）"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "从自然语言中提取关联关系（属于哪个 Project/Goal）"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "对于明确的创建类请求，准确率达到 100%"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "对于模糊的请求，能够识别为创建任务并返回确认提示"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "能够区分 Goal、Project 和 Task 的语义差异"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "API 响应时间 < 500ms"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "识别结果可转换为 Brain API action 格式"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "与 Brain API 集成成功"
-  - **method**: auto
-  - **location**: tests/api/intent-brain-integration.test.ts
-
-- **dod_item**: "与 Task Management API 集成，支持任务 CRUD 操作"
-  - **method**: auto
-  - **location**: tests/api/intent-task-integration.test.ts
-
-- **dod_item**: "提供完整的 TypeScript 类型支持"
-  - **method**: manual
-  - **location**: manual:代码审查时检查 TypeScript 类型定义完整性
-
-- **dod_item**: "单元测试覆盖核心识别逻辑"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "集成测试验证完整的识别→执行流程"
-  - **method**: auto
-  - **location**: tests/api/intent-end-to-end.test.ts
-
-- **dod_item**: "至少 10 个真实场景的测试用例通过"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "npm run test 通过（vitest）"
-  - **method**: auto
-  - **location**: CI 自动运行
-
-- **dod_item**: "API 文档说明接口使用方法"
-  - **method**: manual
-  - **location**: manual:检查 API 文档完整性
-
-- **dod_item**: "代码注释解释关键算法逻辑"
-  - **method**: manual
-  - **location**: manual:代码审查时确认
-
-- **dod_item**: "场景 1：创建 Task - 输入'实现用户登录接口'，返回正确的 CREATE_TASK 意图和实体"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "场景 2：创建 Goal - 输入'完成整个用户认证系统作为 P0 目标'，返回正确的 CREATE_GOAL 意图和 P0 优先级"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "场景 3：查询任务 - 输入'我有哪些待办任务'，返回正确的 QUERY_TASKS 意图和 pending 状态过滤"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-- **dod_item**: "场景 4：更新状态 - 输入'把登录功能标记为完成'，返回正确的 UPDATE_TASK 意图和 completed 状态"
-  - **method**: auto
-  - **location**: apps/core/src/__tests__/intent-recognition.test.ts
-
-## RCI
-
-**new**: []
-**update**: []
-
-## Reason
-
-新增意图识别功能，属于业务功能扩展。虽然是 P0 优先级的新特性，但不涉及核心 Engine 机制（Hook/Gate/CI），不改变现有系统行为。功能独立可测，通过完善的单元测试和集成测试覆盖即可确保质量，无需纳入回归契约。
+Reason: KR1 是核心功能（意图识别是整个 Brain 系统的关键能力），P0 优先级，需要添加回归契约确保未来修改不会破坏该功能。
