@@ -4,35 +4,35 @@ Decision: NO_RCI
 Priority: P1
 RepoType: Business
 
-## 分析
+## Context
 
-**改动范围**: 前端新增 Block 编辑器组件，集成到详情页
+This is a **QA verification task** (not feature development). The Goal API already exists and has database-level tests. This task verifies API-level CRUD operations through integration testing.
 
-**风险评估**:
-- 不涉及 Public API 改动（R1: 否）- 后端 API 已就绪
-- 不涉及数据模型变更（R2: 否）- blocks 表已存在
-- 多模块改动（R3: 是）- 新增组件 + 集成到详情页
-- 新增依赖（R4: 是）- @dnd-kit/core, @dnd-kit/sortable
-- 无安全/权限涉及（R5: 否）
-- 不改核心工作流（R6: 否）
-- 不改默认行为（R7: 否）
-- 不涉及计费（R8: 否）
+## Risk Analysis
 
-**RISK SCORE**: 2（R3 + R4）
+**Scope**: Verify existing Goal API endpoints
+
+**Risk Assessment**:
+- No Public API changes (R1: No) - testing existing API
+- No data model changes (R2: No) - goals table exists
+- Single module testing (R3: No) - only goal API
+- No new dependencies (R4: No)
+- No security/auth changes (R5: No)
+- No core workflow changes (R6: No)
+- No default behavior changes (R7: No)
+- No billing involved (R8: No)
+
+**RISK SCORE**: 0 (QA only)
 
 ## Tests
 
-| DoD 条目 | 测试方法 | 测试位置 |
-|----------|----------|----------|
-| Block 创建（5 种类型） | manual | 点击+按钮验证5种类型可创建 |
-| Block 编辑（blur 保存） | manual | 编辑后blur验证保存 |
-| Block 删除 | manual | 删除后刷新验证 |
-| 拖拽排序 | manual | 拖拽后刷新验证顺序 |
-| API 同步 | manual | curl验证API数据 |
-| 集成验证（Goal详情页） | manual | Goal详情页验证BlockEditor |
-| 响应式布局 | manual | DevTools移动端视图 |
-| TypeScript 编译 | auto | npm run build |
-| Lint 检查 | auto | npm run lint |
+| DoD Item | Method | Location |
+|----------|--------|----------|
+| Create Goal API returns correct response | auto | apps/core/src/task-system/__tests__/goals-api.test.js |
+| Query Goals list contains newly created Goal | auto | apps/core/src/task-system/__tests__/goals-api.test.js |
+| Update Goal status succeeds | auto | apps/core/src/task-system/__tests__/goals-api.test.js |
+| Delete Goal succeeds | auto | apps/core/src/task-system/__tests__/goals-api.test.js |
+| Data persistence verification | auto | apps/core/src/task-system/__tests__/goals-api.test.js |
 
 ## RCI
 
@@ -41,4 +41,4 @@ update: []
 
 ## Reason
 
-前端 UI 组件首次实现，无历史回归契约。手动验证为主（UI 交互需人工确认），TypeScript/Lint 自动检查。RISK SCORE = 2，中低风险。
+QA verification task. No new RCI needed - this verifies existing API functionality with integration tests. Database-level tests exist (`goals.test.js`), now adding API-level tests to complete verification coverage.
