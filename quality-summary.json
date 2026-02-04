@@ -1,11 +1,12 @@
 {
-  "branch": "cp-02042336-f2a212ae-daac-45fe-9c48-355371",
-  "type": "qa",
+  "branch": "cp-02042336-29ed8180-f852-4e24-943d-45dea1",
   "checks": {
-    "verification": {"status": "pass", "tests": 4, "passed": 4}
+    "typecheck": {"status": "pass"},
+    "build": {"status": "pass"},
+    "goals-api-test": {"status": "pass", "tests": 22}
   },
   "gates": {
     "quality": {"status": "pass"}
   },
-  "timestamp": "2026-02-04T23:41:36+08:00"
+  "timestamp": "2026-02-04T23:47:57+08:00"
 }
