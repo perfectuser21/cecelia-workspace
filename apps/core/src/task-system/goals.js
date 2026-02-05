@@ -43,7 +43,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/goals - Create goal (Objective or Key Result)
 router.post('/', async (req, res) => {
   try {
-    const { project_id, title, description, status, priority, deadline, progress, metadata, parent_id, type, weight } = req.body;
+    const { project_id, title, description, status, priority, target_date, progress, metadata, parent_id, type, weight } = req.body;
 
     // Determine type based on parent_id if not explicitly set
     const goalType = type || (parent_id ? 'key_result' : 'objective');
@@ -59,8 +59,8 @@ router.post('/', async (req, res) => {
     }
 
     const result = await pool.query(
-      'INSERT INTO goals (project_id, title, description, status, priority, deadline, progress, metadata, parent_id, type, weight) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
-      [project_id, title, description, status || 'pending', priority || 'P2', deadline, progress || 0, metadata || {}, parent_id || null, goalType, weight || 1.0]
+      'INSERT INTO goals (project_id, title, description, status, priority, target_date, progress, metadata, parent_id, type, weight) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
+      [project_id, title, description, status || 'pending', priority || 'P2', target_date, progress || 0, metadata || {}, parent_id || null, goalType, weight || 1.0]
     );
 
     res.status(201).json(result.rows[0]);
@@ -104,14 +104,14 @@ async function recalculateParentProgress(parentId) {
 // PATCH /api/goals/:id - Update goal
 router.patch('/:id', async (req, res) => {
   try {
-    const { title, description, status, priority, deadline, progress, metadata, weight } = req.body;
+    const { title, description, status, priority, target_date, progress, metadata, weight } = req.body;
 
     const updates = [];
     const params = [];
     let paramIndex = 1;
 
     // Validate at least one field to update
-    if (!title && !description && !status && !priority && deadline === undefined && progress === undefined && !metadata && weight === undefined) {
+    if (!title && !description && !status && !priority && target_date === undefined && progress === undefined && !metadata && weight === undefined) {
       return res.status(400).json({ error: 'At least one field must be provided for update' });
     }
 
@@ -126,17 +126,14 @@ router.patch('/:id', async (req, res) => {
     if (status !== undefined) {
       updates.push('status = $' + paramIndex++);
       params.push(status);
-      if (status === 'completed') {
-        updates.push('completed_at = NOW()');
-      }
     }
     if (priority !== undefined) {
       updates.push('priority = $' + paramIndex++);
       params.push(priority);
     }
-    if (deadline !== undefined) {
-      updates.push('deadline = $' + paramIndex++);
-      params.push(deadline);
+    if (target_date !== undefined) {
+      updates.push('target_date = $' + paramIndex++);
+      params.push(target_date);
     }
     if (progress !== undefined) {
       updates.push('progress = $' + paramIndex++);

@@ -4,7 +4,7 @@ Decision: NO_RCI
 Priority: P1
 RepoType: Business
 
-## 分析
+## Context
 
 **改动范围**: 前端新增 ClusterStatus 组件，集成到 CeceliaOverview 页面
 
