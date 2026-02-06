@@ -1,37 +1,43 @@
-# Audit Report - 验证 Task 创建带 goal_id 关联
+# Audit Report - 前端页面去重
 
 ## Summary
 
 **Decision: PASS**
-**Type: QA Verification**
+**Type: Refactoring**
 
 ## Scope
 
-验证脚本：`scripts/qa/verify-task-goal-association.sh`
+合并 4 个重复的 Cecelia 监控页面为 1 个，统一 4 个 Home 导航页面使用 GenericHome 组件。
 
 ## Findings
 
 ### L1 (Blocking): 0
-无
 
 ### L2 (Functional): 0
-无
 
 ### L3 (Best Practice): 0
-验证脚本结构清晰，输出格式规范
+GenericHome 组件设计合理，支持 cards（扁平）和 groups（分组）两种布局模式。
 
 ### L4 (Over-engineering): 0
-无
 
-## Verification Results
+## Changes Reviewed
 
-| 测试项 | 状态 |
-|--------|------|
-| 创建 Task 带 goal_id | ✅ PASS |
-| 查询 Goal 关联 Tasks | ✅ PASS |
-| 更新 Task 状态 | ✅ PASS |
-| Task-Goal 关联验证 | ✅ PASS |
+| File | Action | Risk |
+|------|--------|------|
+| brain/pages/CeceliaOverview.tsx | Deleted | None - replaced by execution version |
+| brain/pages/SeatsStatus.tsx | Deleted | None - subset of CeceliaOverview |
+| brain/index.ts | Modified route | Low - points to execution/CeceliaOverview |
+| shared/pages/GenericHome.tsx | Created | None - new shared component |
+| today/pages/TodayHome.tsx | Simplified | None - uses GenericHome |
+| work/pages/WorkHome.tsx | Simplified | None - uses GenericHome |
+| knowledge/pages/KnowledgeHome.tsx | Simplified | None - uses GenericHome |
+| system-hub/pages/SystemHome.tsx | Simplified | None - uses GenericHome |
+
+## Verification
+
+- Vite build: PASS
+- All DoD checks: PASS (9/9)
 
 ## Conclusion
 
-所有验证测试通过，Task 与 Goal 关联功能正常工作。
+纯前端重构，删除重复代码约 700 行，无功能变更，编译通过。
