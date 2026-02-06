@@ -155,6 +155,7 @@ function OverviewPage({
   vpsSlots,
   clusterStatus,
   runningTasks,
+  loading,
   navigate
 }: any) {
   const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set());
@@ -999,6 +1000,7 @@ export default function CommandCenter() {
               vpsSlots={vpsSlots}
               clusterStatus={clusterStatus}
               runningTasks={runningTasks}
+              loading={loading}
               navigate={navigate}
             />
           } />
@@ -1023,6 +1025,7 @@ export default function CommandCenter() {
               vpsSlots={vpsSlots}
               clusterStatus={clusterStatus}
               runningTasks={runningTasks}
+              loading={loading}
               navigate={navigate}
             />
           } />
