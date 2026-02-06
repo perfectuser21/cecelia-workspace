@@ -44,6 +44,14 @@ apps/cecelia-frontend/database/
 .cecelia-run-id
 *.backup-*
 
+# Dev workflow temp files
+.dev-mode
+.dev-mode.lock
+.prd*.md
+.dod*.md
+docs/QA-DECISION.md
+docs/AUDIT-REPORT.md
+
 # Secrets
 workflows/.secrets
 *.secrets
@@ -56,5 +64,3 @@ dist-dev/
 
 # Stray symlinks & generated files
 apps/core/features/node_modules
-apps/dashboard/frontend/pnpm-lock.yaml
-apps/dashboard/frontend/server.js
