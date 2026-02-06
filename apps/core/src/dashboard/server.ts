@@ -29,6 +29,8 @@ import { startMonitor as startWatchdogMonitor } from '../watchdog/service.js';
 // Tick loop migrated to cecelia-semantic-brain
 import { auditMiddleware, initAuditTable } from '../middleware/audit.js';
 import orchestratorQueueRoutes from './orchestrator-queue.js';
+import vpsMonitorRoutes from '../vps-monitor/routes.js';
+import n8nApiRoutes from '../n8n-api/routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -94,7 +96,11 @@ app.use('/api/autumnrice', createProxyMiddleware({
   pathRewrite: (path) => `/autumnrice${path}`,  // /run → /autumnrice/run
 }));
 
-// Proxy /api/v1/* to autopilot backend
+// Local API routes that replace Autopilot backend (port 3333 no longer needed)
+app.use('/api/v1/vps-monitor', vpsMonitorRoutes);
+app.use('/api/v1', n8nApiRoutes);
+
+// Proxy remaining /api/v1/* to autopilot backend (fallback)
 app.use('/api/v1', createProxyMiddleware({
   target: AUTOPILOT_BACKEND,
   changeOrigin: true,

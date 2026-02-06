@@ -8,9 +8,7 @@ import { join, basename } from 'path';
 import type { EngineInfo, Skill, Hook, ChangelogEntry } from '../../shared/engine-types.js';
 
 // Default engine path - can be overridden via environment variable
-// 支持 dev/prod 分离：CODE_BASE_PATH=/home/xx/prod 或 /home/xx/dev
-const CODE_BASE = process.env.CODE_BASE_PATH || '/home/xx/dev';
-const ENGINE_PATH = process.env.ZENITHJOY_ENGINE || `${CODE_BASE}/zenithjoy-engine`;
+const ENGINE_PATH = process.env.ZENITHJOY_ENGINE || '/home/xx/perfect21/cecelia/engine';
 
 /**
  * Parse YAML front matter from a markdown file
