@@ -6,30 +6,29 @@ RepoType: Business
 
 ## Context
 
-**改动范围**: 前端新增 ClusterStatus 组件，集成到 CeceliaOverview 页面
+**改动范围**: 前端页面去重 — 合并 Cecelia 监控页面 + 统一 Home 导航页面
 
 **风险评估**:
-- 不涉及 Public API 改动（R1: 否）- 只是消费 API
+- 不涉及 Public API 改动（R1: 否）
 - 不涉及数据模型变更（R2: 否）
-- 单模块改动（R3: 否）- 只改 execution feature
+- 跨模块改动（R3: 是 — brain, execution, today, work, knowledge, system-hub, dashboard, shared）
 - 无新增依赖（R4: 否）
 - 无安全/权限涉及（R5: 否）
 - 不改核心工作流（R6: 否）
-- 不改默认行为（R7: 否）
+- 不改默认行为（R7: 否）— 仅合并重复 UI
 - 不涉及计费（R8: 否）
 
-**RISK SCORE**: 0（低风险）
+**RISK SCORE**: 1（低风险 — R3 仅因跨目录，但全是前端 UI 重构）
 
 ## Tests
 
 | DoD 条目 | 测试方法 | 测试位置 |
 |----------|----------|----------|
-| ClusterStatus 组件显示双服务器状态 | manual | 访问 CeceliaOverview 页面验证 |
-| API 不可用时优雅降级 | manual | 停止 Brain 后验证降级提示 |
-| UI 布局与设计文档一致 | manual | 对照设计文档验证 |
-| 30 秒自动刷新 | manual | 观察组件状态更新 |
-| TypeScript 编译 | auto | npm run build |
-| Lint 检查 | auto | npm run lint |
+| brain 路由指向 execution/CeceliaOverview | auto | bash:grep 验证 index.ts |
+| 删除的文件不存在 | auto | bash:test ! -f 验证 |
+| GenericHome 组件存在 | auto | bash:test -f 验证 |
+| 5 个 Home 使用 GenericHome | auto | bash:grep 验证 |
+| Vite 构建通过 | auto | vite build |
 
 ## RCI
 
@@ -38,4 +37,4 @@ update: []
 
 ## Reason
 
-前端 UI 组件，低风险改动。主要是视觉效果和数据展示，手动验证更合适。RISK SCORE = 0，低风险。
+纯前端重构（删除重复页面 + 提取通用组件），不改变功能逻辑。vite build 通过即可验证所有 import 和路由正确。
