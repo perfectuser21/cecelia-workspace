@@ -1,1 +1,0 @@
-import{j as r,z as a,ai as t,B as c,V as e,aj as i,ak as j,al as m}from"./index-B5aDd_jC.js";const p={Monitor:m,Code:j,Wallet:i,Video:e,BarChart3:c,Wrench:t,User:a};function l({name:s,...o}){const n=p[s]||a;return r.jsx(n,{...o})}export{l as D};

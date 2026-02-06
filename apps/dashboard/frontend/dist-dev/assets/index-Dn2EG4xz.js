@@ -1,2 +1,0 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/PanoramaV3-OqhfHCKx.js","assets/index-xvZdZyzc.js","assets/index-DmdrB02_.css"])))=>i.map(i=>d[i]);
-import{ai as a}from"./index-xvZdZyzc.js";const r={id:"panorama",name:"Panorama V3",version:"1.0.0",source:"core",instances:["core"],routes:[{path:"/panorama-v3",component:"PanoramaV3",navItem:{label:"Panorama V3",icon:"LayoutDashboard",order:5}}],components:{PanoramaV3:()=>a(()=>import("./PanoramaV3-OqhfHCKx.js"),__vite__mapDeps([0,1,2]))}};export{r as default};

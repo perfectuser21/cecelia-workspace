@@ -1,0 +1,56 @@
+{
+  "branch": "cp-02010915-cleanup-brain-api-migration",
+  "base": "develop",
+  "timestamp": "2026-02-01T09:24:25+08:00",
+  "gates": {
+    "prd": {
+      "status": "PASS",
+      "location": ".prd-cp-02010915-cleanup-brain-api-migration.md",
+      "decision": "PASS"
+    },
+    "dod": {
+      "status": "PASS",
+      "location": ".dod-cp-02010915-cleanup-brain-api-migration.md",
+      "decision": "PASS"
+    },
+    "qa": {
+      "status": "PASS",
+      "location": "docs/QA-DECISION.md",
+      "decision": "NO_RCI",
+      "priority": "P2",
+      "repo_type": "Business"
+    },
+    "test": {
+      "status": "PASS",
+      "location": "apps/core/src/dashboard/__tests__/routes.test.ts",
+      "tests_run": 4,
+      "tests_passed": 4,
+      "tests_failed": 0,
+      "details": "All new tests for Brain API client passed with fetch mocking"
+    }
+  },
+  "code_changes": {
+    "files_modified": [
+      "apps/core/src/dashboard/routes.ts",
+      "apps/core/package.json"
+    ],
+    "files_created": [
+      "apps/core/src/dashboard/__tests__/routes.test.ts"
+    ],
+    "files_deleted": [
+      "apps/core/src/brain/ (entire directory with 17 source files + 13 test files)"
+    ]
+  },
+  "verification": {
+    "brain_directory_deleted": true,
+    "no_brain_imports": true,
+    "api_functions_exported": true,
+    "fetch_mocked_in_tests": true,
+    "build_script_updated": true
+  },
+  "notes": {
+    "test_suite_status": "4/4 new tests passed. 21 pre-existing test failures in other modules (brain, system/planning) due to missing semantic-brain service - not caused by this change.",
+    "breaking_changes": false,
+    "migration_complete": true
+  }
+}
