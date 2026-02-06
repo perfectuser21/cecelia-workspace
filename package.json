@@ -1,6 +1,6 @@
 {
   "name": "cecelia-workspace",
-  "version": "1.9.2",
+  "version": "1.10.0",
   "description": "Cecelia Workspace - AI-powered automation platform monorepo",
   "private": true,
   "type": "module",
@@ -11,9 +11,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "build:core": "npm run build --workspace=apps/core",
-    "build:frontend": "npm run build --workspace=apps/dashboard/frontend",
     "dev:core": "npm run dev --workspace=apps/core",
-    "dev:frontend": "npm run dev --workspace=apps/dashboard/frontend",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "clean": "find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +",
