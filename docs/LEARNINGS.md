@@ -1,4 +1,20 @@
 
+### [2026-02-06] 前端页面清理 (PR #237-#240)
+
+**任务**: 仓库清理 + 页面去重 + 共享组件提取 + Autopilot 前端迁移
+
+**技术要点**:
+1. brain 模块可以跨模块引用 execution 的页面组件，通过 `import('../execution/pages/CeceliaOverview')` 实现路由共享
+2. GenericHome 组件支持 `cards`（扁平列表）和 `groups`（分组布局）两种模式，覆盖所有 Home 页面场景
+3. DashboardHome 因为是 API 驱动的动态数据（`/api/areas`），不适合用静态配置组件替代
+4. OKRPage（战略视角）和 OrchestratorPage（运营视角）用途不同，提取 ProgressBar/StatusIcon/PriorityBadge 共享组件即可
+5. 5 个系统监控页面各有专精（LiveDashboard/VpsMonitor/ClaudeMonitor/PerformanceMonitoring/QualityMonitor），不需合并
+6. Autopilot 前端已 100% 迁移到 zenithjoy-workspace，server.ts 通过 DASHBOARD_FRONTEND_PATH 引用
+
+**影响程度**: High（-25k+ 行，架构变更：前端从 cecelia 分离）
+
+---
+
 ### [2026-01-19] Autopilot 导航结构重构
 
 **任务**: 将侧边栏从按 Feature 分组改为按场景分组（工作台/新媒体运营/设置）
