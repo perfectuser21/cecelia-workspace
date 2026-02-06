@@ -7,28 +7,6 @@ on:
     branches: [main, develop]
 
 jobs:
-  test-frontend:
-    runs-on: ubuntu-latest
-    name: Test Dashboard Frontend
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: apps/dashboard/frontend/package-lock.json
-
-      - name: Install dependencies
-        working-directory: apps/dashboard/frontend
-        run: npm ci
-
-      - name: Build Frontend
-        working-directory: apps/dashboard/frontend
-        run: npm run build
-
   test-core:
     runs-on: ubuntu-latest
     name: Test Core Backend
@@ -55,27 +33,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     name: All Tests Passed
-    needs: [test-frontend, test-core]
+    needs: [test-core]
     if: always()
 
     steps:
       - name: Check test results
         run: |
-          if [ "${{ needs.test-frontend.result }}" != "success" ] || [ "${{ needs.test-core.result }}" != "success" ]; then
+          if [ "${{ needs.test-core.result }}" != "success" ]; then
             echo "❌ Some tests failed"
             exit 1
           fi
           echo "✅ All tests passed"
-
-  # Deploy job - requires manual trigger or webhook
-  # Uncomment when ready
-  # deploy:
-  #   needs: build
-  #   runs-on: ubuntu-latest
-  #   if: github.event_name == 'push'
-  #   steps:
-  #     - name: Trigger VPS Deploy
-  #       run: |
-  #         curl -X POST "${{ secrets.DEPLOY_WEBHOOK_URL }}" \
-  #           -H "Content-Type: application/json" \
-  #           -d '{"repo": "zenithjoy-autopilot", "branch": "${{ github.ref_name }}"}'
