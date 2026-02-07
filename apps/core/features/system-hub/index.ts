@@ -34,6 +34,7 @@ const manifest: FeatureManifest = {
     { path: '/system/claude', component: 'SystemTabbed' },
     { path: '/system/engine', component: 'SystemTabbed' },
     // Drill-down routes (remain separate)
+    { path: '/brain-status', component: 'BrainStatusDashboard' },
     { path: '/system/cecelia/runs', component: 'CeceliaRuns' },
     { path: '/system/cecelia/runs/:runId', component: 'RunDetail' },
     { path: '/system/cecelia/agents/:agentId', component: 'AgentDetail' },
@@ -117,6 +118,7 @@ const manifest: FeatureManifest = {
   components: {
     SystemTabbed: () => import('./pages/SystemTabbed'),
     // Drill-down pages
+    BrainStatusDashboard: () => import('../execution/pages/BrainStatusDashboard'),
     CeceliaRuns: () => import('../execution/pages/CeceliaRuns'),
     RunDetail: () => import('../execution/pages/RunDetail'),
     AgentDetail: () => import('../execution/pages/AgentDetail'),
