@@ -9,7 +9,7 @@ set -euo pipefail
 
 REMOTE="hk"
 REMOTE_DIR="/opt/cecelia/frontend"
-FRONTEND_DIR="/home/xx/perfect21/zenithjoy/workspace/apps/dashboard"
+FRONTEND_DIR="$(cd "$(dirname "$0")/.." && pwd)/apps/dashboard"
 DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=== Cecelia 前端 → HK 部署 ==="
