@@ -72,25 +72,27 @@ export default function DynamicSidebar({
       {/* Logo 区域 */}
       <div
         className={`h-16 flex items-center ${
-          collapsed ? 'justify-center' : 'justify-start'
-        } px-4 border-b border-white/10`}
+          collapsed ? 'justify-center' : 'px-5'
+        } border-b border-white/10`}
       >
         {collapsed ? (
           <div className="relative w-10 h-10 flex items-center justify-center">
-            <div className="absolute inset-0 rounded-full bg-white/10 blur-sm" />
-            <div className="relative w-9 h-9 rounded-full bg-gradient-to-br from-white/15 to-white/5 border border-white/20 flex items-center justify-center backdrop-blur-sm">
-              <span
-                className="font-black text-[11px] bg-gradient-to-br from-slate-300 to-blue-400 bg-clip-text text-transparent"
-                style={{ fontFamily: 'system-ui' }}
-              >
-                XX
+            <div className="absolute inset-0 rounded-lg bg-cyan-500/15 blur-md" />
+            <div className="relative w-10 h-10 rounded-lg bg-slate-800/80 border border-cyan-500/25 flex items-center justify-center backdrop-blur-sm"
+              style={{ boxShadow: '0 0 12px rgba(6,182,212,0.15), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+              <span className="logo-glow">
+                <span className="text-sm font-black bg-gradient-to-b from-cyan-300 to-blue-400 bg-clip-text text-transparent" style={{ fontFamily: 'system-ui' }}>
+                  21
+                </span>
               </span>
             </div>
           </div>
         ) : (
-          <div className="flex items-baseline gap-0" style={{ fontFamily: 'system-ui' }}>
-            <span className="text-slate-400 font-semibold text-xl tracking-tight">Perfect</span>
-            <span className="text-blue-400 font-black text-xl tracking-tight">21</span>
+          <div className="flex items-center gap-1.5" style={{ fontFamily: 'system-ui' }}>
+            <span className="text-[11px] font-semibold tracking-[0.18em] uppercase text-slate-500/70">Perfect</span>
+            <span className="logo-glow">
+              <span className="text-[22px] font-black bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">21</span>
+            </span>
           </div>
         )}
       </div>
