@@ -37,7 +37,9 @@ export default function FeishuLogin() {
   // 飞书应用配置（从环境变量读取）
   const APP_ID = import.meta.env.VITE_FEISHU_APP_ID;
   // 动态 redirect_uri：使用当前域名（需要在飞书应用后台配置所有域名）
-  const origin = window.location.origin.replace(/^http:/, 'https:');
+  // localhost 保持 http（飞书不支持 https://localhost），其他域名转 https
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const origin = isLocalhost ? window.location.origin : window.location.origin.replace(/^http:/, 'https:');
   const REDIRECT_URI = `${origin}/login`;
 
   // 处理飞书登录回调
@@ -388,7 +390,7 @@ export default function FeishuLogin() {
 
           {/* 底部版权 */}
           <p className="text-center text-white/30 text-xs mt-8">
-            © 2025 悦升云端科技 ZenithJoy
+            © 2026 悦升云端科技 ZenithJoy
           </p>
         </div>
       </div>

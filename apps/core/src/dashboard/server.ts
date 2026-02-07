@@ -6,6 +6,7 @@
 
 import 'dotenv/config';
 import express from 'express';
+import compression from 'compression';
 import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -61,6 +62,9 @@ app.use((_req, res, next) => {
   }
   next();
 });
+
+// Gzip compression for all responses
+app.use(compression() as unknown as express.RequestHandler);
 
 // Proxy routes BEFORE body parser (so request body is not consumed)
 // Proxy /api/quality to cecelia-quality API
@@ -207,10 +211,22 @@ app.use('/api/system', systemRoutes);
 // Static frontend files (single frontend, theme switches by hostname in JS)
 // Frontend lives in apps/dashboard/ within this workspace
 const frontendPath = process.env.DASHBOARD_FRONTEND_PATH || join(__dirname, '../../../dashboard/dist');
-app.use(express.static(frontendPath));
 
-// SPA fallback
+// Hashed assets (/assets/*) — immutable long-term cache (1 year)
+app.use('/assets', express.static(join(frontendPath, 'assets'), {
+  maxAge: '1y',
+  immutable: true,
+}));
+
+// Other static files (index.html, favicon, logos) — no cache
+app.use(express.static(frontendPath, {
+  maxAge: 0,
+  etag: true,
+}));
+
+// SPA fallback — no cache for index.html
 app.get('*', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(join(frontendPath, 'index.html'));
 });
 
