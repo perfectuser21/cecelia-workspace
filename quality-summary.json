@@ -1,6 +1,6 @@
 {
-  "branch": "cp-remove-instance-detection-02071658",
-  "head_sha": "42c7556a3",
-  "timestamp": "2026-02-07T12:25:46Z",
+  "branch": "cp-env-badge-02071710",
+  "head_sha": "b401aeb1d",
+  "timestamp": "2026-02-07T12:50:21Z",
   "note": "Quality 只汇总，不判定。CI 是最终裁判。"
 }
