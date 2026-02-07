@@ -50,6 +50,7 @@ interface InstanceContextType {
   loading: boolean;
   error: string | null;
   isFeatureEnabled: (featureKey: string) => boolean;
+  isCore: boolean;
   coreConfig: CoreDynamicConfig | null;
 }
 
@@ -63,7 +64,7 @@ export function InstanceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     async function initializeConfig() {
-      // 动态加载配置
+      // Core 实例: 动态加载配置
       try {
         const dynamicConfig = await loadCoreConfig();
         if (dynamicConfig) {
@@ -72,11 +73,11 @@ export function InstanceProvider({ children }: { children: ReactNode }) {
           applyTheme(dynamicConfig.instanceConfig.theme, dynamicConfig.instanceConfig.instance);
           document.title = 'Perfect21';
         } else {
-          setError('Failed to load configuration');
+          setError('Failed to load Core configuration');
         }
       } catch (err) {
-        console.error('Failed to load config:', err);
-        setError('Failed to load configuration');
+        console.error('Failed to load Core config:', err);
+        setError('Failed to load Core configuration');
       }
 
       setLoading(false);
@@ -109,13 +110,16 @@ export function InstanceProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // 检查 feature 是否启用 - 所有 feature 默认启用
+  // 检查 feature 是否启用 - Core 实例所有 feature 默认启用
   const isFeatureEnabled = (_featureKey: string): boolean => {
     return true;
   };
 
+  // 始终为 Core 实例
+  const isCore = true;
+
   return (
-    <InstanceContext.Provider value={{ config, loading, error, isFeatureEnabled, coreConfig }}>
+    <InstanceContext.Provider value={{ config, loading, error, isFeatureEnabled, isCore, coreConfig }}>
       {children}
     </InstanceContext.Provider>
   );
