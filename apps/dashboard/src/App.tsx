@@ -106,25 +106,23 @@ function AppContent() {
           {/* 左侧导航栏 - 使用配置的渐变色 */}
           <aside className={`fixed inset-y-0 left-0 ${collapsed ? 'w-16' : 'w-64'} flex flex-col shadow-2xl transition-all duration-300 z-20`} style={{ background: config?.theme.sidebarGradient || 'var(--sidebar-gradient)' }}>
             {/* Logo 区域 */}
-            <div className={`h-16 flex items-center ${collapsed ? 'justify-center' : 'px-5'} border-b border-white/10`}>
+            <div className={`h-16 flex items-center justify-center border-b border-white/10`}>
               {collapsed ? (
                 <div className="relative w-10 h-10 flex items-center justify-center">
                   <div className="absolute inset-0 rounded-lg bg-cyan-500/15 blur-md" />
                   <div className="relative w-10 h-10 rounded-lg bg-slate-800/80 border border-cyan-500/25 flex items-center justify-center backdrop-blur-sm"
                     style={{ boxShadow: '0 0 12px rgba(6,182,212,0.15), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
                     <span className="logo-glow">
-                      <span className="text-sm font-black bg-gradient-to-b from-cyan-300 to-blue-400 bg-clip-text text-transparent" style={{ fontFamily: 'system-ui' }}>
-                        21
+                      <span className="text-[13px] font-black tracking-wide bg-gradient-to-b from-cyan-300 to-blue-400 bg-clip-text text-transparent" style={{ fontFamily: 'system-ui' }}>
+                        XX
                       </span>
                     </span>
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5" style={{ fontFamily: 'system-ui' }}>
-                  <span className="text-[11px] font-semibold tracking-[0.18em] uppercase text-slate-500/70">Perfect</span>
-                  <span className="logo-glow">
-                    <span className="text-[22px] font-black bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">21</span>
-                  </span>
+                <div className="logo-glow flex items-baseline" style={{ fontFamily: 'system-ui' }}>
+                  <span className="text-lg font-semibold tracking-tight text-slate-400">Perfect</span>
+                  <span className="text-lg font-black tracking-tight bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">21</span>
                 </div>
               )}
             </div>
