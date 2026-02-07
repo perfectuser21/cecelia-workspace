@@ -1,33 +1,8 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect } from 'react';
 
-// Cookie 工具函数 - 跨子域名共享
-const COOKIE_DOMAIN = '.zenjoymedia.media';
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 天
-
-function setCookie(name: string, value: string) {
-  const isLocalhost = window.location.hostname === 'localhost';
-  const domain = isLocalhost ? '' : `; domain=${COOKIE_DOMAIN}`;
-  const secure = isLocalhost ? '' : '; Secure';
-  // SameSite=None 允许跨子域名共享（需要 Secure）
-  const sameSite = isLocalhost ? 'Lax' : 'None';
-  document.cookie = `${name}=${encodeURIComponent(value)}; path=/${domain}; max-age=${COOKIE_MAX_AGE}; SameSite=${sameSite}${secure}`;
-}
-
-function getCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-  return match ? decodeURIComponent(match[2]) : null;
-}
-
-function deleteCookie(name: string) {
-  const isLocalhost = window.location.hostname === 'localhost';
-  const domain = isLocalhost ? '' : `; domain=${COOKIE_DOMAIN}`;
-  document.cookie = `${name}=; path=/${domain}; max-age=0`;
-}
-
 interface User {
   id: string;
-  feishu_user_id?: string;
   name: string;
   avatar?: string;
   email?: string;
@@ -46,94 +21,28 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const LOCAL_ADMIN: User = {
+  id: 'local-admin',
+  name: 'Admin',
+  email: 'admin@local',
+  department: 'System',
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // 初始化时从 cookie 读取用户信息（跨子域名共享）
+  // 始终以超级管理员身份自动登录
   useEffect(() => {
-    const hostname = window.location.hostname;
-    const isLocalAccess = hostname === 'localhost' || hostname === '127.0.0.1' || /^100\./.test(hostname);
-
-    // localhost / 127.0.0.1 / Tailscale (100.x.x.x) → 自动登录为超级管理员
-    if (isLocalAccess) {
-      const localAdmin: User = {
-        id: 'local-admin',
-        name: 'Admin',
-        email: 'admin@local',
-        department: 'System',
-      };
-      setUser(localAdmin);
-      setToken('local-access-token');
-      setAuthLoading(false);
-      return;
-    }
-
-    console.log('🔍 AuthProvider init, checking cookies...');
-    console.log('🍪 All cookies:', document.cookie);
-    const savedUser = getCookie('user');
-    const savedToken = getCookie('token');
-    console.log('🔍 Found user cookie:', !!savedUser, 'token cookie:', !!savedToken);
-
-    if (savedUser && savedToken) {
-      try {
-        setUser(JSON.parse(savedUser));
-        setToken(savedToken);
-        console.log('✅ Restored user from cookie');
-      } catch (error) {
-        console.error('Failed to parse user data:', error);
-        deleteCookie('user');
-        deleteCookie('token');
-      }
-    }
-
-    // 迁移：如果 localStorage 有数据但 cookie 没有，迁移到 cookie
-    if (!savedUser && !savedToken) {
-      const lsUser = localStorage.getItem('user');
-      const lsToken = localStorage.getItem('token');
-      if (lsUser && lsToken) {
-        try {
-          setUser(JSON.parse(lsUser));
-          setToken(lsToken);
-          setCookie('user', lsUser);
-          setCookie('token', lsToken);
-          // 清理 localStorage
-          localStorage.removeItem('user');
-          localStorage.removeItem('token');
-        } catch (error) {
-          console.error('Failed to migrate auth data:', error);
-        }
-      }
-    }
+    setUser(LOCAL_ADMIN);
+    setToken('local-access-token');
     setAuthLoading(false);
   }, []);
 
-  const login = (newUser: User, newToken: string) => {
-    console.log('🔐 Login called, setting cookies with domain:', COOKIE_DOMAIN);
-    setUser(newUser);
-    setToken(newToken);
-    setCookie('user', JSON.stringify(newUser));
-    setCookie('token', newToken);
-    console.log('🍪 Cookies after login:', document.cookie);
-  };
-
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    deleteCookie('user');
-    deleteCookie('token');
-    // 清理可能残留的 localStorage
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-  };
-
-  // 超级管理员判定：本地/Tailscale 访问自动为超管，外部域名检查飞书 ID
-  const hostname = window.location.hostname;
-  const isLocalAccess = hostname === 'localhost' || hostname === '127.0.0.1' || /^100\./.test(hostname);
-  const superAdminIds = (import.meta.env.VITE_SUPER_ADMIN_FEISHU_IDS || '').split(',').filter(Boolean);
-  const userFeishuId = user?.feishu_user_id || user?.id;
-  const isSuperAdmin = isLocalAccess || (!!userFeishuId && superAdminIds.includes(userFeishuId));
+  // 保留 login/logout 接口避免改消费者组件，但实际为空操作
+  const login = (_user: User, _token: string) => {};
+  const logout = () => {};
 
   const value = {
     user,
@@ -141,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     isAuthenticated: !!user && !!token,
-    isSuperAdmin,
+    isSuperAdmin: true,
     authLoading,
   };
 
