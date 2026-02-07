@@ -1,7 +1,7 @@
 import { ComponentType } from 'react';
 
-// Instance types for feature visibility
-export type InstanceType = 'core' | 'autopilot';
+// Instance types for feature visibility (simplified to only 'core')
+export type InstanceType = 'core';
 
 // Navigation group configuration
 export interface FeatureNavGroup {

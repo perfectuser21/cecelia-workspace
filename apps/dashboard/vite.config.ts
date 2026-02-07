@@ -113,10 +113,6 @@ export default defineConfig({
     host: '0.0.0.0',
     allowedHosts: [
       'localhost',
-      'dev-core.zenjoymedia.media',
-      'dev-autopilot.zenjoymedia.media',
-      'core.zenjoymedia.media',
-      'autopilot.zenjoymedia.media',
     ],
     proxy: {
       '/api/brain': {
