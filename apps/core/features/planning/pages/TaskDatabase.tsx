@@ -170,8 +170,8 @@ export default function TaskDatabase() {
   const [pageSize, setPageSize] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('taskdb_page_size');
-      return saved ? Number(saved) : 50;
-    } catch { return 50; }
+      return saved ? Number(saved) : 10;
+    } catch { return 10; }
   });
 
   // Toast
@@ -603,9 +603,9 @@ export default function TaskDatabase() {
               onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
               className="px-3 py-1.5 text-sm bg-slate-700 text-gray-300 rounded-lg border border-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
             >
+              <option value={10}>10/页</option>
               <option value={20}>20/页</option>
               <option value={50}>50/页</option>
-              <option value={100}>100/页</option>
             </select>
           </div>
         </div>
