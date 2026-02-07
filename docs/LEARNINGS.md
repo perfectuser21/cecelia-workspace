@@ -395,3 +395,27 @@
 **影响程度**: Low（UI 增强，不影响功能）
 
 ---
+
+### [2026-02-07] 移除公网域名改用本地地址 (PR #287)
+
+**任务**: 将 Cecelia 从公网域名访问改为完全本地访问
+
+**变更内容**:
+1. 从 vite.config.ts allowedHosts 移除 `core.zenjoymedia.media` 和 `dev-core.zenjoymedia.media`
+2. 更新注释和文档中的域名引用为 `perfect21:5211` / `perfect21:5212`
+3. Cloudflare Tunnel 配置已更新（version 29），移除 core 域名路由
+
+**架构决策**:
+- Cecelia（管家系统）是监控/展示美国 Brain 大脑状态的前端
+- Brain 和数据库都在美国 VPS，前端直接在美国本地访问最快（< 10ms）
+- 避免 中国 → HK → US → HK → 中国 的跨太平洋绕路（>500ms 延迟）
+- Autopilot 继续使用公网域名（面向外部用户）
+
+**技术要点**:
+1. Cloudflare Tunnel API 管理：`PUT /accounts/{id}/cfd_tunnel/{tunnel_id}/configurations`
+2. 配置立即生效：tunnel 容器自动接收新配置，无需重启
+3. 本地开发：vite allowedHosts 控制允许的 Host 头（防 DNS rebinding 攻击）
+
+**影响程度**: Low（配置调整，不影响功能）
+
+---
