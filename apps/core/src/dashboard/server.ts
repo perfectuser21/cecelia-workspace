@@ -205,9 +205,8 @@ app.use('/api/watchdog', watchdogRoutes);
 app.use('/api/system', systemRoutes);
 
 // Static frontend files (single frontend, theme switches by hostname in JS)
-// Frontend has been migrated to zenithjoy-workspace
-// Set DASHBOARD_FRONTEND_PATH env var to point to the built frontend dist
-const frontendPath = process.env.DASHBOARD_FRONTEND_PATH || join(__dirname, '../../../../../../zenithjoy/workspace/apps/dashboard/dist');
+// Frontend lives in apps/dashboard/ within this workspace
+const frontendPath = process.env.DASHBOARD_FRONTEND_PATH || join(__dirname, '../../../dashboard/dist');
 app.use(express.static(frontendPath));
 
 // SPA fallback
