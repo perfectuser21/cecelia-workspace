@@ -114,9 +114,7 @@ export default defineConfig({
     allowedHosts: [
       'localhost',
       'perfect21',
-      'dev-core.zenjoymedia.media',
       'dev-autopilot.zenjoymedia.media',
-      'core.zenjoymedia.media',
       'autopilot.zenjoymedia.media',
     ],
     proxy: {

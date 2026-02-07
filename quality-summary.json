@@ -1,6 +1,6 @@
 {
-  "branch": "cp-env-badge-02071710",
-  "head_sha": "b401aeb1d",
-  "timestamp": "2026-02-07T12:50:21Z",
+  "branch": "cp-remove-domain-02072208",
+  "head_sha": "7e6f3d27a",
+  "timestamp": "2026-02-07T14:09:41Z",
   "note": "Quality 只汇总，不判定。CI 是最终裁判。"
 }
