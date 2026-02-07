@@ -1,6 +1,6 @@
 {
-  "branch": "cp-02071522-task-preset-views",
-  "head_sha": "d9cc79643",
-  "timestamp": "2026-02-07T07:26:43Z",
+  "branch": "cp-remove-instance-detection-02071658",
+  "head_sha": "42c7556a3",
+  "timestamp": "2026-02-07T12:25:46Z",
   "note": "Quality 只汇总，不判定。CI 是最终裁判。"
 }
