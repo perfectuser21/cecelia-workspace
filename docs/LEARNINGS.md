@@ -355,3 +355,43 @@
 - gate:audit 和 gate:test 的 subagent 审核有效防止质量问题
 - Stop Hook 循环机制确保 CI 通过和 PR 合并才结束
 
+
+### [2026-02-07] 移除 core/dev-core 实例区分
+
+**任务**: 简化前端实例检测逻辑，移除 core/dev-core 域名区分，统一使用 localhost
+
+**Bug**: 无
+
+**技术要点**:
+1. `registry.ts` 的 `detectInstance()` 函数之前检测域名（core.zenjoymedia.media, dev-core.zenjoymedia.media）和端口（5211, 5212），现在简化为直接返回 'core'
+2. `types.ts` 的 `InstanceType` 从 `'core' | 'autopilot'` 简化为只有 `'core'`
+3. `InstanceContext.tsx` 已经硬编码 `isCore = true`，所以实例检测逻辑已经没有实际作用
+4. `vite.config.ts` 的 `allowedHosts` 移除了所有远程域名，只保留 `localhost`
+
+**优化点**: 
+1. 这次重构清理了不再需要的逻辑，代码更简洁
+2. 前端现在只需要关注 localhost 环境，部署配置由 nginx/Cloudflare Tunnel 处理
+
+**影响程度**: Low（代码简化，功能不变）
+
+---
+
+### [2026-02-07] 添加开发/生产环境视觉标识
+
+**任务**: 为前端添加环境标识，让开发环境（5212）和生产环境（5211）容易区分
+
+**技术要点**:
+1. 使用 `window.location.port` 检测环境：5212 = 开发，5211 = 生产
+2. 开发环境顶部固定橙色横条（32px 高度）
+3. `useEffect` 设置浏览器 Tab 标题：开发显示 "Cecelia [DEV]"
+4. 布局调整：开发环境的 topbar 和 main 需要额外的 padding（+32px）
+5. 使用 Wrench 图标增强视觉识别
+
+**优化点**:
+1. 环境标识 z-index 设置为 100，确保始终置顶显示
+2. isDev 变量在整个组件中复用，保持一致性
+3. 橙色渐变背景（from-orange-500 to-orange-600）视觉醒目
+
+**影响程度**: Low（UI 增强，不影响功能）
+
+---
