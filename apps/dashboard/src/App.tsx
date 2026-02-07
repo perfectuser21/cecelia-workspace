@@ -6,13 +6,13 @@
  */
 
 import { useState, useMemo, lazy, Suspense } from 'react';
-import { Route, Link, useLocation } from 'react-router-dom';
-import { LogOut, PanelLeftClose, PanelLeft, Sun, Moon, Monitor, Circle } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { PanelLeftClose, PanelLeft, Sun, Moon, Monitor, Circle } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import CollapsibleNavItem from './components/CollapsibleNavItem';
 import Breadcrumb from './components/Breadcrumb';
 // 配置驱动
-import { getAutopilotNavGroups, filterNavGroups, additionalRoutes, type NavGroup } from './config/navigation.config';
+import { getAutopilotNavGroups, filterNavGroups, type NavGroup } from './config/navigation.config';
 import DynamicRouter from './components/DynamicRouter';
 // Context
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -22,8 +22,6 @@ import { CeceliaProvider } from './contexts/CeceliaContext';
 
 // Lazy load CeceliaChat for Core instance only
 const CeceliaChat = lazy(() => import('@features/core/shared/components/CeceliaChat'));
-// 只有登录页需要静态导入
-import FeishuLogin from './pages/FeishuLogin';
 import './App.css';
 
 // 将 Core 的 NavGroup 格式转换为带 LucideIcon 的格式
@@ -50,21 +48,10 @@ function convertCoreNavGroups(
 
 function AppContent() {
   const location = useLocation();
-  const { user, logout, isAuthenticated, isSuperAdmin, authLoading } = useAuth();
+  const { user, isAuthenticated, isSuperAdmin, authLoading } = useAuth();
   const { theme, setTheme } = useTheme();
   const { config, loading: instanceLoading, isFeatureEnabled, isCore, coreConfig } = useInstance();
   const [collapsed, setCollapsed] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-
-  const handleLogout = () => {
-    setShowLogoutConfirm(true);
-  };
-
-  const confirmLogout = () => {
-    setShowLogoutConfirm(false);
-    logout();
-  };
-
   // 主题切换
   const cycleTheme = () => {
     const themes: Array<'light' | 'dark' | 'auto'> = ['light', 'dark', 'auto'];
@@ -86,11 +73,6 @@ function AppContent() {
   // 兼容旧代码
   const navItems = navGroups.flatMap(g => g.items);
 
-  // 检查当前路由是否允许未认证访问
-  const currentRouteAllowsUnauthenticated = additionalRoutes.some(
-    route => location.pathname === route.path && route.requireAuth === false
-  );
-
   // 配置或认证加载中时显示加载状态
   if (instanceLoading || authLoading) {
     return (
@@ -107,11 +89,6 @@ function AppContent() {
     );
   }
 
-  // 如果未登录且不在登录页，且当前路由需要认证，显示登录页
-  if (!isAuthenticated && !location.pathname.startsWith('/login') && !currentRouteAllowsUnauthenticated) {
-    return <FeishuLogin />;
-  }
-
   // Callback for voice navigation - collapse sidebar for full-screen view
   const handleNavigation = () => {
     setCollapsed(true);
@@ -124,49 +101,6 @@ function AppContent() {
         ? 'bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400/50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800'
         : 'bg-gradient-to-br from-slate-50 to-blue-50/30 dark:from-slate-900 dark:to-slate-800'
     }`}>
-      {/* 退出登录确认框 - 毛玻璃效果 */}
-      {showLogoutConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* 背景遮罩 - 模糊效果 */}
-          <div
-            className="absolute inset-0 bg-gradient-to-br from-slate-900/60 via-slate-800/50 to-slate-900/60 backdrop-blur-sm"
-            onClick={() => setShowLogoutConfirm(false)}
-          />
-          {/* 弹窗主体 */}
-          <div className="relative bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-3xl shadow-2xl p-8 max-w-sm w-full mx-4 border border-white/20 dark:border-slate-700/50">
-            {/* 顶部图标 */}
-            <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-100 to-orange-100 dark:from-red-900/30 dark:to-orange-900/30 flex items-center justify-center">
-                <LogOut className="w-8 h-8 text-red-500" />
-              </div>
-            </div>
-            {/* 标题 */}
-            <h3 className="text-xl font-bold text-center text-gray-900 dark:text-white mb-2">
-              确认退出登录？
-            </h3>
-            <p className="text-center text-gray-500 dark:text-gray-400 mb-8">
-              退出后需要重新登录才能访问系统
-            </p>
-            {/* 按钮组 */}
-            <div className="flex gap-4">
-              <button
-                onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 px-5 py-3 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-2xl font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-all"
-              >
-                取消
-              </button>
-              <button
-                onClick={confirmLogout}
-                className="flex-1 px-5 py-3 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white rounded-2xl font-medium transition-all shadow-lg shadow-red-500/25 hover:shadow-red-500/40 flex items-center justify-center gap-2"
-              >
-                <LogOut className="w-4 h-4" />
-                退出
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {isAuthenticated && (
         <>
           {/* 左侧导航栏 - 使用配置的渐变色 */}
@@ -270,52 +204,28 @@ function AppContent() {
             {/* 底部用户信息 */}
             <div className={`border-t border-white/5 ${collapsed ? 'p-2' : 'p-4'}`}>
               {collapsed ? (
-                <div className="space-y-2">
-                  <div className="relative mx-auto w-10 h-10">
-                    {user?.avatar ? (
-                      <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-900" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600">
-                        <span className="text-white font-semibold text-sm">{user?.name?.charAt(0) || 'U'}</span>
-                      </div>
-                    )}
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-900 rounded-full" />
+                <div className="relative mx-auto w-10 h-10">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600">
+                    <span className="text-white font-semibold text-sm">{user?.name?.charAt(0) || 'A'}</span>
                   </div>
-                  <button
-                    onClick={handleLogout}
-                    title="退出登录"
-                    className="w-full flex items-center justify-center p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </button>
+                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-900 rounded-full" />
                 </div>
               ) : (
                 <div className="p-3 rounded-xl bg-white/5 backdrop-blur">
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      {user?.avatar ? (
-                        <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-900" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg bg-gradient-to-br from-blue-500 to-blue-600">
-                          <span className="text-white font-semibold text-sm">{user?.name?.charAt(0) || 'U'}</span>
-                        </div>
-                      )}
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg bg-gradient-to-br from-blue-500 to-blue-600">
+                        <span className="text-white font-semibold text-sm">{user?.name?.charAt(0) || 'A'}</span>
+                      </div>
                       <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-800 rounded-full" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white truncate">
-                        {user?.name || '用户'}
-                        {isSuperAdmin && <span className="ml-2 px-1.5 py-0.5 text-[10px] bg-amber-500 text-white rounded">超级管理员</span>}
+                        {user?.name || 'Admin'}
+                        <span className="ml-2 px-1.5 py-0.5 text-[10px] bg-amber-500 text-white rounded">超级管理员</span>
                       </p>
-                      <p className="text-xs text-slate-500 truncate">{user?.department || '在线'}</p>
+                      <p className="text-xs text-slate-500 truncate">{user?.department || 'System'}</p>
                     </div>
-                    <button
-                      onClick={handleLogout}
-                      title="退出登录"
-                      className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                    >
-                      <LogOut className="w-4 h-4" />
-                    </button>
                   </div>
                 </div>
               )}
@@ -366,10 +276,7 @@ function AppContent() {
       {/* 主内容区域 - 配置驱动路由 */}
       <main className={isAuthenticated ? `flex-1 overflow-auto ${collapsed ? 'ml-16' : 'ml-64'} pt-16 transition-all duration-300` : "flex-1 overflow-auto"}>
         <div key={location.pathname} className={isAuthenticated ? "p-8 page-fade-in" : ""}>
-          <DynamicRouter>
-            {/* 登录页面（静态路由） */}
-            <Route path="/login" element={<FeishuLogin />} />
-          </DynamicRouter>
+          <DynamicRouter />
         </div>
       </main>
 
