@@ -120,9 +120,9 @@ function AppContent() {
                   </div>
                 </div>
               ) : (
-                <div className="logo-glow flex items-baseline" style={{ fontFamily: 'system-ui' }}>
-                  <span className="text-lg font-semibold tracking-tight text-slate-400">Perfect</span>
-                  <span className="text-lg font-black tracking-tight bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">21</span>
+                <div className="logo-glow flex items-baseline tracking-tighter" style={{ fontFamily: 'system-ui' }}>
+                  <span className="text-[28px] font-light text-slate-300/90">Perfect</span>
+                  <span className="text-[28px] font-extrabold text-white">21</span>
                 </div>
               )}
             </div>
