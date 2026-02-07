@@ -333,3 +333,23 @@
 - gate:audit 和 gate:test 的 subagent 审核有效防止质量问题
 - Stop Hook 循环机制确保 CI 通过和 PR 合并才结束
 
+
+### [2026-02-07] 移除 core/dev-core 实例区分
+
+**任务**: 简化前端实例检测逻辑，移除 core/dev-core 域名区分，统一使用 localhost
+
+**Bug**: 无
+
+**技术要点**:
+1. `registry.ts` 的 `detectInstance()` 函数之前检测域名（core.zenjoymedia.media, dev-core.zenjoymedia.media）和端口（5211, 5212），现在简化为直接返回 'core'
+2. `types.ts` 的 `InstanceType` 从 `'core' | 'autopilot'` 简化为只有 `'core'`
+3. `InstanceContext.tsx` 已经硬编码 `isCore = true`，所以实例检测逻辑已经没有实际作用
+4. `vite.config.ts` 的 `allowedHosts` 移除了所有远程域名，只保留 `localhost`
+
+**优化点**: 
+1. 这次重构清理了不再需要的逻辑，代码更简洁
+2. 前端现在只需要关注 localhost 环境，部署配置由 nginx/Cloudflare Tunnel 处理
+
+**影响程度**: Low（代码简化，功能不变）
+
+---
