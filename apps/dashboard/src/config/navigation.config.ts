@@ -117,7 +117,7 @@ export const autopilotNavGroups: NavGroup[] = [
         featureKey: 'accounts',
         component: 'AccountsList'
       },
-      // 管理员设置已迁移到 Core: core.zenjoymedia.media
+      // 管理员设置已迁移到 Core: perfect21:5211
     ]
   }
 ];
@@ -158,7 +158,7 @@ export const additionalRoutes: RouteConfig[] = [
 
   // 管理员子页面已迁移到 Core
   // ClaudeMonitor, VpsMonitor, ClaudeStats, N8n*, Canvas 等
-  // 通过 Core 实例访问: core.zenjoymedia.media
+  // 通过 Core 实例访问: perfect21:5211
 ];
 
 // ============ 辅助函数 ============
