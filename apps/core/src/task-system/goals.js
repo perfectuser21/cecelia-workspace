@@ -8,16 +8,14 @@ router.get('/', async (req, res) => {
   try {
     const { project_id, scope, business_id, department_id, area_id } = req.query;
 
-    // Join with businesses, departments, and workspaces (areas) for related data
+    // Join with businesses and departments for related data
     let query = `
       SELECT g.*,
         b.name as business_name, b.owner as business_owner,
-        d.name as department_name, d.lead as department_lead,
-        w.name as area_name
+        d.name as department_name, d.lead as department_lead
       FROM goals g
       LEFT JOIN businesses b ON g.business_id = b.id
       LEFT JOIN departments d ON g.department_id = d.id
-      LEFT JOIN workspaces w ON g.area_id = w.id
     `;
     let params = [];
     let conditions = [];
@@ -65,16 +63,11 @@ router.get('/', async (req, res) => {
         name: row.department_name,
         lead: row.department_lead
       } : null,
-      area: row.area_id ? {
-        id: row.area_id,
-        name: row.area_name
-      } : null,
       // Remove flattened fields
       business_name: undefined,
       business_owner: undefined,
       department_name: undefined,
-      department_lead: undefined,
-      area_name: undefined
+      department_lead: undefined
     }));
 
     res.json(goals);
