@@ -112,8 +112,8 @@ function AppContent() {
     }`}>
       {/* 开发环境标识 - 橙色顶部横条 */}
       {isDev && (
-        <div className="fixed top-0 left-0 right-0 h-8 bg-gradient-to-r from-orange-500 to-orange-600 text-white flex items-center justify-center text-sm font-semibold z-[100] shadow-lg">
-          <Wrench className="w-4 h-4 mr-2" />
+        <div className="fixed top-0 left-0 right-0 h-12 bg-gradient-to-r from-orange-500 to-orange-600 text-white flex items-center justify-center text-lg font-bold z-[100] shadow-lg">
+          <Wrench className="w-5 h-5 mr-2" />
           开发环境 (DEV)
         </div>
       )}
@@ -225,7 +225,7 @@ function AppContent() {
           </aside>
 
           {/* 顶部栏 - Canvas 页面使用深色主题 */}
-          <div className={`fixed ${isDev ? 'top-8' : 'top-0'} ${collapsed ? 'left-16' : 'left-64'} right-0 h-16 ${
+          <div className={`fixed ${isDev ? 'top-12' : 'top-0'} ${collapsed ? 'left-16' : 'left-64'} right-0 h-16 ${
             location.pathname === '/canvas'
               ? 'bg-slate-900/90 border-indigo-500/20'
               : 'bg-white/90 dark:bg-slate-800/90 border-slate-200/80 dark:border-slate-700/50'
@@ -266,7 +266,7 @@ function AppContent() {
       )}
 
       {/* 主内容区域 - 配置驱动路由 */}
-      <main className={isAuthenticated ? `flex-1 overflow-auto ${collapsed ? 'ml-16' : 'ml-64'} ${isDev ? 'pt-24' : 'pt-16'} transition-all duration-300` : "flex-1 overflow-auto"}>
+      <main className={isAuthenticated ? `flex-1 overflow-auto ${collapsed ? 'ml-16' : 'ml-64'} ${isDev ? 'pt-28' : 'pt-16'} transition-all duration-300` : "flex-1 overflow-auto"}>
         <div key={location.pathname} className={isAuthenticated ? "p-8 page-fade-in" : ""}>
           <DynamicRouter />
         </div>
