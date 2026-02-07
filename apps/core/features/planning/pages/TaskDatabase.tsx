@@ -710,7 +710,7 @@ function TaskTableView({
   onTaskUpdate: (id: string, field: 'priority' | 'status', value: string) => void;
 }) {
   return (
-    <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+    <div className="bg-slate-800 rounded-xl overflow-hidden">
       {/* Header */}
       <div className="flex items-center border-b border-slate-700 bg-slate-800/80 text-xs font-medium text-gray-400 uppercase tracking-wider">
         <div className="w-8 flex-shrink-0" />
