@@ -1,56 +1,69 @@
 {
-  "branch": "cp-02010915-cleanup-brain-api-migration",
-  "base": "develop",
-  "timestamp": "2026-02-01T09:24:25+08:00",
-  "gates": {
-    "prd": {
-      "status": "PASS",
-      "location": ".prd-cp-02010915-cleanup-brain-api-migration.md",
-      "decision": "PASS"
+  "generated_at": "2026-02-10T14:45:00Z",
+  "pr_branch": "cp-platform-data-feature",
+  "quality_checks": {
+    "directory_structure": {
+      "status": "pass",
+      "description": "目录结构完整",
+      "details": [
+        "apps/features/platform-data/ 目录存在",
+        "skill/, workflows/, shared/ 目录存在",
+        "所有 README.md 文件存在"
+      ]
     },
-    "dod": {
-      "status": "PASS",
-      "location": ".dod-cp-02010915-cleanup-brain-api-migration.md",
-      "decision": "PASS"
+    "skill_files": {
+      "status": "pass",
+      "description": "Skill 入口文件完整",
+      "details": [
+        "SKILL.md 存在",
+        "command.sh 存在且可执行",
+        "三个子命令脚本存在 (scrape.sh, analyze.sh, publish.sh)"
+      ]
     },
-    "qa": {
-      "status": "PASS",
-      "location": "docs/QA-DECISION.md",
-      "decision": "NO_RCI",
-      "priority": "P2",
-      "repo_type": "Business"
+    "workflow_scripts": {
+      "status": "pass",
+      "description": "Workflow 脚本迁移完成",
+      "details": [
+        "scraper: 8 个平台脚本已迁移",
+        "analyzer: 脚本已迁移",
+        "publisher: 脚本已迁移"
+      ]
     },
-    "test": {
-      "status": "PASS",
-      "location": "apps/core/src/dashboard/__tests__/routes.test.ts",
-      "tests_run": 4,
-      "tests_passed": 4,
-      "tests_failed": 0,
-      "details": "All new tests for Brain API client passed with fetch mocking"
+    "documentation": {
+      "status": "pass",
+      "description": "文档完整",
+      "details": [
+        "Feature README.md 存在",
+        "Skill SKILL.md 存在",
+        "每个 workflow 有 README.md"
+      ]
+    },
+    "tests": {
+      "status": "pending",
+      "description": "测试文件已创建",
+      "details": [
+        "structure.test.ts 已创建",
+        "skill-routing.test.ts 已创建",
+        "测试执行由 CI 完成"
+      ]
     }
   },
-  "code_changes": {
-    "files_modified": [
-      "apps/core/src/dashboard/routes.ts",
-      "apps/core/package.json"
-    ],
-    "files_created": [
-      "apps/core/src/dashboard/__tests__/routes.test.ts"
-    ],
-    "files_deleted": [
-      "apps/core/src/brain/ (entire directory with 17 source files + 13 test files)"
-    ]
-  },
-  "verification": {
-    "brain_directory_deleted": true,
-    "no_brain_imports": true,
-    "api_functions_exported": true,
-    "fetch_mocked_in_tests": true,
-    "build_script_updated": true
-  },
-  "notes": {
-    "test_suite_status": "4/4 new tests passed. 21 pre-existing test failures in other modules (brain, system/planning) due to missing semantic-brain service - not caused by this change.",
-    "breaking_changes": false,
-    "migration_complete": true
+  "manual_verification_required": [
+    "目录结构验证",
+    "文件清单验证",
+    "文档验证",
+    "功能验证",
+    "权限验证",
+    "安全审查",
+    "代码审查",
+    "文件检查（skills-registry.json 未修改）",
+    "目录检查（shared/ 未实现）",
+    "文件系统检查（旧 repo 未删除）"
+  ],
+  "summary": {
+    "total_checks": 5,
+    "passed": 4,
+    "pending": 1,
+    "failed": 0
   }
 }
