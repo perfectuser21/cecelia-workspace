@@ -33,6 +33,8 @@ const manifest: FeatureManifest = {
       navItem: { label: 'Projects', icon: 'FolderKanban', group: 'planning', order: 3 },
     },
     { path: '/projects/:projectId', component: 'ProjectDetail' },
+    // Initiatives (Three-layer decomposition)
+    { path: '/initiatives/:id', component: 'InitiativeDetail' },
     // Planner (PlannerOverview removed — use CommandCenter)
     { path: '/planner', redirect: '/dashboard/command' },
     { path: '/scheduler', component: 'Scheduler' },
@@ -69,6 +71,7 @@ const manifest: FeatureManifest = {
     CompanyTasks: () => import('./pages/Tasks'),
     ProjectsDashboard: () => import('./pages/ProjectsDashboard'),
     ProjectDetail: () => import('./pages/ProjectDetail'),
+    InitiativeDetail: () => import('./pages/InitiativeDetail'),
     Scheduler: () => import('./pages/Scheduler'),
     TodayPlan: () => import('./components/TodayPlan'),
     RoadmapView: () => import('./pages/RoadmapView'),
