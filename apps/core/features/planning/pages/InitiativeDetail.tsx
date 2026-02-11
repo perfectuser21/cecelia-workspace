@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Target, RefreshCw, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Target, RefreshCw, AlertCircle, List, Network } from 'lucide-react';
 import { useCeceliaPage } from '@/contexts/CeceliaContext';
 import PRPlansList from '../components/PRPlansList';
+import PRPlanDependencyGraph from '../components/PRPlanDependencyGraph';
 import StatusIcon from '../../shared/components/StatusIcon';
 import { getInitiative, getPRPlans } from '../api/pr-plans.api';
 import type { Initiative, PRPlan } from '../api/pr-plans.api';
@@ -15,6 +16,7 @@ export default function InitiativeDetail() {
   const [prPlans, setPRPlans] = useState<PRPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'graph'>('list');
 
   useEffect(() => {
     setCurrentPage('Initiative Detail');
@@ -51,6 +53,11 @@ export default function InitiativeDetail() {
 
   const handleRefresh = () => {
     loadData();
+  };
+
+  const handleStatusUpdate = (updatedPlan: PRPlan) => {
+    // Update local state
+    setPRPlans(prev => prev.map(p => p.id === updatedPlan.id ? updatedPlan : p));
   };
 
   if (loading && !initiative) {
@@ -185,12 +192,51 @@ export default function InitiativeDetail() {
                 ({prPlans.length})
               </span>
             </h2>
+
+            {/* View Toggle */}
+            {prPlans.length > 0 && (
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`
+                    flex items-center gap-2 px-3 py-1.5 rounded transition-colors text-sm font-medium
+                    ${viewMode === 'list'
+                      ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }
+                  `}
+                >
+                  <List className="w-4 h-4" />
+                  List
+                </button>
+                <button
+                  onClick={() => setViewMode('graph')}
+                  className={`
+                    flex items-center gap-2 px-3 py-1.5 rounded transition-colors text-sm font-medium
+                    ${viewMode === 'graph'
+                      ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }
+                  `}
+                >
+                  <Network className="w-4 h-4" />
+                  Graph
+                </button>
+              </div>
+            )}
           </div>
 
-          <PRPlansList
-            prPlans={prPlans}
-            loading={loading}
-          />
+          {viewMode === 'list' ? (
+            <PRPlansList
+              prPlans={prPlans}
+              loading={loading}
+              onStatusUpdate={handleStatusUpdate}
+            />
+          ) : (
+            <PRPlanDependencyGraph
+              prPlans={prPlans}
+            />
+          )}
         </div>
 
         {/* Stats */}

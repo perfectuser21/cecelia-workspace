@@ -34,5 +34,8 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/ZenithJoycloud/cecelia-workspace.git"
+  },
+  "dependencies": {
+    "reactflow": "^11.11.4"
   }
 }

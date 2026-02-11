@@ -7,9 +7,10 @@ interface PRPlansListProps {
   prPlans: PRPlan[];
   loading?: boolean;
   onPRPlanClick?: (prPlan: PRPlan) => void;
+  onStatusUpdate?: (updatedPlan: PRPlan) => void;
 }
 
-export default function PRPlansList({ prPlans, loading, onPRPlanClick }: PRPlansListProps) {
+export default function PRPlansList({ prPlans, loading, onPRPlanClick, onStatusUpdate }: PRPlansListProps) {
   // Loading state
   if (loading) {
     return (
@@ -60,7 +61,9 @@ export default function PRPlansList({ prPlans, loading, onPRPlanClick }: PRPlans
             prPlan={prPlan}
             isBlocked={isBlocked}
             dependencyTitles={dependencyTitles}
+            allPRPlans={sortedPRPlans}
             onClick={onPRPlanClick ? () => onPRPlanClick(prPlan) : undefined}
+            onStatusUpdate={onStatusUpdate}
           />
         );
       })}

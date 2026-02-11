@@ -175,3 +175,74 @@ export function getDependencyChain(prPlan: PRPlan, allPRPlans: PRPlan[]): PRPlan
 
   return chain;
 }
+
+/**
+ * Update PR Plan status
+ */
+export async function updatePRPlanStatus(
+  id: string,
+  status: PRPlan['status'],
+  allPRPlans?: PRPlan[]
+): Promise<PRPlan> {
+  try {
+    // Client-side validation (if allPRPlans provided)
+    if (allPRPlans) {
+      const prPlan = allPRPlans.find(p => p.id === id);
+      if (!prPlan) {
+        throw new Error('PR Plan not found');
+      }
+
+      // Validate status transition
+      if (!isValidStatusTransition(prPlan.status, status)) {
+        throw new Error(`Invalid status transition: ${prPlan.status} → ${status}`);
+      }
+
+      // Check if dependencies are met for in_progress
+      if (status === 'in_progress' && isPRPlanBlocked(prPlan, allPRPlans)) {
+        throw new Error('Cannot start PR Plan: dependencies not completed');
+      }
+    }
+
+    const response = await fetch(`${BRAIN_API_URL}/pr-plans/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Failed to update PR Plan: ${response.statusText}`);
+    }
+
+    const data: PRPlanResponse = await response.json();
+    return data.pr_plan;
+  } catch (error) {
+    console.error('Error updating PR Plan status:', error);
+    throw error;
+  }
+}
+
+/**
+ * Validate status transition
+ */
+export function isValidStatusTransition(
+  currentStatus: PRPlan['status'],
+  newStatus: PRPlan['status']
+): boolean {
+  // Allow same status (no change)
+  if (currentStatus === newStatus) {
+    return true;
+  }
+
+  // Define valid transitions
+  const validTransitions: Record<PRPlan['status'], PRPlan['status'][]> = {
+    planning: ['in_progress', 'cancelled'],
+    in_progress: ['completed', 'planning', 'cancelled'],
+    completed: ['in_progress'], // Allow reopening
+    cancelled: ['planning'], // Allow un-cancelling
+  };
+
+  return validTransitions[currentStatus]?.includes(newStatus) || false;
+}

@@ -1,14 +1,68 @@
-import { CheckCircle2, Clock, AlertCircle, FileText, Link2, Layers } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, Clock, AlertCircle, FileText, Link2, Layers, MoreVertical, ListTodo } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { PRPlan } from '../api/pr-plans.api';
+import { updatePRPlanStatus, isValidStatusTransition } from '../api/pr-plans.api';
 
 interface PRPlanCardProps {
   prPlan: PRPlan;
   isBlocked: boolean;
   dependencyTitles?: string[];  // Titles of dependent PR Plans
+  allPRPlans?: PRPlan[];  // For validation
   onClick?: () => void;
+  onStatusUpdate?: (updatedPlan: PRPlan) => void;
 }
 
-export default function PRPlanCard({ prPlan, isBlocked, dependencyTitles, onClick }: PRPlanCardProps) {
+export default function PRPlanCard({
+  prPlan,
+  isBlocked,
+  dependencyTitles,
+  allPRPlans,
+  onClick,
+  onStatusUpdate
+}: PRPlanCardProps) {
+  const navigate = useNavigate();
+  const [showMenu, setShowMenu] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleStatusChange = async (newStatus: PRPlan['status']) => {
+    if (newStatus === prPlan.status) {
+      setShowMenu(false);
+      return;
+    }
+
+    // Validate transition
+    if (!isValidStatusTransition(prPlan.status, newStatus)) {
+      alert(`Invalid status transition: ${prPlan.status} → ${newStatus}`);
+      setShowMenu(false);
+      return;
+    }
+
+    // Check dependencies for in_progress
+    if (newStatus === 'in_progress' && isBlocked) {
+      alert('Cannot start this PR Plan: dependencies not completed');
+      setShowMenu(false);
+      return;
+    }
+
+    try {
+      setIsUpdating(true);
+      const updated = await updatePRPlanStatus(prPlan.id, newStatus, allPRPlans);
+      onStatusUpdate?.(updated);
+      setShowMenu(false);
+    } catch (error) {
+      console.error('Failed to update status:', error);
+      alert(error instanceof Error ? error.message : 'Failed to update status');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleViewTasks = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/planning/tasks?pr_plan_id=${prPlan.id}`);
+  };
+
   const getStatusIcon = () => {
     if (isBlocked) {
       return <AlertCircle className="w-5 h-5 text-amber-500" />;
@@ -93,6 +147,64 @@ export default function PRPlanCard({ prPlan, isBlocked, dependencyTitles, onClic
             </div>
           </div>
         </div>
+
+        {/* Status Menu */}
+        <div className="relative">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowMenu(!showMenu);
+            }}
+            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors"
+            disabled={isUpdating}
+          >
+            <MoreVertical className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+          </button>
+
+          {showMenu && (
+            <>
+              {/* Backdrop */}
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setShowMenu(false)}
+              />
+
+              {/* Menu */}
+              <div className="absolute right-0 top-8 z-20 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1">
+                <div className="px-3 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-700">
+                  Change Status
+                </div>
+
+                {['planning', 'in_progress', 'completed', 'cancelled'].map((status) => {
+                  const statusTyped = status as PRPlan['status'];
+                  const isCurrent = prPlan.status === statusTyped;
+                  const isValid = isValidStatusTransition(prPlan.status, statusTyped);
+                  const isDisabled = !isValid || isCurrent || isUpdating;
+
+                  return (
+                    <button
+                      key={status}
+                      onClick={() => handleStatusChange(statusTyped)}
+                      disabled={isDisabled}
+                      className={`
+                        w-full px-3 py-2 text-left text-sm transition-colors
+                        ${isCurrent
+                          ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium'
+                          : isValid
+                          ? 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                          : 'text-slate-400 dark:text-slate-600 cursor-not-allowed'
+                        }
+                      `}
+                    >
+                      {status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                      {isCurrent && ' ✓'}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Dependencies */}
@@ -108,21 +220,32 @@ export default function PRPlanCard({ prPlan, isBlocked, dependencyTitles, onClic
 
       {/* Tasks Progress */}
       {prPlan.tasks_count !== undefined && prPlan.tasks_count > 0 && (
-        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-          <Layers className="w-4 h-4" />
-          <span>Tasks: {tasksProgress}</span>
-          {prPlan.tasks_count > 0 && (
-            <div className="flex-1 max-w-[100px]">
-              <div className="h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 rounded-full transition-all"
-                  style={{
-                    width: `${((prPlan.tasks_completed || 0) / prPlan.tasks_count) * 100}%`
-                  }}
-                />
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+            <Layers className="w-4 h-4" />
+            <span>Tasks: {tasksProgress}</span>
+            {prPlan.tasks_count > 0 && (
+              <div className="w-[100px]">
+                <div className="h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all"
+                    style={{
+                      width: `${((prPlan.tasks_completed || 0) / prPlan.tasks_count) * 100}%`
+                    }}
+                  />
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+
+          {/* View Tasks Button */}
+          <button
+            onClick={handleViewTasks}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+          >
+            <ListTodo className="w-3 h-3" />
+            <span>View Tasks</span>
+          </button>
         </div>
       )}
 

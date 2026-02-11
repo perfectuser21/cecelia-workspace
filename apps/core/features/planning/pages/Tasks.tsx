@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { CheckSquare, Plus, RefreshCw, AlertCircle, Loader2, GripVertical, Star, ChevronLeft, ChevronRight, Sparkles, ExternalLink } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { CheckSquare, Plus, RefreshCw, AlertCircle, Loader2, GripVertical, Star, ChevronLeft, ChevronRight, Sparkles, ExternalLink, Link2 } from 'lucide-react';
 import type { DropResult } from '@hello-pangea/dnd';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useCurrentUser } from '../api/auth';
@@ -60,6 +61,8 @@ const getWeekDates = (baseDate: Date) => {
 
 export default function Tasks() {
   const user = useCurrentUser();
+  const [searchParams] = useSearchParams();
+  const prPlanIdFilter = searchParams.get('pr_plan_id');
 
   // 视图状态
   const [viewType, setViewType] = useState<ViewType>('day');
@@ -105,17 +108,25 @@ export default function Tasks() {
   const weekDates = useMemo(() => getWeekDates(selectedDate), [selectedDate]);
   const displayDates = viewType === 'day' ? [selectedDate] : weekDates;
 
+  // Filter tasks by pr_plan_id if provided
+  const filteredTasks = useMemo(() => {
+    if (!prPlanIdFilter) return allTasks;
+    // Note: Task interface would need pr_plan_id field. For now, filter by metadata if it exists.
+    // This is a placeholder for when Task has pr_plan_id field
+    return allTasks.filter(t => (t as any).pr_plan_id === prPlanIdFilter);
+  }, [allTasks, prPlanIdFilter]);
+
   // 计算任务统计
   const taskStats = useMemo(() => {
     const today = formatDate(new Date());
     const weekStart = formatDate(weekDates[0]);
     const weekEnd = formatDate(weekDates[6]);
 
-    // 今日任务统计（allTasks 只包含未完成的）
-    const todayTasks = allTasks.filter(t => t.due === today);
+    // 今日任务统计（filteredTasks 只包含未完成的）
+    const todayTasks = filteredTasks.filter(t => t.due === today);
 
     // 本周任务统计
-    const weekTasks = allTasks.filter(t => {
+    const weekTasks = filteredTasks.filter(t => {
       if (!t.due) return false;
       return t.due >= weekStart && t.due <= weekEnd;
     });
@@ -124,7 +135,7 @@ export default function Tasks() {
       today: { total: todayTasks.length },
       week: { total: weekTasks.length },
     };
-  }, [allTasks, weekDates]);
+  }, [filteredTasks, weekDates]);
 
   // 加载任务
   const loadTasks = useCallback(async () => {
