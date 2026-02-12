@@ -1,3 +1,33 @@
+### [2026-02-12] Observability Dashboard UI (PR #297)
+
+**任务**: 为 Brain 的 Observability System v1.1.1 创建前端 UI，实现实时执行监控和故障分析
+
+**技术要点**:
+1. **Core vs Workspace 边界清晰**：Core 提供 API (port 5221)，Workspace 提供 UI (port 5211/5212)
+2. **实时刷新策略**：不同组件使用不同刷新间隔（ActiveRuns 5s, FailureAnalysis 30s, StuckDetection 10s）
+3. **测试基础设施**：Vitest + @testing-library/react + happy-dom，完整的 vitest.config.ts 和 setup.ts
+4. **API Mock 模式**：使用 `vi.mock('../client')` 拦截 axios 调用，模拟 API 响应
+5. **组件设计模式**：
+   - Loading/Error/Empty 三态处理
+   - useEffect + setInterval 实现自动刷新
+   - Color mapping (LAYER_COLORS, STATUS_COLORS, REASON_KIND_COLORS)
+6. **Grid Layout**：Tailwind grid-cols-1 lg:grid-cols-3 实现响应式布局
+
+**遇到的问题**:
+1. **测试 Mock 路径**：初始使用 '../api-client' 但实际应该是 '../client'，导致 mock 失败
+2. **测试数据字段不匹配**：Mock 数据使用了 `task_title` 但组件实际不显示该字段，导致测试超时
+3. **API 参数格式**：`/brain/trace/failures/top` 使用 `{ params: { limit } }` 而不是查询字符串
+4. **getTopFailures vs getStuckRuns 端点**：`/brain/trace/failures/top` vs `/brain/trace/stuck`（不是 `/brain/trace/runs/stuck`）
+
+**改进建议**:
+1. 测试时先检查组件实际渲染的文本，再写断言
+2. Mock 数据应该完整包含 TypeScript 接口定义的所有必需字段
+3. 添加 TypeScript 严格模式避免字段遗漏
+
+**影响程度**: Medium（新功能，有完整测试覆盖，CI 通过）
+
+---
+
 ### [2026-02-07] 开发环境标识视觉优化 (PR #285)
 
 **任务**: 增大开发环境标识字体和高度，让环境区分更明显
