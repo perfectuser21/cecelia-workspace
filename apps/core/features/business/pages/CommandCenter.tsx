@@ -2,20 +2,24 @@
  * CommandCenter - 统一控制中心（层级导航版）
  *
  * 支持下钻导航：
- * /command - 总览
- * /command/okr - OKR 列表
- * /command/projects - Projects 列表
- * /command/tasks - Tasks 列表
- * /command/vps - VPS 详情
+ * /dashboard/command - 总览
+ * /dashboard/command/okr - OKR 列表
+ * /dashboard/command/projects - Projects 列表
+ * /dashboard/command/tasks - Tasks 列表
+ * /dashboard/command/vps - VPS 详情
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate, useLocation, Routes, Route, Link } from 'react-router-dom';
 import {
   Share2, Briefcase, TrendingUp, ChevronRight, ChevronDown,
   Target, CheckCircle2, Circle, Play, Clock, Server, Cpu,
   Home, ListTodo, Folder, Activity
 } from 'lucide-react';
+import ClusterStatusComponent from '../../execution/components/ClusterStatus';
+import { fetchClusterStatus, ClusterStatus as ClusterStatusType } from '../../execution/api/agents.api';
+import { useApi, useApiFn } from '../../shared/hooks/useApi';
+import { SkeletonCard } from '../../shared/components/LoadingState';
 
 interface Goal {
   id: string;
@@ -77,7 +81,7 @@ interface VpsSlot {
 function Breadcrumb({ items }: { items: Array<{ label: string; path?: string }> }) {
   return (
     <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
-      <Link to="/command" className="hover:text-blue-500 flex items-center gap-1">
+      <Link to="/dashboard/command" className="hover:text-blue-500 flex items-center gap-1">
         <Home className="w-4 h-4" />
         <span>Command Center</span>
       </Link>
@@ -151,7 +155,9 @@ function OverviewPage({
   tasks,
   projects,
   vpsSlots,
+  clusterStatus,
   runningTasks,
+  loading,
   navigate
 }: any) {
   const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set());
@@ -216,47 +222,18 @@ function OverviewPage({
         <p className="text-slate-500 dark:text-slate-400 mt-2">统一控制中心</p>
       </div>
 
-      {/* Top Row: VPS + Execution */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* VPS Status */}
-        <SummaryCard
-          icon={Server}
-          title="VPS 状态"
-          subtitle="Claude 并发槽位"
-          color="cyan"
-          onClick={() => navigate('/command/vps')}
-        >
-          <div className="flex gap-2 mb-3">
-            {Array.from({ length: vpsSlots.total }).map((_: any, i: number) => {
-              const slot = vpsSlots.slots?.[i];
-              return (
-                <div
-                  key={i}
-                  className={`flex-1 h-8 rounded-lg flex items-center justify-center text-xs font-medium transition-all ${
-                    slot
-                      ? 'bg-blue-500 text-white animate-pulse'
-                      : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
-                  }`}
-                  title={slot ? `PID: ${slot.pid}\nCPU: ${slot.cpu}\nMem: ${slot.memory}` : '空闲'}
-                >
-                  {slot ? <Cpu className="w-4 h-4" /> : ''}
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            <span className="font-bold text-blue-500">{vpsSlots.used}</span> / {vpsSlots.total} 槽位使用中
-            {vpsSlots.slots?.length > 0 && <span className="ml-2 text-xs text-slate-400">(真实进程)</span>}
-          </p>
-        </SummaryCard>
+      {/* Cluster Status (US + HK) */}
+      <ClusterStatusComponent data={clusterStatus} loading={loading} />
 
+      {/* Today Stats + Execution */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Today Stats + Current Execution */}
         <SummaryCard
           icon={Play}
           title="今日执行"
           subtitle={`Tick: ${tickStatus?.enabled ? '已启用' : '已禁用'}`}
           color="blue"
-          onClick={() => navigate('/command/execution')}
+          onClick={() => navigate('/dashboard/command/execution')}
         >
           {/* Today Stats */}
           <div className="grid grid-cols-2 gap-3 mb-4">
@@ -290,95 +267,125 @@ function OverviewPage({
         </SummaryCard>
       </div>
 
-      {/* OKR Summary Card */}
+      {/* OKR 全景 */}
       <SummaryCard
         icon={Target}
         title="OKR 目标"
-        subtitle="点击展开查看详情"
+        subtitle={`${goals.filter((g: Goal) => !g.parent_id).length} 个目标`}
         color="purple"
-        onClick={() => navigate('/command/okr')}
+        onClick={() => navigate('/dashboard/command/okr')}
       >
-        {brainStatus?.daily_focus && (
-          <div className="space-y-3">
-            <button
-              onClick={(e) => { e.stopPropagation(); toggleGoal(brainStatus.daily_focus!.objective_id); }}
-              className="w-full text-left p-4 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:border-purple-400 transition-all"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {expandedGoals.has(brainStatus.daily_focus.objective_id) ? (
-                    <ChevronDown className="w-5 h-5 text-purple-500" />
-                  ) : (
-                    <ChevronRight className="w-5 h-5 text-purple-500" />
-                  )}
-                  <span className="font-medium text-slate-800 dark:text-white">
-                    {brainStatus.daily_focus.objective_title}
-                  </span>
-                </div>
-                <span className="text-xs px-2 py-1 bg-purple-200 dark:bg-purple-800 text-purple-700 dark:text-purple-200 rounded-full">
-                  P0 Focus
-                </span>
-              </div>
-            </button>
+        <div className="space-y-3">
+          {goals.filter((g: Goal) => !g.parent_id).map((obj: Goal) => {
+            const krs = goals.filter((g: Goal) => g.parent_id === obj.id);
+            const allKrTasks = krs.flatMap((kr: Goal) => getTasksForGoal(kr.id));
+            const completedCount = allKrTasks.filter((t: Task) => t.status === 'completed').length;
+            const totalCount = allKrTasks.length;
+            const oProgress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+            const isFocus = brainStatus?.daily_focus?.objective_id === obj.id;
 
-            {expandedGoals.has(brainStatus.daily_focus.objective_id) && (
-              <div className="ml-6 space-y-2">
-                {brainStatus.daily_focus.key_results.map((kr: any) => {
-                  const stats = getTaskStats(kr.id);
-                  return (
-                    <div key={kr.id}>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleGoal(kr.id); }}
-                        className="w-full text-left p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            {expandedGoals.has(kr.id) ? (
-                              <ChevronDown className="w-4 h-4 text-slate-400" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4 text-slate-400" />
-                            )}
-                            <span className="text-sm text-slate-700 dark:text-slate-200">{kr.title}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-500">{stats.completed}/{stats.total} tasks</span>
-                            <div className="w-16 h-2 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
-                              <div className="h-full bg-emerald-500 transition-all" style={{ width: `${stats.percent}%` }} />
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-
-                      {expandedGoals.has(kr.id) && (
-                        <div className="ml-6 mt-2 space-y-1">
-                          {getTasksForGoal(kr.id).map((task: Task) => (
-                            <div
-                              key={task.id}
-                              className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/30 cursor-pointer"
-                              onClick={(e) => { e.stopPropagation(); navigate(`/command/tasks/${task.id}`); }}
-                            >
-                              {getStatusIcon(task.status)}
-                              <span className={`text-sm flex-1 ${
-                                task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-600 dark:text-slate-300'
-                              }`}>
-                                {task.title.slice(0, 50)}...
-                              </span>
-                              <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                task.priority === 'P1' ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'
-                              }`}>
-                                {task.priority}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
+            return (
+              <div key={obj.id}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleGoal(obj.id); }}
+                  className={`w-full text-left p-4 rounded-xl border transition-all ${
+                    isFocus
+                      ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 hover:border-purple-400'
+                      : 'bg-slate-50 dark:bg-slate-700/30 border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      {expandedGoals.has(obj.id) ? (
+                        <ChevronDown className="w-4 h-4 text-purple-500" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4 text-purple-500" />
                       )}
+                      <span className="font-medium text-sm text-slate-800 dark:text-white">
+                        {obj.title}
+                      </span>
                     </div>
-                  );
-                })}
+                    <div className="flex items-center gap-2">
+                      {isFocus && (
+                        <span className="text-xs px-2 py-0.5 bg-purple-200 dark:bg-purple-800 text-purple-700 dark:text-purple-200 rounded-full">
+                          Focus
+                        </span>
+                      )}
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${
+                        obj.priority === 'P0' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                      }`}>
+                        {obj.priority || 'P1'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
+                      <div className="h-full bg-purple-500 transition-all" style={{ width: `${oProgress}%` }} />
+                    </div>
+                    <span className="text-xs text-slate-500 w-20 text-right">{completedCount}/{totalCount} ({oProgress}%)</span>
+                  </div>
+                </button>
+
+                {expandedGoals.has(obj.id) && (
+                  <div className="ml-6 mt-2 space-y-2">
+                    {krs.map((kr: Goal) => {
+                      const stats = getTaskStats(kr.id);
+                      return (
+                        <div key={kr.id}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleGoal(kr.id); }}
+                            className="w-full text-left p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                {expandedGoals.has(kr.id) ? (
+                                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                                )}
+                                <span className="text-sm text-slate-700 dark:text-slate-200">{kr.title}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-slate-500">{stats.completed}/{stats.total}</span>
+                                <div className="w-16 h-2 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
+                                  <div className="h-full bg-emerald-500 transition-all" style={{ width: `${stats.percent}%` }} />
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+
+                          {expandedGoals.has(kr.id) && (
+                            <div className="ml-6 mt-2 space-y-1">
+                              {getTasksForGoal(kr.id).map((task: Task) => (
+                                <div
+                                  key={task.id}
+                                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/30 cursor-pointer"
+                                  onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/command/tasks`); }}
+                                >
+                                  {getStatusIcon(task.status)}
+                                  <span className={`text-sm flex-1 ${
+                                    task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-600 dark:text-slate-300'
+                                  }`}>
+                                    {task.title.length > 50 ? task.title.slice(0, 50) + '...' : task.title}
+                                  </span>
+                                  <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                    task.priority === 'P0' ? 'bg-red-100 text-red-600' : task.priority === 'P1' ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'
+                                  }`}>
+                                    {task.priority}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        )}
+            );
+          })}
+        </div>
 
         {/* Summary Stats */}
         <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700 flex gap-6">
@@ -406,7 +413,7 @@ function OverviewPage({
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <button
-          onClick={() => navigate('/command/tasks')}
+          onClick={() => navigate('/dashboard/command/tasks')}
           className="p-4 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 hover:border-blue-300 hover:shadow-lg transition-all text-left"
         >
           <ListTodo className="w-6 h-6 text-blue-500 mb-2" />
@@ -415,7 +422,7 @@ function OverviewPage({
         </button>
 
         <button
-          onClick={() => navigate('/command/projects')}
+          onClick={() => navigate('/dashboard/command/projects')}
           className="p-4 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 hover:shadow-lg transition-all text-left"
         >
           <Folder className="w-6 h-6 text-emerald-500 mb-2" />
@@ -424,7 +431,7 @@ function OverviewPage({
         </button>
 
         <button
-          onClick={() => navigate('/command/execution')}
+          onClick={() => navigate('/dashboard/command/execution')}
           className="p-4 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 hover:border-purple-300 hover:shadow-lg transition-all text-left"
         >
           <Activity className="w-6 h-6 text-purple-500 mb-2" />
@@ -912,91 +919,76 @@ function VPSDetailPage({ vpsSlots }: { vpsSlots: { used: number; total: number; 
   );
 }
 
+// ==================== Skeleton for Overview ====================
+function OverviewSkeleton() {
+  return (
+    <div className="space-y-8">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-slate-800 dark:text-white">Command Center</h1>
+        <p className="text-slate-500 dark:text-slate-400 mt-2">统一控制中心</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
+      <SkeletonCard />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
+    </div>
+  );
+}
+
 // ==================== Main CommandCenter ====================
 export default function CommandCenter() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [brainStatus, setBrainStatus] = useState<BrainStatus | null>(null);
-  const [tickStatus, setTickStatus] = useState<TickStatus | null>(null);
-  const [runningTasks, setRunningTasks] = useState<Task[]>([]);
-  const [vpsSlots, setVpsSlots] = useState<{ used: number; total: number; slots?: VpsSlot[] }>({ used: 0, total: 8 });
-  const [loading, setLoading] = useState(true);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [brainRes, tickRes, goalsRes, tasksRes, projectsRes, vpsRes] = await Promise.all([
-        fetch('/api/brain/status'),
-        fetch('/api/brain/tick/status'),
-        fetch('/api/tasks/goals'),
-        fetch('/api/tasks/tasks'),
-        fetch('/api/tasks/projects'),
-        fetch('/api/brain/vps-slots'),
-      ]);
+  // Individual SWR-cached API calls — each resolves independently
+  const pollOpts = { pollInterval: 10_000, staleTime: 30_000 };
+  const { data: brainStatus } = useApi<BrainStatus>('/api/brain/status', pollOpts);
+  const { data: tickStatus } = useApi<TickStatus>('/api/brain/tick/status', pollOpts);
+  const { data: goals, loading: goalsLoading } = useApi<Goal[]>('/api/tasks/goals', { ...pollOpts, initialData: [] });
+  const { data: tasks, loading: tasksLoading } = useApi<Task[]>('/api/tasks/tasks', { ...pollOpts, initialData: [] });
+  const { data: projects } = useApi<Project[]>('/api/tasks/projects', { ...pollOpts, initialData: [] });
+  const { data: vpsData } = useApi<{ success?: boolean; used: number; total: number; slots?: VpsSlot[] }>(
+    '/api/brain/vps-slots', { ...pollOpts, initialData: { used: 0, total: 8 } }
+  );
+  const { data: clusterStatus, loading: clusterLoading } = useApiFn<ClusterStatusType | null>(
+    'cluster-status', fetchClusterStatus, pollOpts
+  );
 
-      const [brainData, tickData, goalsData, tasksData, projectsData, vpsData] = await Promise.all([
-        brainRes.json(),
-        tickRes.json(),
-        goalsRes.json(),
-        tasksRes.json(),
-        projectsRes.json(),
-        vpsRes.json(),
-      ]);
+  const vpsSlots = vpsData?.success ? vpsData : { used: 0, total: 8, slots: vpsData?.slots };
+  const runningTasks = useMemo(
+    () => (tasks || []).filter((t: Task) => t.status === 'in_progress'),
+    [tasks]
+  );
 
-      setBrainStatus(brainData);
-      setTickStatus(tickData);
-      setGoals(goalsData || []);
-      setTasks(tasksData || []);
-      setProjects(projectsData || []);
-
-      const running = (tasksData || []).filter((t: Task) => t.status === 'in_progress');
-      setRunningTasks(running);
-
-      if (vpsData.success) {
-        setVpsSlots({ used: vpsData.used, total: vpsData.total, slots: vpsData.slots });
-      }
-    } catch (err) {
-      console.error('Failed to fetch data:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-        <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
-      </div>
-    );
-  }
+  // Show skeleton only on very first load (no cached data at all)
+  const firstLoad = goalsLoading && tasksLoading && !goals?.length && !tasks?.length;
 
   return (
     <div className="min-h-screen -m-8 -mt-8 p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       <div className="max-w-6xl mx-auto">
         <Routes>
           <Route path="/" element={
+            firstLoad ? <OverviewSkeleton /> :
             <OverviewPage
               brainStatus={brainStatus}
               tickStatus={tickStatus}
-              goals={goals}
-              tasks={tasks}
-              projects={projects}
+              goals={goals || []}
+              tasks={tasks || []}
+              projects={projects || []}
               vpsSlots={vpsSlots}
+              clusterStatus={clusterStatus}
               runningTasks={runningTasks}
+              loading={clusterLoading}
               navigate={navigate}
             />
           } />
-          <Route path="/okr" element={<OKRListPage goals={goals} tasks={tasks} navigate={navigate} />} />
-          <Route path="/projects" element={<ProjectsListPage projects={projects} tasks={tasks} navigate={navigate} />} />
-          <Route path="/tasks" element={<TasksListPage tasks={tasks} projects={projects} navigate={navigate} />} />
+          <Route path="/okr" element={<OKRListPage goals={goals || []} tasks={tasks || []} navigate={navigate} />} />
+          <Route path="/projects" element={<ProjectsListPage projects={projects || []} tasks={tasks || []} navigate={navigate} />} />
+          <Route path="/tasks" element={<TasksListPage tasks={tasks || []} projects={projects || []} navigate={navigate} />} />
           <Route path="/vps" element={<VPSDetailPage vpsSlots={vpsSlots} />} />
           <Route path="/execution" element={
             <div>
@@ -1006,14 +998,17 @@ export default function CommandCenter() {
             </div>
           } />
           <Route path="/*" element={
+            firstLoad ? <OverviewSkeleton /> :
             <OverviewPage
               brainStatus={brainStatus}
               tickStatus={tickStatus}
-              goals={goals}
-              tasks={tasks}
-              projects={projects}
+              goals={goals || []}
+              tasks={tasks || []}
+              projects={projects || []}
               vpsSlots={vpsSlots}
+              clusterStatus={clusterStatus}
               runningTasks={runningTasks}
+              loading={clusterLoading}
               navigate={navigate}
             />
           } />

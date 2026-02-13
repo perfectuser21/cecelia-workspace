@@ -126,18 +126,8 @@ class FeatureRegistry {
 // Singleton instance
 export const featureRegistry = new FeatureRegistry();
 
-// Detect instance from hostname
+// Detect instance - always returns 'core' (simplified)
 export function detectInstance(): InstanceType {
-  if (typeof window === 'undefined') return 'core';
-
-  const hostname = window.location.hostname;
-  if (hostname.startsWith('dashboard.')) return 'dashboard';
-  if (hostname.includes('core.')) return 'core';  // Matches both 'core.' and 'dev-core.'
-
-  // Default based on port for development
-  const port = window.location.port;
-  if (port === '5211' || port === '5212') return 'core';
-
   return 'core';
 }
 

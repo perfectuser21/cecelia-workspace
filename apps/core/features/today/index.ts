@@ -14,21 +14,28 @@ const manifest: FeatureManifest = {
   routes: [
     {
       path: '/today',
-      component: 'TodayHome',
-      navItem: { label: 'Today', icon: 'CalendarDays', group: 'today' },
+      component: 'TodayTabbed',
+      navItem: {
+        label: 'Today', icon: 'CalendarDays', group: 'today',
+        children: [
+          { path: '/today', label: 'Daily', icon: 'CalendarDays', order: 1 },
+          { path: '/today/schedule', label: 'Schedule', icon: 'ListTodo', order: 2 },
+          { path: '/today/queue', label: 'Queue', icon: 'CalendarClock', order: 3 },
+        ],
+      },
     },
-    { path: '/today/view', component: 'TodayView' },
-    { path: '/today/scheduler', component: 'Scheduler' },
-    { path: '/today/tasks', component: 'TasksPage' },
+    { path: '/today/schedule', component: 'TodayTabbed' },
+    { path: '/today/queue', component: 'TodayTabbed' },
+    // Redirects from old paths
+    { path: '/today/view', redirect: '/today' },
+    { path: '/today/tasks', redirect: '/today/schedule' },
+    { path: '/today/scheduler', redirect: '/today/queue' },
     // Legacy redirects
-    { path: '/scheduler', redirect: '/today/scheduler' },
+    { path: '/scheduler', redirect: '/today/queue' },
   ],
 
   components: {
-    TodayHome: () => import('./pages/TodayHome'),
-    TodayView: () => import('../daily/pages/TodayView'),
-    Scheduler: () => import('../planning/pages/Scheduler'),
-    TasksPage: () => import('../planning/pages/Tasks'),
+    TodayTabbed: () => import('./pages/TodayTabbed'),
   },
 };
 

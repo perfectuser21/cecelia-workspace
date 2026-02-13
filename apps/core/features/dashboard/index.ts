@@ -14,11 +14,13 @@ const manifest: FeatureManifest = {
   routes: [
     {
       path: '/dashboard',
-      component: 'DashboardHome',
+      component: 'CommandCenter',
       navItem: { label: 'Dashboard', icon: 'LayoutDashboard', group: 'dashboard' },
     },
+    { path: '/dashboard/*', component: 'CommandCenter' },
     { path: '/dashboard/command', component: 'CommandCenter' },
     { path: '/dashboard/command/*', component: 'CommandCenter' },
+    { path: '/dashboard/panorama', component: 'PanoramaV3' },
     // Default route
     { path: '/', redirect: '/dashboard' },
     // Legacy redirects
@@ -28,8 +30,8 @@ const manifest: FeatureManifest = {
   ],
 
   components: {
-    DashboardHome: () => import('./pages/DashboardHome'),
     CommandCenter: () => import('../business/pages/CommandCenter'),
+    PanoramaV3: () => import('../business/pages/PanoramaV3'),
   },
 };
 

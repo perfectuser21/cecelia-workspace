@@ -9,6 +9,8 @@ import goalsRouter from './goals.js';
 import tasksRouter from './tasks.js';
 import linksRouter from './links.js';
 import runsRouter from './runs.js';
+import businessesRouter from './businesses.js';
+import departmentsRouter from './departments.js';
 
 const router = Router();
 
@@ -18,5 +20,12 @@ router.use('/goals', goalsRouter);
 router.use('/tasks', tasksRouter);
 router.use('/tasks', linksRouter);  // Task links routes
 router.use('/runs', runsRouter);
+router.use('/businesses', businessesRouter);
+router.use('/departments', departmentsRouter);
+
+// Personal tasks stub (Notion-backed, not yet implemented)
+router.get('/personal', (_req, res) => {
+  res.json({ success: true, tasks: [], message: 'Personal tasks API not yet connected' });
+});
 
 export default router;

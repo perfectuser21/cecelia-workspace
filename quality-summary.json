@@ -1,12 +1,27 @@
 {
-  "branch": "cp-02042336-29ed8180-f852-4e24-943d-45dea1",
+  "branch": "cp-02122252-immune-system-frontend",
+  "head_sha": "138607fe9",
+  "timestamp": "2026-02-12T15:01:20Z",
+  "status": "ready_for_pr",
   "checks": {
-    "typecheck": {"status": "pass"},
-    "build": {"status": "pass"},
-    "goals-api-test": {"status": "pass", "tests": 22}
+    "prd_exists": true,
+    "dod_exists": true,
+    "tests_created": true,
+    "typescript_types": true
   },
-  "gates": {
-    "quality": {"status": "pass"}
-  },
-  "timestamp": "2026-02-04T23:47:57+08:00"
+  "files_created": [
+    "apps/core/features/system/types/immune.ts",
+    "apps/core/features/system/api/immune.api.ts",
+    "apps/core/features/system/pages/immune/Dashboard.tsx",
+    "apps/core/features/system/pages/immune/Policies.tsx",
+    "apps/core/features/system/pages/immune/PolicyDetail.tsx",
+    "apps/core/features/system/pages/immune/Signatures.tsx",
+    "apps/core/features/system/pages/immune/SignatureDetail.tsx",
+    "apps/core/features/system/pages/immune/components/StatusBadge.tsx",
+    "apps/core/features/system/pages/immune/components/RiskBadge.tsx",
+    "apps/core/features/system/pages/immune/components/PolicyCard.tsx",
+    "apps/core/features/system/pages/immune/components/EvaluationTable.tsx",
+    "apps/core/features/system-hub/index.ts"
+  ],
+  "message": "Immune system frontend ready for PR. All core pages and components implemented."
 }

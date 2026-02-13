@@ -1,7 +1,7 @@
 import { ComponentType } from 'react';
 
-// Instance types for feature visibility
-export type InstanceType = 'core' | 'autopilot';
+// Instance types for feature visibility (simplified to only 'core')
+export type InstanceType = 'core';
 
 // Navigation group configuration
 export interface FeatureNavGroup {
@@ -22,6 +22,12 @@ export interface FeatureRoute {
     icon?: string;
     group?: string;   // Group ID to nest under
     order?: number;
+    children?: Array<{
+      path: string;
+      label: string;
+      icon?: string;
+      order?: number;
+    }>;
   };
 }
 
@@ -111,4 +117,5 @@ export interface NavGroupItem {
   featureKey: string;
   component?: string;
   requireSuperAdmin?: boolean;
+  children?: NavGroupItem[];
 }

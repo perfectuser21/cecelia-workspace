@@ -6,6 +6,7 @@
 
 import 'dotenv/config';
 import express from 'express';
+import compression from 'compression';
 import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -29,6 +30,8 @@ import { startMonitor as startWatchdogMonitor } from '../watchdog/service.js';
 // Tick loop migrated to cecelia-semantic-brain
 import { auditMiddleware, initAuditTable } from '../middleware/audit.js';
 import orchestratorQueueRoutes from './orchestrator-queue.js';
+import vpsMonitorRoutes from '../vps-monitor/routes.js';
+import n8nApiRoutes from '../n8n-api/routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -59,6 +62,9 @@ app.use((_req, res, next) => {
   }
   next();
 });
+
+// Gzip compression for all responses
+app.use(compression() as unknown as express.RequestHandler);
 
 // Proxy routes BEFORE body parser (so request body is not consumed)
 // Proxy /api/quality to cecelia-quality API
@@ -94,13 +100,27 @@ app.use('/api/autumnrice', createProxyMiddleware({
   pathRewrite: (path) => `/autumnrice${path}`,  // /run → /autumnrice/run
 }));
 
-// Proxy /api/v1/* to autopilot backend
+// Local API routes that replace Autopilot backend (port 3333 no longer needed)
+app.use('/api/v1/vps-monitor', vpsMonitorRoutes);
+app.use('/api/v1', n8nApiRoutes);
+
+// Proxy remaining /api/v1/* to autopilot backend (fallback)
 app.use('/api/v1', createProxyMiddleware({
   target: AUTOPILOT_BACKEND,
   changeOrigin: true,
+  timeout: 8000,
+  proxyTimeout: 8000,
   pathRewrite: {
     '^/api/v1': '/v1'
-  }
+  },
+  on: {
+    error: (_err, _req, res) => {
+      if ('writeHead' in res) {
+        (res as any).writeHead(502, { 'Content-Type': 'application/json' });
+        (res as any).end(JSON.stringify({ error: 'Autopilot backend unavailable' }));
+      }
+    },
+  },
 }));
 
 // Proxy /n8n/* to N8N container (workflow automation)
@@ -189,13 +209,24 @@ app.use('/api/watchdog', watchdogRoutes);
 app.use('/api/system', systemRoutes);
 
 // Static frontend files (single frontend, theme switches by hostname in JS)
-// Frontend has been migrated to zenithjoy-workspace
-// Set DASHBOARD_FRONTEND_PATH env var to point to the built frontend dist
-const frontendPath = process.env.DASHBOARD_FRONTEND_PATH || join(__dirname, '../../../../../zenithjoy/workspace/apps/dashboard/dist');
-app.use(express.static(frontendPath));
+// Frontend lives in apps/dashboard/ within this workspace
+const frontendPath = process.env.DASHBOARD_FRONTEND_PATH || join(__dirname, '../../../dashboard/dist');
 
-// SPA fallback
+// Hashed assets (/assets/*) — immutable long-term cache (1 year)
+app.use('/assets', express.static(join(frontendPath, 'assets'), {
+  maxAge: '1y',
+  immutable: true,
+}));
+
+// Other static files (index.html, favicon, logos) — no cache
+app.use(express.static(frontendPath, {
+  maxAge: 0,
+  etag: true,
+}));
+
+// SPA fallback — no cache for index.html
 app.get('*', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(join(frontendPath, 'index.html'));
 });
 

@@ -1,3 +1,55 @@
+### [2026-02-12] Observability Dashboard UI (PR #297)
+
+**任务**: 为 Brain 的 Observability System v1.1.1 创建前端 UI，实现实时执行监控和故障分析
+
+**技术要点**:
+1. **Core vs Workspace 边界清晰**：Core 提供 API (port 5221)，Workspace 提供 UI (port 5211/5212)
+2. **实时刷新策略**：不同组件使用不同刷新间隔（ActiveRuns 5s, FailureAnalysis 30s, StuckDetection 10s）
+3. **测试基础设施**：Vitest + @testing-library/react + happy-dom，完整的 vitest.config.ts 和 setup.ts
+4. **API Mock 模式**：使用 `vi.mock('../client')` 拦截 axios 调用，模拟 API 响应
+5. **组件设计模式**：
+   - Loading/Error/Empty 三态处理
+   - useEffect + setInterval 实现自动刷新
+   - Color mapping (LAYER_COLORS, STATUS_COLORS, REASON_KIND_COLORS)
+6. **Grid Layout**：Tailwind grid-cols-1 lg:grid-cols-3 实现响应式布局
+
+**遇到的问题**:
+1. **测试 Mock 路径**：初始使用 '../api-client' 但实际应该是 '../client'，导致 mock 失败
+2. **测试数据字段不匹配**：Mock 数据使用了 `task_title` 但组件实际不显示该字段，导致测试超时
+3. **API 参数格式**：`/brain/trace/failures/top` 使用 `{ params: { limit } }` 而不是查询字符串
+4. **getTopFailures vs getStuckRuns 端点**：`/brain/trace/failures/top` vs `/brain/trace/stuck`（不是 `/brain/trace/runs/stuck`）
+
+**改进建议**:
+1. 测试时先检查组件实际渲染的文本，再写断言
+2. Mock 数据应该完整包含 TypeScript 接口定义的所有必需字段
+3. 添加 TypeScript 严格模式避免字段遗漏
+
+**影响程度**: Medium（新功能，有完整测试覆盖，CI 通过）
+
+---
+
+### [2026-02-07] 开发环境标识视觉优化 (PR #285)
+
+**任务**: 增大开发环境标识字体和高度，让环境区分更明显
+
+**技术要点**:
+1. 端口检测：`window.location.port === '5212'` 判断开发环境
+2. 固定定位横条：`fixed top-0 left-0 right-0`，z-index 100 确保置顶
+3. 尺寸调整链：横条高度变化 → 顶部栏 top 偏移 → 主内容区 padding-top
+   - h-8 (32px) → h-12 (48px)
+   - top-8 → top-12
+   - pt-24 (96px = 32 + 64) → pt-28 (112px = 48 + 64)
+4. 字体大小：text-sm + font-semibold → text-lg + font-bold
+5. 图标大小：w-4 h-4 → w-5 h-5
+
+**教训**:
+1. 布局偏移计算：顶部横条高度变化时，必须同步调整所有依赖它的偏移量
+2. Tailwind 尺寸单位：h-8 = 32px (8 × 4px)，h-12 = 48px (12 × 4px)
+3. 开发体验优化：明显的视觉标识能有效防止误操作生产环境
+
+**影响程度**: Low（UI 调整，无功能变更）
+
+---
 
 ### [2026-02-06] 前端页面清理 (PR #237-#240)
 
@@ -332,4 +384,105 @@
 - /dev workflow 自动化程度高，从 PRD 到 PR 合并全程自动化
 - gate:audit 和 gate:test 的 subagent 审核有效防止质量问题
 - Stop Hook 循环机制确保 CI 通过和 PR 合并才结束
+
+
+### [2026-02-07] 移除 core/dev-core 实例区分
+
+**任务**: 简化前端实例检测逻辑，移除 core/dev-core 域名区分，统一使用 localhost
+
+**Bug**: 无
+
+**技术要点**:
+1. `registry.ts` 的 `detectInstance()` 函数之前检测域名（core.zenjoymedia.media, dev-core.zenjoymedia.media）和端口（5211, 5212），现在简化为直接返回 'core'
+2. `types.ts` 的 `InstanceType` 从 `'core' | 'autopilot'` 简化为只有 `'core'`
+3. `InstanceContext.tsx` 已经硬编码 `isCore = true`，所以实例检测逻辑已经没有实际作用
+4. `vite.config.ts` 的 `allowedHosts` 移除了所有远程域名，只保留 `localhost`
+
+**优化点**: 
+1. 这次重构清理了不再需要的逻辑，代码更简洁
+2. 前端现在只需要关注 localhost 环境，部署配置由 nginx/Cloudflare Tunnel 处理
+
+**影响程度**: Low（代码简化，功能不变）
+
+---
+
+### [2026-02-07] 添加开发/生产环境视觉标识
+
+**任务**: 为前端添加环境标识，让开发环境（5212）和生产环境（5211）容易区分
+
+**技术要点**:
+1. 使用 `window.location.port` 检测环境：5212 = 开发，5211 = 生产
+2. 开发环境顶部固定橙色横条（32px 高度）
+3. `useEffect` 设置浏览器 Tab 标题：开发显示 "Cecelia [DEV]"
+4. 布局调整：开发环境的 topbar 和 main 需要额外的 padding（+32px）
+5. 使用 Wrench 图标增强视觉识别
+
+**优化点**:
+1. 环境标识 z-index 设置为 100，确保始终置顶显示
+2. isDev 变量在整个组件中复用，保持一致性
+3. 橙色渐变背景（from-orange-500 to-orange-600）视觉醒目
+
+**影响程度**: Low（UI 增强，不影响功能）
+
+---
+
+### [2026-02-07] 移除公网域名改用本地地址 (PR #287)
+
+**任务**: 将 Cecelia 从公网域名访问改为完全本地访问
+
+**变更内容**:
+1. 从 vite.config.ts allowedHosts 移除 `core.zenjoymedia.media` 和 `dev-core.zenjoymedia.media`
+2. 更新注释和文档中的域名引用为 `perfect21:5211` / `perfect21:5212`
+3. Cloudflare Tunnel 配置已更新（version 29），移除 core 域名路由
+
+**架构决策**:
+- Cecelia（管家系统）是监控/展示美国 Brain 大脑状态的前端
+- Brain 和数据库都在美国 VPS，前端直接在美国本地访问最快（< 10ms）
+- 避免 中国 → HK → US → HK → 中国 的跨太平洋绕路（>500ms 延迟）
+- Autopilot 继续使用公网域名（面向外部用户）
+
+**技术要点**:
+1. Cloudflare Tunnel API 管理：`PUT /accounts/{id}/cfd_tunnel/{tunnel_id}/configurations`
+2. 配置立即生效：tunnel 容器自动接收新配置，无需重启
+3. 本地开发：vite allowedHosts 控制允许的 Host 头（防 DNS rebinding 攻击）
+
+**影响程度**: Low（配置调整，不影响功能）
+
+---
+
+### [2026-02-07] Brain Status Dashboard 实现
+
+- **Bug**: Hook 检查要求 PRD/DoD 文件名必须是 .prd.md 和 .dod.md，不能使用带功能名的文件名（如 .prd-brain-status-dashboard.md）
+  - **解决**: 创建标准文件名的副本，满足 Hook 检查要求
+  - **影响程度**: Medium
+  
+- **优化点**: 使用 shared/hooks/useApi.ts 实现 SWR 模式的数据获取和自动刷新
+  - **具体**: useApi hook 支持 pollInterval 和 staleTime 参数，非常适合实时监控页面
+  - **建议**: 所有需要轮询的页面都应使用 useApi 而不是手动 setInterval
+  - **影响程度**: Low
+
+- **开发环境**: 记住开发环境 (perfect21:5212) 和正式环境 (perfect21:5211) 的区别
+  - **具体**: 所有开发中的功能先部署到 5212，测试通过后部署到 5211
+  - **影响程度**: Low
+
+### [2026-02-10] platform-data 删除操作（物理迁移后）
+
+**背景**：platform-data Feature 已物理迁移到 zenithjoy/workflows，需要在 cecelia/workspace 提交 git 删除操作。
+
+**Bug**：无
+
+**优化点**：流程顺畅，无明显优化点
+
+**影响程度**：N/A
+
+**执行流程**：
+1. 创建 PRD/DoD（定义删除操作的验收标准）
+2. 走完整 /dev 流程（创建分支 → git add → commit → push → PR）
+3. CI 通过（无特殊检查）
+4. PR 合并（删除 35 个文件，6244 行代码）
+
+**教训**：
+- 物理迁移（`mv`）和 git 提交是两个独立步骤
+- 删除操作也需要走完整 /dev 流程，确保 CI 验证和 PR review
+- 架构调整（Cecelia vs ZenithJoy）需要多个仓库协同（engine + workspace）
 

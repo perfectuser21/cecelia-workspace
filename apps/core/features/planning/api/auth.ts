@@ -19,23 +19,25 @@ function getCookie(name: string): string | null {
 
 /**
  * Get current user from cookie
+ * Falls back to default dev user if no cookie is set (local dev environment)
  */
-export function getCurrentUser(): User | null {
+export function getCurrentUser(): User {
   const userCookie = getCookie('user');
-  if (!userCookie) return null;
-  
-  try {
-    return JSON.parse(userCookie);
-  } catch {
-    return null;
+  if (userCookie) {
+    try {
+      return JSON.parse(userCookie);
+    } catch {
+      // Fall through to default
+    }
   }
+
+  // Default user for local dev environment (matches sidebar display)
+  return { id: 'dev', name: '开发者' };
 }
 
 /**
  * Hook to get current user (for React components)
  */
-export function useCurrentUser(): User | null {
-  // Simple implementation - just read from cookie
-  // In a real app, you might want to use useState/useEffect for reactivity
+export function useCurrentUser(): User {
   return getCurrentUser();
 }

@@ -6,20 +6,71 @@ const router = Router();
 // GET /api/goals - List goals
 router.get('/', async (req, res) => {
   try {
-    const { project_id } = req.query;
-    
-    let query = 'SELECT * FROM goals';
+    const { project_id, scope, business_id, department_id, area_id } = req.query;
+
+    // Join with businesses and departments for related data
+    let query = `
+      SELECT g.*,
+        b.name as business_name, b.owner as business_owner,
+        d.name as department_name, d.lead as department_lead
+      FROM goals g
+      LEFT JOIN businesses b ON g.business_id = b.id
+      LEFT JOIN departments d ON g.department_id = d.id
+    `;
     let params = [];
-    
+    let conditions = [];
+    let paramIndex = 1;
+
     if (project_id) {
-      query += ' WHERE project_id = $1';
+      conditions.push(`g.project_id = $${paramIndex++}`);
       params.push(project_id);
     }
-    
-    query += ' ORDER BY created_at DESC';
-    
+    if (scope) {
+      conditions.push(`g.scope = $${paramIndex++}`);
+      params.push(scope);
+    }
+    if (business_id) {
+      conditions.push(`g.business_id = $${paramIndex++}`);
+      params.push(business_id);
+    }
+    if (department_id) {
+      conditions.push(`g.department_id = $${paramIndex++}`);
+      params.push(department_id);
+    }
+    if (area_id) {
+      conditions.push(`g.area_id = $${paramIndex++}`);
+      params.push(area_id);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    query += ' ORDER BY g.created_at DESC';
+
     const result = await pool.query(query, params);
-    res.json(result.rows);
+
+    // Transform to include nested objects
+    const goals = result.rows.map(row => ({
+      ...row,
+      business: row.business_id ? {
+        id: row.business_id,
+        name: row.business_name,
+        owner: row.business_owner
+      } : null,
+      department: row.department_id ? {
+        id: row.department_id,
+        name: row.department_name,
+        lead: row.department_lead
+      } : null,
+      // Remove flattened fields
+      business_name: undefined,
+      business_owner: undefined,
+      department_name: undefined,
+      department_lead: undefined
+    }));
+
+    res.json(goals);
   } catch (err) {
     res.status(500).json({ error: 'Failed to list goals', details: err.message });
   }
@@ -43,24 +94,30 @@ router.get('/:id', async (req, res) => {
 // POST /api/goals - Create goal (Objective or Key Result)
 router.post('/', async (req, res) => {
   try {
-    const { project_id, title, description, status, priority, target_date, progress, metadata, parent_id, type, weight } = req.body;
+    const {
+      project_id, title, description, status, priority, target_date, progress, metadata, parent_id, type, weight,
+      scope, cycle, business_id, department_id, area_id,
+      expected_start_date, expected_end_date, actual_start_date, actual_end_date
+    } = req.body;
 
     // Determine type based on parent_id if not explicitly set
     const goalType = type || (parent_id ? 'key_result' : 'objective');
 
-    // Validate: Key Results must have a parent
-    if (goalType === 'key_result' && !parent_id) {
-      return res.status(400).json({ error: 'Key Results must have a parent_id' });
-    }
-
-    // Validate: Objectives should not have a parent
-    if (goalType === 'objective' && parent_id) {
-      return res.status(400).json({ error: 'Objectives should not have a parent_id' });
-    }
+    // Note: OKR 三层架构允许跨层级 parent_id，所以移除严格的验证
+    // 个人 KR 可以有业务 O 作为子级 (通过 parent_id 连接)
 
     const result = await pool.query(
-      'INSERT INTO goals (project_id, title, description, status, priority, target_date, progress, metadata, parent_id, type, weight) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
-      [project_id, title, description, status || 'pending', priority || 'P2', target_date, progress || 0, metadata || {}, parent_id || null, goalType, weight || 1.0]
+      `INSERT INTO goals (
+        project_id, title, description, status, priority, target_date, progress, metadata, parent_id, type, weight,
+        scope, cycle, business_id, department_id, area_id,
+        expected_start_date, expected_end_date, actual_start_date, actual_end_date
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING *`,
+      [
+        project_id || null, title, description || null, status || 'pending', priority || 'P2',
+        target_date || null, progress || 0, metadata || {}, parent_id || null, goalType, weight || 1.0,
+        scope || null, cycle || null, business_id || null, department_id || null, area_id || null,
+        expected_start_date || null, expected_end_date || null, actual_start_date || null, actual_end_date || null
+      ]
     );
 
     res.status(201).json(result.rows[0]);
@@ -104,16 +161,15 @@ async function recalculateParentProgress(parentId) {
 // PATCH /api/goals/:id - Update goal
 router.patch('/:id', async (req, res) => {
   try {
-    const { title, description, status, priority, target_date, progress, metadata, weight } = req.body;
+    const {
+      title, description, status, priority, target_date, progress, metadata, weight,
+      scope, cycle, business_id, department_id, area_id,
+      expected_start_date, expected_end_date, actual_start_date, actual_end_date
+    } = req.body;
 
     const updates = [];
     const params = [];
     let paramIndex = 1;
-
-    // Validate at least one field to update
-    if (!title && !description && !status && !priority && target_date === undefined && progress === undefined && !metadata && weight === undefined) {
-      return res.status(400).json({ error: 'At least one field must be provided for update' });
-    }
 
     if (title !== undefined) {
       updates.push('title = $' + paramIndex++);
@@ -146,6 +202,46 @@ router.patch('/:id', async (req, res) => {
     if (weight !== undefined) {
       updates.push('weight = $' + paramIndex++);
       params.push(weight);
+    }
+    if (scope !== undefined) {
+      updates.push('scope = $' + paramIndex++);
+      params.push(scope);
+    }
+    if (cycle !== undefined) {
+      updates.push('cycle = $' + paramIndex++);
+      params.push(cycle);
+    }
+    if (business_id !== undefined) {
+      updates.push('business_id = $' + paramIndex++);
+      params.push(business_id);
+    }
+    if (department_id !== undefined) {
+      updates.push('department_id = $' + paramIndex++);
+      params.push(department_id);
+    }
+    if (area_id !== undefined) {
+      updates.push('area_id = $' + paramIndex++);
+      params.push(area_id);
+    }
+    if (expected_start_date !== undefined) {
+      updates.push('expected_start_date = $' + paramIndex++);
+      params.push(expected_start_date);
+    }
+    if (expected_end_date !== undefined) {
+      updates.push('expected_end_date = $' + paramIndex++);
+      params.push(expected_end_date);
+    }
+    if (actual_start_date !== undefined) {
+      updates.push('actual_start_date = $' + paramIndex++);
+      params.push(actual_start_date);
+    }
+    if (actual_end_date !== undefined) {
+      updates.push('actual_end_date = $' + paramIndex++);
+      params.push(actual_end_date);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'At least one field must be provided for update' });
     }
 
     updates.push('updated_at = NOW()');
