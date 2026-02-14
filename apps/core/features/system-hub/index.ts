@@ -26,6 +26,7 @@ const manifest: FeatureManifest = {
           { path: '/system/claude', label: 'Claude', icon: 'Brain', order: 5 },
           { path: '/system/engine', label: 'Engine', icon: 'Cpu', order: 6 },
           { path: '/system/feature-map', label: 'Feature Map', icon: 'Map', order: 7 },
+          { path: '/live-monitor', label: 'Live Monitor', icon: 'Activity', order: 8 },
         ],
       },
     },
@@ -36,6 +37,7 @@ const manifest: FeatureManifest = {
     { path: '/system/engine', component: 'SystemTabbed' },
     { path: '/system/feature-map', component: 'SystemTabbed' },
     // Drill-down routes (remain separate)
+    { path: '/live-monitor', component: 'LiveMonitor' },
     { path: '/brain-status', component: 'BrainStatusDashboard' },
     { path: '/system/cecelia/runs', component: 'CeceliaRuns' },
     { path: '/system/cecelia/runs/:runId', component: 'RunDetail' },
@@ -127,6 +129,7 @@ const manifest: FeatureManifest = {
   components: {
     SystemTabbed: () => import('./pages/SystemTabbed'),
     // Drill-down pages
+    LiveMonitor: () => import('../../../dashboard/src/pages/live-monitor/LiveMonitorPage'),
     BrainStatusDashboard: () => import('../execution/pages/BrainStatusDashboard'),
     CeceliaRuns: () => import('../execution/pages/CeceliaRuns'),
     RunDetail: () => import('../execution/pages/RunDetail'),
