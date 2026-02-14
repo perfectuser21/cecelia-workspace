@@ -1,6 +1,6 @@
 {
-  "branch": "cp-02142241-register-live-monitor-route",
-  "head_sha": "99c3ce617",
-  "timestamp": "2026-02-14T14:46:54Z",
+  "branch": "cp-02142307-enhance-live-monitor",
+  "head_sha": "9492b4b6e",
+  "timestamp": "2026-02-14T15:12:39Z",
   "note": "Quality 只汇总，不判定。CI 是最终裁判。"
 }
