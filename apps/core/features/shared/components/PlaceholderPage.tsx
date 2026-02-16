@@ -1,3 +1,5 @@
+import React from 'react';
+
 interface PlaceholderPageProps {
   title: string;
   description?: string;
