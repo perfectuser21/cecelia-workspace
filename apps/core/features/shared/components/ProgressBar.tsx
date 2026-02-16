@@ -1,3 +1,5 @@
+import React from 'react';
+
 interface ProgressBarProps {
   progress: number;
   size?: 'sm' | 'md';
