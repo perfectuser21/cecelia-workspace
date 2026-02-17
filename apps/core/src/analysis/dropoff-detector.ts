@@ -66,7 +66,7 @@ export class DropoffDetector {
       minRiskScore,
     ]);
 
-    return result.rows.map((row) => {
+    return result.rows.map((row: any) => {
       const preDropoffActions: string[] = [];
       if (row.recent_actions) {
         for (const action of row.recent_actions) {

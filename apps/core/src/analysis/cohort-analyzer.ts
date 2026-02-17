@@ -61,7 +61,7 @@ export class CohortAnalyzer {
 
     const result = await pool.query(query, [startDate || null, endDate || null]);
 
-    return result.rows.map((row) => {
+    return result.rows.map((row: any) => {
       const retentionByWeek: RetentionPoint[] = [];
       const totalUsers = parseInt(row.total_users, 10);
 
