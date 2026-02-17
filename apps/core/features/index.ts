@@ -6,7 +6,7 @@ export { coreInstanceConfig, coreTheme } from './config';
 import type { CoreConfig, CoreRoute, NavGroup, NavGroupItem, FeatureManifest } from './types';
 import { coreInstanceConfig } from './config';
 
-// Feature manifests - 6 entries
+// Feature manifests - 7 entries
 export const coreFeatures = {
   'dashboard': () => import('./dashboard'),
   'today': () => import('./today'),
@@ -14,6 +14,7 @@ export const coreFeatures = {
   'execution': () => import('./execution'),
   'knowledge': () => import('./knowledge'),
   'system-hub': () => import('./system-hub'),
+  'analytics': () => import('./analytics'),
 };
 
 // Load all features and register them

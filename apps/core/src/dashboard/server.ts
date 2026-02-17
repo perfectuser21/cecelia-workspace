@@ -32,6 +32,7 @@ import { auditMiddleware, initAuditTable } from '../middleware/audit.js';
 import orchestratorQueueRoutes from './orchestrator-queue.js';
 import vpsMonitorRoutes from '../vps-monitor/routes.js';
 import n8nApiRoutes from '../n8n-api/routes.js';
+import analyticsRoutes from '../analytics/analytics.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -207,6 +208,9 @@ app.use('/api/watchdog', watchdogRoutes);
 
 // System status API routes (aggregated status from all subsystems)
 app.use('/api/system', systemRoutes);
+
+// Analytics routes (Week 2-3 User Behavior Tracking)
+app.use('/api/analytics', analyticsRoutes);
 
 // Static frontend files (single frontend, theme switches by hostname in JS)
 // Frontend lives in apps/dashboard/ within this workspace
