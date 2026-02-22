@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { Brain, RefreshCw } from 'lucide-react';
+import { useState, useCallback, useMemo } from 'react';
+import { Brain, RefreshCw, Save, Loader, X } from 'lucide-react';
 import { useApiFn } from '../../shared/hooks/useApi';
 import { useWebSocket } from '../../shared/hooks/useWebSocket';
 import Toast, { ToastType } from '../components/Toast';
@@ -9,12 +9,15 @@ import {
   ModelProfile,
   fetchModelProfiles,
   fetchModelRegistry,
+  batchUpdateAgentModels,
   ModelInfo,
   AgentInfo,
 } from '../api/model-profile.api';
 
 export default function ModelProfileSwitcher() {
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+  const [pendingChanges, setPendingChanges] = useState<Map<string, string>>(new Map());
+  const [saving, setSaving] = useState(false);
 
   const {
     data: profiles,
@@ -43,7 +46,7 @@ export default function ModelProfileSwitcher() {
           refreshProfiles();
         }
       } catch {
-        // ignore non-JSON messages
+        // ignore non-JSON
       }
     },
     [refreshProfiles]
@@ -56,7 +59,72 @@ export default function ModelProfileSwitcher() {
     setToast({ message, type });
   };
 
+  const handleModelChange = useCallback((agentId: string, modelId: string) => {
+    setPendingChanges((prev) => {
+      const next = new Map(prev);
+      next.set(agentId, modelId);
+      return next;
+    });
+  }, []);
+
   const activeProfile = profiles?.find((p) => p.is_active);
+
+  // 过滤掉和服务端当前值一致的修改
+  const effectiveChanges = useMemo(() => {
+    if (!activeProfile || !registry) return new Map<string, string>();
+    const filtered = new Map<string, string>();
+    for (const [agentId, modelId] of pendingChanges) {
+      const agent = registry.agents.find((a) => a.id === agentId);
+      if (!agent) continue;
+      let currentModel = '';
+      if (agent.layer === 'brain') {
+        const layerConfig = activeProfile.config[agentId as 'thalamus' | 'cortex'];
+        currentModel = layerConfig?.model || '';
+      } else {
+        const modelMap = activeProfile.config.executor.model_map;
+        if (modelMap && modelMap[agentId]) {
+          for (const p of ['minimax', 'anthropic', 'openai']) {
+            if (modelMap[agentId][p]) { currentModel = modelMap[agentId][p]; break; }
+          }
+        }
+      }
+      if (modelId !== currentModel) {
+        filtered.set(agentId, modelId);
+      }
+    }
+    return filtered;
+  }, [pendingChanges, activeProfile, registry]);
+
+  const hasChanges = effectiveChanges.size > 0;
+
+  const handleSave = async () => {
+    if (!hasChanges) return;
+    setSaving(true);
+    try {
+      const updates = Array.from(effectiveChanges.entries()).map(([agent_id, model_id]) => ({
+        agent_id,
+        model_id,
+      }));
+      await batchUpdateAgentModels(updates);
+      setPendingChanges(new Map());
+      refreshProfiles();
+      handleToast(`已保存 ${updates.length} 项修改`, 'success');
+    } catch (err) {
+      handleToast(`保存失败: ${err instanceof Error ? err.message : '未知错误'}`, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDiscard = () => {
+    setPendingChanges(new Map());
+  };
+
+  const handlePresetSwitch = () => {
+    setPendingChanges(new Map());
+    refreshProfiles();
+  };
+
   const loading = profilesLoading || registryLoading;
   const error = profilesError || registryError;
 
@@ -111,7 +179,7 @@ export default function ModelProfileSwitcher() {
         {profiles && (
           <ProfilePresetBar
             profiles={profiles}
-            onSwitch={refreshProfiles}
+            onSwitch={handlePresetSwitch}
             onToast={handleToast}
           />
         )}
@@ -122,11 +190,42 @@ export default function ModelProfileSwitcher() {
             agents={registry.agents}
             models={registry.models}
             profile={activeProfile}
-            onUpdated={refreshProfiles}
-            onToast={handleToast}
+            pendingChanges={pendingChanges}
+            onModelChange={handleModelChange}
           />
         )}
       </div>
+
+      {/* 浮动保存栏 */}
+      {hasChanges && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-gray-800 border border-white/20 shadow-2xl shadow-black/50">
+            <span className="text-sm text-gray-300">
+              {effectiveChanges.size} 项修改未保存
+            </span>
+            <button
+              onClick={handleDiscard}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50"
+            >
+              <X className="w-3.5 h-3.5" />
+              放弃
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-50"
+            >
+              {saving ? (
+                <Loader className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5" />
+              )}
+              {saving ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />

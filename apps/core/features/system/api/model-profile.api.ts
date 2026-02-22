@@ -99,3 +99,27 @@ export async function updateAgentModel(
   });
   return res.data;
 }
+
+// ============================================================
+// Batch Update API
+// ============================================================
+
+export interface BatchUpdateRequest {
+  agent_id: string;
+  model_id: string;
+}
+
+export interface BatchUpdateResponse {
+  success: boolean;
+  updated: Array<{ agent_id: string; provider: string; model: string }>;
+  profile: ModelProfile;
+}
+
+export async function batchUpdateAgentModels(
+  updates: BatchUpdateRequest[]
+): Promise<BatchUpdateResponse> {
+  const res = await apiClient.patch<BatchUpdateResponse>('/brain/model-profiles/active/agents', {
+    updates,
+  });
+  return res.data;
+}

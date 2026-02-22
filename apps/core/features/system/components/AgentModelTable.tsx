@@ -1,11 +1,6 @@
 import { useState } from 'react';
-import { Lock, Loader, ChevronDown, Check } from 'lucide-react';
-import {
-  ModelProfile,
-  ModelInfo,
-  AgentInfo,
-  updateAgentModel,
-} from '../api/model-profile.api';
+import { Lock, ChevronDown, Check } from 'lucide-react';
+import { ModelInfo, AgentInfo, ModelProfile } from '../api/model-profile.api';
 
 function getProviderColor(provider: string): string {
   switch (provider) {
@@ -30,11 +25,9 @@ function getCurrentModel(agent: AgentInfo, profile: ModelProfile): string {
     const layerConfig = profile.config[agent.id as 'thalamus' | 'cortex'];
     return layerConfig?.model || '';
   }
-  // executor 层
   const modelMap = profile.config.executor.model_map;
   if (!modelMap || !modelMap[agent.id]) return '';
   const agentMap = modelMap[agent.id];
-  // 找到非 null 的模型
   for (const provider of ['minimax', 'anthropic', 'openai']) {
     if (agentMap[provider]) return agentMap[provider];
   }
@@ -45,26 +38,22 @@ interface AgentRowProps {
   agent: AgentInfo;
   models: ModelInfo[];
   currentModelId: string;
-  onUpdate: (agentId: string, modelId: string) => Promise<void>;
+  pendingModelId?: string;
+  onSelect: (agentId: string, modelId: string) => void;
 }
 
-function AgentRow({ agent, models, currentModelId, onUpdate }: AgentRowProps) {
-  const [updating, setUpdating] = useState(false);
+function AgentRow({ agent, models, currentModelId, pendingModelId, onSelect }: AgentRowProps) {
   const [selectOpen, setSelectOpen] = useState(false);
-
   const allowedModels = models.filter((m) => agent.allowed_models.includes(m.id));
   const isLocked = allowedModels.length <= 1;
-  const currentModel = models.find((m) => m.id === currentModelId);
 
-  const handleSelect = async (modelId: string) => {
+  const displayModelId = pendingModelId ?? currentModelId;
+  const displayModel = models.find((m) => m.id === displayModelId);
+  const hasChange = pendingModelId !== undefined && pendingModelId !== currentModelId;
+
+  const handleSelect = (modelId: string) => {
     setSelectOpen(false);
-    if (modelId === currentModelId) return;
-    setUpdating(true);
-    try {
-      await onUpdate(agent.id, modelId);
-    } finally {
-      setUpdating(false);
-    }
+    onSelect(agent.id, modelId);
   };
 
   // 按 provider 分组
@@ -76,9 +65,10 @@ function AgentRow({ agent, models, currentModelId, onUpdate }: AgentRowProps) {
   }
 
   return (
-    <div className="flex items-center gap-4 px-4 py-3 hover:bg-white/[0.02] transition-colors">
+    <div className={`flex items-center gap-4 px-4 py-3 transition-colors ${hasChange ? 'bg-blue-500/5' : 'hover:bg-white/[0.02]'}`}>
       {/* Agent 名称 */}
       <div className="flex items-center gap-2 w-44 flex-shrink-0">
+        {hasChange && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />}
         <span className="text-sm text-white font-medium">{agent.name}</span>
         {agent.fixed_provider && (
           <span title={`锁定: ${agent.fixed_provider}`}>
@@ -92,29 +82,28 @@ function AgentRow({ agent, models, currentModelId, onUpdate }: AgentRowProps) {
 
       {/* 模型选择器 */}
       <div className="relative flex-1 max-w-xs">
-        {updating ? (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
-            <Loader className="w-3.5 h-3.5 animate-spin text-blue-400" />
-            <span className="text-sm text-gray-400">更新中...</span>
-          </div>
-        ) : isLocked ? (
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${getProviderBg(currentModel?.provider || '')} border border-white/5`}>
-            <span className={`text-xs ${getProviderColor(currentModel?.provider || '')}`}>
-              {currentModel?.provider}
+        {isLocked ? (
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${getProviderBg(displayModel?.provider || '')} border border-white/5`}>
+            <span className={`text-xs ${getProviderColor(displayModel?.provider || '')}`}>
+              {displayModel?.provider}
             </span>
-            <span className="text-sm text-gray-300">{currentModel?.name || currentModelId}</span>
+            <span className="text-sm text-gray-300">{displayModel?.name || displayModelId}</span>
           </div>
         ) : (
           <div className="relative">
             <button
               onClick={() => setSelectOpen(!selectOpen)}
-              className="flex items-center justify-between gap-2 w-full px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:border-white/20 transition-colors"
+              className={`flex items-center justify-between gap-2 w-full px-3 py-1.5 rounded-lg border transition-colors ${
+                hasChange
+                  ? 'bg-blue-500/10 border-blue-500/30 hover:border-blue-500/50'
+                  : 'bg-white/5 border-white/10 hover:border-white/20'
+              }`}
             >
               <div className="flex items-center gap-2">
-                <span className={`text-xs ${getProviderColor(currentModel?.provider || '')}`}>
-                  {currentModel?.provider}
+                <span className={`text-xs ${getProviderColor(displayModel?.provider || '')}`}>
+                  {displayModel?.provider}
                 </span>
-                <span className="text-sm text-white">{currentModel?.name || currentModelId}</span>
+                <span className="text-sm text-white">{displayModel?.name || displayModelId}</span>
               </div>
               <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${selectOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -133,11 +122,11 @@ function AgentRow({ agent, models, currentModelId, onUpdate }: AgentRowProps) {
                           key={m.id}
                           onClick={() => handleSelect(m.id)}
                           className={`w-full text-left px-3 py-1.5 text-sm hover:bg-white/10 transition-colors flex items-center gap-2 ${
-                            m.id === currentModelId ? 'text-blue-400 bg-blue-500/10' : 'text-gray-300'
+                            m.id === displayModelId ? 'text-blue-400 bg-blue-500/10' : 'text-gray-300'
                           }`}
                         >
                           <span>{m.name}</span>
-                          {m.id === currentModelId && <Check className="w-3 h-3 ml-auto" />}
+                          {m.id === displayModelId && <Check className="w-3 h-3 ml-auto" />}
                         </button>
                       ))}
                     </div>
@@ -156,25 +145,13 @@ interface AgentModelTableProps {
   agents: AgentInfo[];
   models: ModelInfo[];
   profile: ModelProfile;
-  onUpdated: () => void;
-  onToast: (message: string, type: 'success' | 'error') => void;
+  pendingChanges: Map<string, string>;
+  onModelChange: (agentId: string, modelId: string) => void;
 }
 
-export default function AgentModelTable({ agents, models, profile, onUpdated, onToast }: AgentModelTableProps) {
+export default function AgentModelTable({ agents, models, profile, pendingChanges, onModelChange }: AgentModelTableProps) {
   const brainAgents = agents.filter((a) => a.layer === 'brain');
   const executorAgents = agents.filter((a) => a.layer === 'executor');
-
-  const handleUpdate = async (agentId: string, modelId: string) => {
-    try {
-      await updateAgentModel(agentId, modelId);
-      onUpdated();
-      const agent = agents.find((a) => a.id === agentId);
-      const model = models.find((m) => m.id === modelId);
-      onToast(`${agent?.name || agentId} → ${model?.name || modelId}`, 'success');
-    } catch (err) {
-      onToast(`更新失败: ${err instanceof Error ? err.message : '未知错误'}`, 'error');
-    }
-  };
 
   const renderGroup = (title: string, groupAgents: AgentInfo[]) => (
     <div className="rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden">
@@ -188,7 +165,8 @@ export default function AgentModelTable({ agents, models, profile, onUpdated, on
             agent={agent}
             models={models}
             currentModelId={getCurrentModel(agent, profile)}
-            onUpdate={handleUpdate}
+            pendingModelId={pendingChanges.get(agent.id)}
+            onSelect={onModelChange}
           />
         ))}
       </div>
