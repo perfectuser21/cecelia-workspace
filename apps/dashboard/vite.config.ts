@@ -120,6 +120,11 @@ export default defineConfig({
       'autopilot.zenjoymedia.media',
     ],
     proxy: {
+      '/api/brain/ws': {
+        target: 'ws://localhost:5221',
+        changeOrigin: true,
+        ws: true,
+      },
       '/api/brain': {
         target: 'http://localhost:5221',
         changeOrigin: true,

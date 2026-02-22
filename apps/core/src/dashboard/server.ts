@@ -201,11 +201,13 @@ app.use('/api/cluster', clusterRoutes);
 
 // Brain API routes → proxy to cecelia-semantic-brain Node.js service
 const BRAIN_NODE_API = process.env.BRAIN_NODE_API || 'http://localhost:5221';
-app.use('/api/brain', createProxyMiddleware({
+const brainProxy = createProxyMiddleware({
   target: BRAIN_NODE_API,
   changeOrigin: true,
   pathRewrite: (path) => `/api/brain${path}`,
-}));
+  ws: true,
+});
+app.use('/api/brain', brainProxy);
 
 // OKR Tree API routes (tree-based OKR management)
 app.use('/api/okr', okrRoutes);
@@ -250,14 +252,16 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 // Start server with WebSocket support
 const server = createServer(app);
 
-// Handle WebSocket upgrade for orchestrator realtime
+// Handle WebSocket upgrade for orchestrator realtime and brain WS
 server.on('upgrade', (req, socket, head) => {
   if (req.url?.startsWith('/api/orchestrator/realtime/ws')) {
-    // Strip /api prefix only - pathRewrite adds /orchestrator
-    // /api/orchestrator/realtime/ws -> /realtime/ws -> /orchestrator/realtime/ws (via pathRewrite)
     req.url = '/realtime/ws';
-    console.log('[WebSocket Upgrade] Proxying, input URL rewritten to:', req.url);
+    console.log('[WebSocket Upgrade] Proxying orchestrator, input URL rewritten to:', req.url);
     orchestratorProxy.upgrade(req, socket as any, head);
+  } else if (req.url?.startsWith('/api/brain/ws')) {
+    req.url = '/ws';
+    console.log('[WebSocket Upgrade] Proxying brain WS');
+    brainProxy.upgrade(req, socket as any, head);
   }
 });
 
