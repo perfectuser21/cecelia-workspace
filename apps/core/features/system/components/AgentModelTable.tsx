@@ -11,6 +11,15 @@ function getProviderColor(provider: string): string {
   }
 }
 
+function getProviderDotColor(provider: string): string {
+  switch (provider) {
+    case 'anthropic': return 'bg-purple-400';
+    case 'minimax': return 'bg-emerald-400';
+    case 'openai': return 'bg-blue-400';
+    default: return 'bg-gray-400';
+  }
+}
+
 function getProviderBg(provider: string): string {
   switch (provider) {
     case 'anthropic': return 'bg-purple-500/10';
@@ -84,9 +93,7 @@ function AgentRow({ agent, models, currentModelId, pendingModelId, onSelect }: A
       <div className="relative flex-1 max-w-xs">
         {isLocked ? (
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${getProviderBg(displayModel?.provider || '')} border border-white/5`}>
-            <span className={`text-xs ${getProviderColor(displayModel?.provider || '')}`}>
-              {displayModel?.provider}
-            </span>
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getProviderDotColor(displayModel?.provider || '')}`} />
             <span className="text-sm text-gray-300">{displayModel?.name || displayModelId}</span>
           </div>
         ) : (
@@ -100,9 +107,7 @@ function AgentRow({ agent, models, currentModelId, pendingModelId, onSelect }: A
               }`}
             >
               <div className="flex items-center gap-2">
-                <span className={`text-xs ${getProviderColor(displayModel?.provider || '')}`}>
-                  {displayModel?.provider}
-                </span>
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getProviderDotColor(displayModel?.provider || '')}`} />
                 <span className="text-sm text-white">{displayModel?.name || displayModelId}</span>
               </div>
               <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${selectOpen ? 'rotate-180' : ''}`} />
