@@ -1,3 +1,5 @@
+import React from 'react';
+
 interface PriorityBadgeProps {
   priority: string;
   size?: 'sm' | 'md';

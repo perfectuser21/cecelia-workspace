@@ -32,6 +32,8 @@ import { auditMiddleware, initAuditTable } from '../middleware/audit.js';
 import orchestratorQueueRoutes from './orchestrator-queue.js';
 import vpsMonitorRoutes from '../vps-monitor/routes.js';
 import n8nApiRoutes from '../n8n-api/routes.js';
+import analysisRoutes from '../analysis/routes.js';
+import clusterRoutes from '../cluster/routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -50,7 +52,7 @@ const N8N_BACKEND = process.env.N8N_BACKEND || 'http://localhost:5678';
 const QUALITY_API = process.env.QUALITY_API || 'http://localhost:5681';
 
 // Cecelia Brain API (semantic brain + orchestrator)
-const BRAIN_API = process.env.BRAIN_API || 'http://localhost:5220';
+const BRAIN_API = process.env.BRAIN_API || 'http://localhost:5221';
 
 // CORS
 app.use((_req, res, next) => {
@@ -88,7 +90,7 @@ app.use('/api/orchestrator', orchestratorQueueRoutes);
 const orchestratorProxy = createProxyMiddleware({
   target: BRAIN_API,
   changeOrigin: true,
-  pathRewrite: (path) => `/orchestrator${path}`,  // /chat → /orchestrator/chat
+  pathRewrite: (path) => `/api/brain/orchestrator${path}`,  // /chat → /api/brain/orchestrator/chat
   ws: true,  // Enable WebSocket proxying for realtime voice
 });
 app.use('/api/orchestrator', orchestratorProxy);
@@ -97,7 +99,7 @@ app.use('/api/orchestrator', orchestratorProxy);
 app.use('/api/autumnrice', createProxyMiddleware({
   target: BRAIN_API,
   changeOrigin: true,
-  pathRewrite: (path) => `/autumnrice${path}`,  // /run → /autumnrice/run
+  pathRewrite: (path) => `/api/brain/autumnrice${path}`,  // /run → /api/brain/autumnrice/run
 }));
 
 // Local API routes that replace Autopilot backend (port 3333 no longer needed)
@@ -191,13 +193,30 @@ app.use('/api/areas', areasRoutes);
 // Intent Recognition API routes (KR1: Natural Language → OKR/Project/Task)
 app.use('/api/intent', intentRoutes);
 
+// Analysis API routes (Historical Drop-off Analysis)
+app.use('/api/analysis', analysisRoutes);
+
+// Cluster session management (session-info + kill-session)
+app.use('/api/cluster', clusterRoutes);
+
 // Brain API routes → proxy to cecelia-semantic-brain Node.js service
 const BRAIN_NODE_API = process.env.BRAIN_NODE_API || 'http://localhost:5221';
-app.use('/api/brain', createProxyMiddleware({
+const brainProxy = createProxyMiddleware({
   target: BRAIN_NODE_API,
   changeOrigin: true,
   pathRewrite: (path) => `/api/brain${path}`,
-}));
+  // NOTE: do NOT set ws:true here — http-proxy-middleware v3 would auto-register a
+  // server.on('upgrade') listener that conflicts with the manual handler below.
+  // WebSocket upgrades for /api/brain/ws are handled exclusively in server.on('upgrade').
+});
+app.use('/api/brain', brainProxy);
+
+// Dedicated WebSocket proxy for Brain — no pathRewrite, so /ws stays /ws at port 5221
+const brainWsProxy = createProxyMiddleware({
+  target: BRAIN_NODE_API,
+  changeOrigin: true,
+  ws: true,
+});
 
 // OKR Tree API routes (tree-based OKR management)
 app.use('/api/okr', okrRoutes);
@@ -242,14 +261,16 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 // Start server with WebSocket support
 const server = createServer(app);
 
-// Handle WebSocket upgrade for orchestrator realtime
+// Handle WebSocket upgrade for orchestrator realtime and brain WS
 server.on('upgrade', (req, socket, head) => {
   if (req.url?.startsWith('/api/orchestrator/realtime/ws')) {
-    // Strip /api prefix only - pathRewrite adds /orchestrator
-    // /api/orchestrator/realtime/ws -> /realtime/ws -> /orchestrator/realtime/ws (via pathRewrite)
     req.url = '/realtime/ws';
-    console.log('[WebSocket Upgrade] Proxying, input URL rewritten to:', req.url);
+    console.log('[WebSocket Upgrade] Proxying orchestrator, input URL rewritten to:', req.url);
     orchestratorProxy.upgrade(req, socket as any, head);
+  } else if (req.url?.startsWith('/api/brain/ws')) {
+    req.url = '/ws';
+    console.log('[WebSocket Upgrade] Proxying brain WS');
+    brainWsProxy.upgrade(req, socket as any, head);
   }
 });
 
