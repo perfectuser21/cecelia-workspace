@@ -247,7 +247,7 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
           <FileText className="w-3.5 h-3.5" />
           上传文件
         </button>
-        <input ref={fileRef} type="file" accept=".txt,.pdf,.xlsx,.xls,.docx,.doc,.csv" onChange={handleFile} className="hidden" />
+        <input ref={fileRef} type="file" accept=".txt,.csv" onChange={handleFile} className="hidden" />
         <span className="text-xs text-slate-500">支持 txt / CSV（PDF/Excel/Word 请手动粘贴）</span>
         <button
           onClick={() => doImport(text)}
