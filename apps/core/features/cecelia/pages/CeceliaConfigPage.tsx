@@ -206,9 +206,9 @@ function LayerRow({ layer, allModels, onSave }: LayerRowProps) {
 
 // ── Main Page ──────────────────────────────────────────────────────────────
 
-// 反思层和嘴巴层当前硬编码的模型（brain 接入后从 profile 读取）
-const REFLECTION_MODEL = 'claude-opus-4-20250514';
-const MOUTH_MODEL = 'claude-sonnet-4-6-20251001';
+// 反思层和嘴巴层 fallback（profile 里没有时使用）
+const REFLECTION_MODEL_FALLBACK = 'claude-opus-4-20250514';
+const MOUTH_MODEL_FALLBACK = 'claude-sonnet-4-6-20251001';
 
 // 追加 Sonnet 4.6 到模型列表（registry 里只有 4.5，但嘴巴用的是 4.6）
 const EXTRA_MODELS: ModelInfo[] = [
@@ -289,14 +289,14 @@ export default function CeceliaConfigPage() {
       name: 'L3 反思层',
       description: '定期深度反思 · 生成洞察',
       allowed_models: ['claude-opus-4-20250514', 'claude-sonnet-4-20250514'],
-      currentModel: REFLECTION_MODEL,
+      currentModel: (profile.config as any).reflection?.model || REFLECTION_MODEL_FALLBACK,
     },
     {
       id: 'mouth',
       name: '嘴巴',
       description: '对话生成 · 对外接口',
       allowed_models: ['claude-sonnet-4-6-20251001', 'claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001', 'MiniMax-M2.5-highspeed'],
-      currentModel: MOUTH_MODEL,
+      currentModel: (profile.config as any).mouth?.model || MOUTH_MODEL_FALLBACK,
     },
   ] : [];
 
