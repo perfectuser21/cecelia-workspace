@@ -1,4 +1,4 @@
-import { Activity, Bot, Workflow, Server, Cpu, Map, Settings, Users, Puzzle } from 'lucide-react';
+import { Activity, Bot, Workflow, Server, Cpu, Map, Settings, Users } from 'lucide-react';
 import { Brain } from 'lucide-react';
 import TabbedPage from '../../shared/components/TabbedPage';
 import type { TabConfig } from '../../shared/components/TabbedPage';
@@ -61,18 +61,11 @@ const tabs: TabConfig[] = [
     component: () => import('../../system/pages/ModelProfileSwitcher'),
   },
   {
-    id: 'staff',
-    label: '员工',
+    id: 'team',
+    label: 'Team',
     icon: Users,
-    path: '/system/staff',
-    component: () => import('../../system/pages/StaffPage'),
-  },
-  {
-    id: 'skills-registry',
-    label: '技能库',
-    icon: Puzzle,
-    path: '/system/skills-registry',
-    component: () => import('../../system/pages/SkillsRegistryPage'),
+    path: '/system/team',
+    component: () => import('../../system/pages/TeamPage'),
   },
 ];
 
