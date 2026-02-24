@@ -20,7 +20,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   BrainCircuit, Plus, Pencil, Trash2, Upload, Check, X,
   Loader2, RefreshCw, FileText, Search,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Square, CheckSquare,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -268,6 +268,8 @@ function FactTableRow({
   fact,
   isLast,
   isDeleting,
+  selected,
+  onToggleSelect,
   onEdit,
   onDeleteRequest,
   onDeleteConfirm,
@@ -276,6 +278,8 @@ function FactTableRow({
   fact: ProfileFact;
   isLast: boolean;
   isDeleting: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
   onEdit: () => void;
   onDeleteRequest: () => void;
   onDeleteConfirm: () => void;
@@ -287,11 +291,22 @@ function FactTableRow({
 
   return (
     <div
-      className={`group grid items-center px-4 py-2.5 gap-3 hover:bg-slate-800/40 transition-colors ${
-        !isLast ? 'border-b border-slate-700/30' : ''
-      }`}
-      style={{ gridTemplateColumns: '1fr 80px 90px 64px' }}
+      className={`group grid items-center px-4 py-2.5 gap-3 transition-colors ${
+        selected ? 'bg-slate-700/30' : 'hover:bg-slate-800/40'
+      } ${!isLast ? 'border-b border-slate-700/30' : ''}`}
+      style={{ gridTemplateColumns: '20px 1fr 80px 90px 64px' }}
     >
+      {/* Checkbox */}
+      <button
+        onClick={onToggleSelect}
+        className="text-slate-500 hover:text-slate-300 transition-colors"
+        title={selected ? '取消选择' : '选择'}
+      >
+        {selected
+          ? <CheckSquare className="w-4 h-4 text-blue-400" />
+          : <Square className="w-4 h-4" />}
+      </button>
+
       {/* Content */}
       <p className="text-sm text-slate-200 truncate leading-relaxed" title={fact.content}>
         {fact.content}
@@ -364,6 +379,9 @@ export default function ProfileFactsPage() {
 
   const [showImport, setShowImport] = useState(false);
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchDeleting, setBatchDeleting] = useState(false);
+
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchFacts = useCallback(async (isRefresh = false) => {
@@ -385,7 +403,8 @@ export default function ProfileFactsPage() {
   }, [category]);
 
   useEffect(() => { fetchFacts(); }, [fetchFacts]);
-  useEffect(() => { setPage(0); }, [search]);
+  useEffect(() => { setPage(0); setSelectedIds(new Set()); }, [search]);
+  useEffect(() => { setSelectedIds(new Set()); }, [category]);
 
   // ── Filter + paginate ──────────────────────────────────────────────────────
 
@@ -418,6 +437,37 @@ export default function ProfileFactsPage() {
     setAllFacts(prev => prev.filter(f => f.id !== id));
     setTotal(prev => prev - 1);
     setDeletingId(null);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === pageData.length && pageData.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pageData.map(f => f.id)));
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0 || batchDeleting) return;
+    setBatchDeleting(true);
+    try {
+      await apiFetch(`${BASE}/batch`, {
+        method: 'DELETE',
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      setSelectedIds(new Set());
+      await fetchFacts(true);
+    } finally {
+      setBatchDeleting(false);
+    }
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -513,13 +563,46 @@ export default function ProfileFactsPage() {
         </div>
       </div>
 
+      {/* Batch delete bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-3 py-2 bg-slate-800/80 border border-slate-600/50 rounded-xl">
+          <span className="text-xs text-slate-300">已选 {selectedIds.size} 条</span>
+          <div className="flex-1" />
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="px-3 py-1.5 text-xs rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
+          >
+            取消选择
+          </button>
+          <button
+            onClick={handleBatchDelete}
+            disabled={batchDeleting}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 hover:text-rose-300 border border-rose-500/30 transition-colors disabled:opacity-50"
+          >
+            {batchDeleting
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              : <Trash2 className="w-3.5 h-3.5" />}
+            {batchDeleting ? '删除中…' : `批量删除 (${selectedIds.size})`}
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-xl border border-slate-700/50 overflow-hidden">
         {/* Table header */}
         <div
-          className="grid bg-slate-800/60 border-b border-slate-700/50 px-4 py-2.5 gap-3"
-          style={{ gridTemplateColumns: '1fr 80px 90px 64px' }}
+          className="grid bg-slate-800/60 border-b border-slate-700/50 px-4 py-2.5 gap-3 items-center"
+          style={{ gridTemplateColumns: '20px 1fr 80px 90px 64px' }}
         >
+          <button
+            onClick={toggleSelectAll}
+            className="text-slate-500 hover:text-slate-300 transition-colors"
+            title={selectedIds.size === pageData.length && pageData.length > 0 ? '取消全选' : '全选当前页'}
+          >
+            {selectedIds.size === pageData.length && pageData.length > 0
+              ? <CheckSquare className="w-4 h-4 text-blue-400" />
+              : <Square className="w-4 h-4" />}
+          </button>
           <span className="text-xs font-medium text-slate-400">内容</span>
           <span className="text-xs font-medium text-slate-400">分类</span>
           <span className="text-xs font-medium text-slate-400">时间</span>
@@ -552,6 +635,8 @@ export default function ProfileFactsPage() {
               fact={fact}
               isLast={idx === pageData.length - 1}
               isDeleting={deletingId === fact.id}
+              selected={selectedIds.has(fact.id)}
+              onToggleSelect={() => toggleSelect(fact.id)}
               onEdit={() => setEditFact(fact)}
               onDeleteRequest={() => setDeletingId(fact.id)}
               onDeleteConfirm={() => handleDelete(fact.id)}
