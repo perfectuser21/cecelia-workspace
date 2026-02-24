@@ -72,3 +72,20 @@ export async function fetchSkillsRegistry(): Promise<SkillsRegistryResponse> {
   if (!res.ok) throw new Error(`Skills registry API error: ${res.status}`);
   return res.json();
 }
+
+export interface WorkerUpdatePayload {
+  skill?: string | null;
+  model?: { provider: string; name: string } | null;
+}
+
+export async function updateWorker(workerId: string, payload: WorkerUpdatePayload): Promise<void> {
+  const res = await fetch(`${BRAIN_URL}/staff/workers/${workerId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as any).error || `Update worker failed: ${res.status}`);
+  }
+}
