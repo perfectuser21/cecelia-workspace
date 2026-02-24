@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Bot, Users, Puzzle, AlertCircle, Loader2, Brain, Building2, X, ChevronRight, Pencil, Check, RotateCcw } from 'lucide-react';
+import { Bot, Users, Puzzle, AlertCircle, Loader2, Brain, Building2, X, ChevronRight, Check } from 'lucide-react';
 import {
   fetchStaff,
   fetchSkillsRegistry,
@@ -70,54 +70,34 @@ interface WorkerPanelProps {
 }
 
 function WorkerPanel({ worker, skills, onClose, onSaved }: WorkerPanelProps) {
-  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // edit state
-  const [editSkill, setEditSkill] = useState(worker.skill || '');
-  const [editProvider, setEditProvider] = useState(worker.model.provider || 'anthropic');
-  const [editModelName, setEditModelName] = useState(worker.model.name || '');
-
-  const startEdit = () => {
-    setEditSkill(worker.skill || '');
-    setEditProvider(worker.model.provider || 'anthropic');
-    setEditModelName(worker.model.name || '');
-    setError(null);
-    setEditing(true);
-  };
-
-  const cancelEdit = () => {
-    setEditing(false);
-    setError(null);
-  };
+  const [skill, setSkill] = useState(worker.skill || '');
+  const [provider, setProvider] = useState(worker.model.provider || 'anthropic');
+  const [modelName, setModelName] = useState(worker.model.name || '');
 
   const save = async () => {
     setSaving(true);
     setError(null);
     try {
       await updateWorker(worker.id, {
-        skill: editSkill || null,
-        model: editModelName ? { provider: editProvider, name: editModelName } : null,
+        skill: skill || null,
+        model: modelName ? { provider, name: modelName } : null,
       });
-      setEditing(false);
       onSaved();
     } catch (e: any) {
       setError(e.message);
-    } finally {
       setSaving(false);
     }
   };
 
-  const providers = Object.entries(worker.model.full_map || {});
-
   return (
     <>
       <div className="fixed inset-0 bg-black/20 dark:bg-black/40 z-40" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-gray-900 shadow-2xl z-50 flex flex-col overflow-hidden">
+      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-gray-900 shadow-2xl z-50 flex flex-col">
 
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-gray-100 dark:border-gray-800">
+        <div className="shrink-0 flex items-start justify-between p-5 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0">
               <Bot size={20} className="text-white" />
@@ -127,118 +107,62 @@ function WorkerPanel({ worker, skills, onClose, onSaved }: WorkerPanelProps) {
               <div className="text-sm text-gray-500">{worker.role}</div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {!editing && (
-              <button
-                onClick={startEdit}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
-              >
-                <Pencil size={12} />
-                编辑
-              </button>
-            )}
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1">
-              <X size={20} />
-            </button>
-          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 shrink-0">
+            <X size={20} />
+          </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* Content — scrollable */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5 min-h-0">
 
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">描述</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">描述</div>
             <p className="text-sm text-gray-700 dark:text-gray-300">{worker.description}</p>
           </div>
 
           {/* Skill */}
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Skill</div>
-            {editing ? (
-              <select
-                value={editSkill}
-                onChange={e => setEditSkill(e.target.value)}
-                className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">— 不绑定 Skill —</option>
-                {skills.map(s => (
-                  <option key={s.id} value={`/${s.id}`}>/{s.id}  {s.name && `(${s.name})`}</option>
-                ))}
-              </select>
-            ) : (
-              <span className="text-sm font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-gray-700 dark:text-gray-300">
-                {worker.skill || <span className="text-gray-400 italic">未绑定</span>}
-              </span>
-            )}
+            <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5 block">Skill</label>
+            <select
+              value={skill}
+              onChange={e => setSkill(e.target.value)}
+              className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">— 不绑定 —</option>
+              {skills.map(s => (
+                <option key={s.id} value={`/${s.id}`}>/{s.id}{s.name ? `  (${s.name})` : ''}</option>
+              ))}
+            </select>
           </div>
 
           {/* Model */}
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">模型配置</div>
-            {editing ? (
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Provider</label>
-                  <select
-                    value={editProvider}
-                    onChange={e => setEditProvider(e.target.value)}
-                    className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {PROVIDERS.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Model Name</label>
-                  <input
-                    type="text"
-                    value={editModelName}
-                    onChange={e => setEditModelName(e.target.value)}
-                    placeholder="e.g. claude-sonnet-4-6-20251001"
-                    className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                  />
-                </div>
-              </div>
-            ) : (
-              providers.length > 0 ? (
-                <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 dark:bg-gray-800">
-                      <tr>
-                        <th className="text-left px-3 py-2 text-xs text-gray-500 font-medium">Provider</th>
-                        <th className="text-left px-3 py-2 text-xs text-gray-500 font-medium">Model</th>
-                        <th className="px-3 py-2 w-8" />
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                      {providers.map(([prov, model]) => (
-                        <tr key={prov} className={model ? '' : 'opacity-40'}>
-                          <td className="px-3 py-2 font-mono text-xs text-gray-600 dark:text-gray-400">{prov}</td>
-                          <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300">
-                            {model ? model.replace('claude-', '').replace('-20250514', '').replace('-20251001', '').replace('MiniMax-', '') : '—'}
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            {prov === worker.model.provider && (
-                              <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 italic">未配置 — 点击编辑配置</p>
-              )
-            )}
+            <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">模型</div>
+            <div className="flex gap-2">
+              <select
+                value={provider}
+                onChange={e => setProvider(e.target.value)}
+                className="w-32 shrink-0 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {PROVIDERS.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+              <input
+                type="text"
+                value={modelName}
+                onChange={e => setModelName(e.target.value)}
+                placeholder="claude-sonnet-4-6-20251001"
+                className="flex-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono min-w-0"
+              />
+            </div>
           </div>
 
           {/* Abilities */}
           {worker.abilities && worker.abilities.length > 0 && (
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
+              <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">
                 Abilities ({worker.abilities.length})
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {worker.abilities.map(ab => (
                   <div key={ab.id} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                     <div className="text-sm font-medium text-gray-800 dark:text-gray-200">{ab.name}</div>
@@ -249,7 +173,6 @@ function WorkerPanel({ worker, skills, onClose, onSaved }: WorkerPanelProps) {
             </div>
           )}
 
-          {/* Error */}
           {error && (
             <div className="flex items-center gap-2 text-sm text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
               <AlertCircle size={15} />
@@ -258,27 +181,17 @@ function WorkerPanel({ worker, skills, onClose, onSaved }: WorkerPanelProps) {
           )}
         </div>
 
-        {/* Footer — 只在编辑模式显示 */}
-        {editing && (
-          <div className="p-4 border-t border-gray-100 dark:border-gray-800 flex gap-2">
-            <button
-              onClick={cancelEdit}
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
-            >
-              <RotateCcw size={14} />
-              取消
-            </button>
-            <button
-              onClick={save}
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
-            >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-              {saving ? '保存中...' : '保存'}
-            </button>
-          </div>
-        )}
+        {/* Footer — 固定底部，始终可见 */}
+        <div className="shrink-0 p-4 border-t border-gray-100 dark:border-gray-800">
+          <button
+            onClick={save}
+            disabled={saving}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+            {saving ? '保存中...' : '保存'}
+          </button>
+        </div>
       </div>
     </>
   );
