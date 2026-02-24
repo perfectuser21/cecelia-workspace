@@ -81,7 +81,6 @@ const manifest: FeatureManifest = {
     { path: '/system/quality', redirect: '/system' },
     { path: '/system/live', redirect: '/system' },
     // Legacy short-form redirects
-    { path: '/cecelia', redirect: '/system' },
     { path: '/cecelia/runs', redirect: '/system/cecelia/runs' },
     { path: '/engine', redirect: '/system/engine' },
     { path: '/engine/capabilities', redirect: '/system/engine' },
