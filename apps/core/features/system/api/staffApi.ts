@@ -1,4 +1,4 @@
-const BRAIN_URL = 'http://localhost:5221/api/brain';
+const BRAIN_URL = '/api/brain';
 
 export interface WorkerModel {
   provider: string | null;
