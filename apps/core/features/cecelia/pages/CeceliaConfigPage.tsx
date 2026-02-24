@@ -28,6 +28,16 @@ interface ActiveProfile {
   };
 }
 
+interface AgentInfo {
+  id: string;
+  name: string;
+  description: string;
+  layer: string;
+  allowed_models: string[];
+  recommended_model: string;
+  fixed_provider: string | null;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const PROVIDER_STYLES: Record<string, { bg: string; text: string }> = {
@@ -208,7 +218,7 @@ function LayerRow({ layer, allModels, onSave }: LayerRowProps) {
 
 // 反思层和嘴巴层 fallback（profile 里没有时使用）
 const REFLECTION_MODEL_FALLBACK = 'claude-opus-4-20250514';
-const MOUTH_MODEL_FALLBACK = 'claude-sonnet-4-6-20251001';
+const MOUTH_MODEL_FALLBACK = 'MiniMax-M2.5-highspeed';
 
 // 追加 Sonnet 4.6 到模型列表（registry 里只有 4.5，但嘴巴用的是 4.6）
 const EXTRA_MODELS: ModelInfo[] = [
@@ -302,7 +312,7 @@ export default function CeceliaConfigPage() {
       id: 'mouth',
       name: '嘴巴',
       description: '对话生成 · 对外接口',
-      allowed_models: agentModels('mouth', ['claude-sonnet-4-6-20251001', 'claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001']),
+      allowed_models: agentModels('mouth', ['MiniMax-M2.5-highspeed', 'MiniMax-M2.5', 'claude-haiku-4-5-20251001', 'claude-sonnet-4-20250514', 'claude-sonnet-4-6-20251001']),
       currentModel: cfg.mouth?.model || MOUTH_MODEL_FALLBACK,
     },
   ] : [];

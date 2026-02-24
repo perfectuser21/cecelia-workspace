@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Brain, Send, Phone, PhoneOff, Mic, Volume2, Zap } from 'lucide-react';
+import { Brain, Send, Phone, PhoneOff, Mic, Volume2, Zap, Clock, ChevronRight, Activity } from 'lucide-react';
 import { useCecelia } from '@/contexts/CeceliaContext';
 import { useRealtimeVoice } from '@features/core/shared/hooks/useRealtimeVoice';
 
@@ -9,6 +9,22 @@ interface Desire {
   content: string;
   urgency: number;
   created_at: string;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  task_type: string;
+  priority: string;
+  status: string;
+}
+
+interface StatusData {
+  tasksQueued: number;
+  tasksInProgress: number;
+  tickActionsToday: number;
+  lastDispatch: string | null;
+  dispatchRate: number;
 }
 
 const ALERTNESS_CONF = {
@@ -29,6 +45,243 @@ const ROUTE_ALIASES: Record<string, string> = {
   'today': '/today', '今天': '/today',
 };
 
+const QUICK_PROMPTS = [
+  '你今天打算做什么？',
+  '现在有哪些优先任务？',
+  '最近有没有遇到问题？',
+  '系统健康状况如何？',
+];
+
+const URGENT_ACTIONS = [
+  { label: '暂停所有任务', prompt: '请暂停所有正在进行的任务' },
+  { label: '触发一次 Tick', prompt: '请手动触发一次 Tick 循环' },
+  { label: '查看任务队列', prompt: '请告诉我当前任务队列的情况' },
+];
+
+// ── 辅助组件 ──────────────────────────────────────────────
+
+function StatRow({ icon, label, value, color }: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  color?: string;
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '5px 0' }}>
+      <div style={{ color: color ?? 'rgba(255,255,255,0.3)', flexShrink: 0 }}>{icon}</div>
+      <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)', flex: 1 }}>{label}</span>
+      <span style={{ fontSize: 11, fontWeight: 600, color: color ?? 'rgba(255,255,255,0.65)' }}>{value}</span>
+    </div>
+  );
+}
+
+function ClickBtn({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: '100%', textAlign: 'left',
+        padding: '7px 10px', borderRadius: 7, border: 'none', cursor: 'pointer',
+        background: 'rgba(255,255,255,0.03)',
+        color: 'rgba(255,255,255,0.55)', fontSize: 11.5, lineHeight: 1.4,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+        transition: 'all 0.15s',
+      }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLButtonElement).style.background = 'rgba(124,58,237,0.12)';
+        (e.currentTarget as HTMLButtonElement).style.color = '#a78bfa';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.03)';
+        (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.55)';
+      }}
+    >
+      <span style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+        {label}
+      </span>
+      <ChevronRight size={11} style={{ flexShrink: 0, opacity: 0.4 }} />
+    </button>
+  );
+}
+
+// ── 左侧状态面板 ──────────────────────────────────────────
+
+function StatusPanel({ alertnessLevel, desires, status }: {
+  alertnessLevel: number;
+  desires: Desire[];
+  status: StatusData;
+}) {
+  const aC = ALERTNESS_CONF[alertnessLevel as keyof typeof ALERTNESS_CONF] ?? ALERTNESS_CONF[1];
+
+  return (
+    <div style={{
+      width: 196, flexShrink: 0,
+      borderRight: '1px solid rgba(255,255,255,0.05)',
+      display: 'flex', flexDirection: 'column',
+      background: '#060610',
+    }}>
+      {/* section: 系统状态 */}
+      <div style={{ padding: '11px 13px 8px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>系统状态</span>
+      </div>
+      <div style={{ padding: '4px 13px 8px' }}>
+        {/* alertness */}
+        <div style={{ padding: '7px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', marginBottom: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{
+              width: 6, height: 6, borderRadius: '50%', background: aC.color, flexShrink: 0,
+              ...(aC.pulse ? { animation: 'pulse 2s ease-in-out infinite' } : {}),
+            }} />
+            <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)' }}>警觉度</span>
+            <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: aC.color, letterSpacing: '0.06em' }}>
+              {aC.label}
+            </span>
+          </div>
+        </div>
+        <StatRow icon={<Clock size={11} />} label="任务队列" value={status.tasksQueued} color={status.tasksQueued > 5 ? '#f59e0b' : undefined} />
+        <StatRow icon={<Activity size={11} />} label="进行中" value={status.tasksInProgress} color={status.tasksInProgress > 0 ? '#3b82f6' : undefined} />
+        <StatRow icon={<Zap size={11} />} label="今日 Actions" value={status.tickActionsToday} />
+      </div>
+
+      {/* section: 内心欲望 */}
+      <div style={{ padding: '9px 13px 7px', borderTop: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>内心欲望</span>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '6px 9px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {desires.length === 0 ? (
+          <div style={{ paddingTop: 20, textAlign: 'center', fontSize: 10.5, color: 'rgba(255,255,255,0.16)' }}>平静无欲</div>
+        ) : desires.map(d => (
+          <div key={d.id} style={{
+            borderRadius: 5, padding: '6px 8px',
+            background: d.urgency >= 8 ? 'rgba(239,68,68,0.05)' : d.urgency >= 5 ? 'rgba(245,158,11,0.04)' : 'rgba(255,255,255,0.018)',
+            borderLeft: `2px solid ${d.urgency >= 8 ? 'rgba(239,68,68,0.5)' : d.urgency >= 5 ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.06)'}`,
+          }}>
+            <p style={{
+              fontSize: 10.5, color: 'rgba(255,255,255,0.42)', lineHeight: 1.45,
+              margin: '0 0 2px',
+              overflow: 'hidden', display: '-webkit-box',
+              WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+            }}>
+              {d.content}
+            </p>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.16)' }}>{d.type} · {d.urgency}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ padding: '6px 13px', borderTop: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: 5 }}>
+        <Zap size={9} style={{ color: 'rgba(167,139,250,0.28)' }} />
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.18)' }}>{desires.length} 件</span>
+      </div>
+    </div>
+  );
+}
+
+// ── 右侧决策面板 ──────────────────────────────────────────
+
+function DecisionPanel({ queuedTasks, onSend }: {
+  queuedTasks: Task[];
+  onSend: (text: string) => void;
+}) {
+  const PRIORITY_COLOR: Record<string, string> = {
+    P0: '#ef4444', P1: '#f59e0b', P2: '#3b82f6', P3: '#6b7280',
+  };
+
+  return (
+    <div style={{
+      width: 226, flexShrink: 0,
+      borderLeft: '1px solid rgba(255,255,255,0.05)',
+      display: 'flex', flexDirection: 'column',
+      background: '#060610',
+    }}>
+      {/* section: 等待任务 */}
+      <div style={{ padding: '11px 13px 8px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>等待队列</span>
+      </div>
+      <div style={{ maxHeight: 220, overflowY: 'auto', padding: '6px 9px', display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+        {queuedTasks.length === 0 ? (
+          <div style={{ paddingTop: 14, textAlign: 'center', fontSize: 10.5, color: 'rgba(255,255,255,0.16)' }}>队列为空</div>
+        ) : queuedTasks.slice(0, 8).map(t => (
+          <button
+            key={t.id}
+            onClick={() => onSend(`这个任务怎么样？「${t.title}」`)}
+            style={{
+              width: '100%', textAlign: 'left',
+              padding: '6px 9px', borderRadius: 6, border: 'none', cursor: 'pointer',
+              background: 'rgba(255,255,255,0.025)',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(124,58,237,0.1)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.025)'; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+              <span style={{
+                fontSize: 8.5, fontWeight: 700, padding: '1px 4px', borderRadius: 3,
+                background: `${PRIORITY_COLOR[t.priority] ?? '#6b7280'}22`,
+                color: PRIORITY_COLOR[t.priority] ?? '#6b7280',
+                letterSpacing: '0.04em',
+              }}>
+                {t.priority}
+              </span>
+              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)' }}>{t.task_type}</span>
+            </div>
+            <p style={{
+              margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4,
+              overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+            }}>
+              {t.title}
+            </p>
+          </button>
+        ))}
+      </div>
+
+      {/* section: 快捷提问 */}
+      <div style={{ padding: '9px 13px 7px', borderTop: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', flexShrink: 0 }}>
+        <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>快捷提问</span>
+      </div>
+      <div style={{ padding: '6px 9px', display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+        {QUICK_PROMPTS.map(p => (
+          <ClickBtn key={p} label={p} onClick={() => onSend(p)} />
+        ))}
+      </div>
+
+      {/* section: 紧急操作 */}
+      <div style={{ padding: '9px 13px 7px', borderTop: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', flexShrink: 0 }}>
+        <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(239,68,68,0.45)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>紧急操作</span>
+      </div>
+      <div style={{ padding: '6px 9px', display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+        {URGENT_ACTIONS.map(a => (
+          <button
+            key={a.label}
+            onClick={() => onSend(a.prompt)}
+            style={{
+              width: '100%', textAlign: 'left',
+              padding: '6px 10px', borderRadius: 7, border: '1px solid rgba(239,68,68,0.1)', cursor: 'pointer',
+              background: 'rgba(239,68,68,0.04)',
+              color: 'rgba(239,68,68,0.55)', fontSize: 11.5,
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.1)';
+              (e.currentTarget as HTMLButtonElement).style.color = '#f87171';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.04)';
+              (e.currentTarget as HTMLButtonElement).style.color = 'rgba(239,68,68,0.55)';
+            }}
+          >
+            {a.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ flex: 1 }} />
+    </div>
+  );
+}
+
+// ── 主组件 ────────────────────────────────────────────────
+
 export default function CeceliaPage() {
   const {
     messages, addMessage, input, setInput, sending, setSending, generateId,
@@ -43,6 +296,10 @@ export default function CeceliaPage() {
   const [alertnessLevel, setAlertnessLevel] = useState(1);
   const [thinkingPhase, setThinkingPhase] = useState(0);
   const [msgDepth, setMsgDepth] = useState<Map<string, number>>(new Map());
+  const [queuedTasks, setQueuedTasks] = useState<Task[]>([]);
+  const [status, setStatus] = useState<StatusData>({
+    tasksQueued: 0, tasksInProgress: 0, tickActionsToday: 0, lastDispatch: null, dispatchRate: 0,
+  });
 
   // scroll to bottom
   useEffect(() => {
@@ -84,6 +341,49 @@ export default function CeceliaPage() {
     };
     load();
     const t = setInterval(load, 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  // poll queued tasks (right panel)
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const r = await fetch('/api/brain/tasks?status=queued&limit=20');
+        if (!r.ok) return;
+        const d = await r.json();
+        setQueuedTasks(Array.isArray(d) ? d : (d.tasks || []));
+      } catch { /* silent */ }
+    };
+    load();
+    const t = setInterval(load, 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  // poll system status (left panel stats)
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [fullRes, inProgressRes] = await Promise.all([
+          fetch('/api/brain/status/full'),
+          fetch('/api/brain/tasks?status=in_progress&limit=50'),
+        ]);
+        const inProgressData = inProgressRes.ok ? await inProgressRes.json() : [];
+        const inProgressCount = Array.isArray(inProgressData) ? inProgressData.length : (inProgressData.tasks?.length ?? 0);
+
+        if (fullRes.ok) {
+          const d = await fullRes.json();
+          setStatus({
+            tasksQueued: d.task_queue?.queued ?? 0,
+            tasksInProgress: inProgressCount,
+            tickActionsToday: d.tick_stats?.actions_today ?? 0,
+            lastDispatch: d.task_queue?.last_dispatch ?? null,
+            dispatchRate: d.tick_stats?.dispatch_rate_1h ?? 0,
+          });
+        }
+      } catch { /* silent */ }
+    };
+    load();
+    const t = setInterval(load, 60_000);
     return () => clearInterval(t);
   }, []);
 
@@ -130,15 +430,7 @@ export default function CeceliaPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // voice
-  const realtime = useRealtimeVoice({
-    onTranscript: useCallback((text: string) => {
-      if (text.trim()) handleSend(text.trim());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []),
-  });
-
-  async function handleSend(overrideText?: string) {
+  const handleSend = useCallback(async (overrideText?: string) => {
     const text = overrideText ?? input.trim();
     if (!text || sending) return;
     if (!overrideText) setInput('');
@@ -189,53 +481,29 @@ export default function CeceliaPage() {
     } finally {
       setSending(false);
     }
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [input, sending, messages, currentRoute, frontendTools]);
+
+  // voice
+  const realtime = useRealtimeVoice({
+    onTranscript: useCallback((text: string) => {
+      if (text.trim()) handleSend(text.trim());
+    }, [handleSend]),
+  });
 
   const aC = ALERTNESS_CONF[alertnessLevel as keyof typeof ALERTNESS_CONF] ?? ALERTNESS_CONF[1];
 
   return (
     <div style={{ display: 'flex', height: '100%', background: '#09090f' }}>
 
-      {/* ── desires sidebar ── */}
-      <div style={{
-        width: 210, flexShrink: 0,
-        borderRight: '1px solid rgba(255,255,255,0.05)',
-        display: 'flex', flexDirection: 'column',
-        background: '#080810',
-      }}>
-        <div style={{ padding: '13px 14px 9px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-          <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.26)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>内心欲望</span>
-        </div>
+      {/* ── 左侧状态面板 ── */}
+      <StatusPanel
+        alertnessLevel={alertnessLevel}
+        desires={desires}
+        status={status}
+      />
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 9px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {desires.length === 0 ? (
-            <div style={{ paddingTop: 28, textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.18)' }}>平静无欲</div>
-          ) : desires.map(d => (
-            <div key={d.id} style={{
-              borderRadius: 6, padding: '7px 10px',
-              background: d.urgency >= 8 ? 'rgba(239,68,68,0.06)' : d.urgency >= 5 ? 'rgba(245,158,11,0.05)' : 'rgba(255,255,255,0.022)',
-              borderLeft: `2px solid ${d.urgency >= 8 ? 'rgba(239,68,68,0.55)' : d.urgency >= 5 ? 'rgba(245,158,11,0.45)' : 'rgba(255,255,255,0.07)'}`,
-            }}>
-              <p style={{
-                fontSize: 11, color: 'rgba(255,255,255,0.46)', lineHeight: 1.45,
-                margin: '0 0 3px',
-                overflow: 'hidden', display: '-webkit-box',
-                WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-              }}>
-                {d.content}
-              </p>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.18)' }}>{d.type} · {d.urgency}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ padding: '8px 14px', borderTop: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: 5 }}>
-          <Zap size={9} style={{ color: 'rgba(167,139,250,0.32)' }} />
-          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)' }}>{desires.length} 件</span>
-        </div>
-      </div>
-
-      {/* ── main chat ── */}
+      {/* ── 中间对话面板 ── */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
 
         {/* presence header */}
@@ -437,6 +705,10 @@ export default function CeceliaPage() {
         </div>
 
       </div>
+
+      {/* ── 右侧决策面板 ── */}
+      <DecisionPanel queuedTasks={queuedTasks} onSend={handleSend} />
+
     </div>
   );
 }
