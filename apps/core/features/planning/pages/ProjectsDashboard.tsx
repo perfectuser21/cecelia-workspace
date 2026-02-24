@@ -79,7 +79,7 @@ function ProjectCard({
 }) {
   return (
     <Link
-      to={`/projects/${project.id}`}
+      to={`/work/projects/${project.id}`}
       className="block bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md transition-all group"
     >
       <div className="flex items-start justify-between mb-3">

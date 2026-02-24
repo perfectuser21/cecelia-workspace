@@ -8,15 +8,8 @@ router.get('/', async (req, res) => {
   try {
     const { project_id, scope, business_id, department_id, area_id } = req.query;
 
-    // Join with businesses and departments for related data
-    let query = `
-      SELECT g.*,
-        b.name as business_name, b.owner as business_owner,
-        d.name as department_name, d.lead as department_lead
-      FROM goals g
-      LEFT JOIN businesses b ON g.business_id = b.id
-      LEFT JOIN departments d ON g.department_id = d.id
-    `;
+    // 直接查询 goals 表（businesses/departments 表不存在）
+    let query = `SELECT g.* FROM goals g`;
     let params = [];
     let conditions = [];
     let paramIndex = 1;
@@ -50,24 +43,11 @@ router.get('/', async (req, res) => {
 
     const result = await pool.query(query, params);
 
-    // Transform to include nested objects
+    // 保留 business/department 为 null（表不存在，无法 JOIN）
     const goals = result.rows.map(row => ({
       ...row,
-      business: row.business_id ? {
-        id: row.business_id,
-        name: row.business_name,
-        owner: row.business_owner
-      } : null,
-      department: row.department_id ? {
-        id: row.department_id,
-        name: row.department_name,
-        lead: row.department_lead
-      } : null,
-      // Remove flattened fields
-      business_name: undefined,
-      business_owner: undefined,
-      department_name: undefined,
-      department_lead: undefined
+      business: null,
+      department: null,
     }));
 
     res.json(goals);
