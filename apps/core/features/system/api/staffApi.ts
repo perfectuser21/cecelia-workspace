@@ -4,6 +4,7 @@ export interface WorkerModel {
   provider: string | null;
   name: string | null;
   full_map: Record<string, string | null>;
+  credentials_file: string | null;
 }
 
 export interface Worker {
@@ -90,6 +91,7 @@ export async function fetchModels(): Promise<ModelEntry[]> {
 export interface WorkerUpdatePayload {
   skill?: string | null;
   model?: { provider: string; name: string } | null;
+  credentials_file?: string | null;
 }
 
 export async function updateWorker(workerId: string, payload: WorkerUpdatePayload): Promise<void> {
