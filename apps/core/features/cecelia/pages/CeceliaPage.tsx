@@ -1,12 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  Brain, Send, RefreshCw, Phone, PhoneOff, Mic, Volume2,
-  AlertTriangle, CheckCircle, Clock, Zap, Navigation
-} from 'lucide-react';
+import { Brain, Send, Phone, PhoneOff, Mic, Volume2, Zap } from 'lucide-react';
 import { useCecelia } from '@/contexts/CeceliaContext';
 import { useRealtimeVoice } from '@features/core/shared/hooks/useRealtimeVoice';
 
-// --------------- helpers ---------------
 interface Desire {
   id: string;
   type: string;
@@ -15,22 +11,16 @@ interface Desire {
   created_at: string;
 }
 
-function timeAgo(d: string) {
-  const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
-  if (m < 1) return '刚刚';
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}d`;
-}
+const ALERTNESS_CONF = {
+  0: { label: 'SLEEPING', color: '#64748b', pulse: false },
+  1: { label: 'CALM',     color: '#22c55e', pulse: false },
+  2: { label: 'AWARE',    color: '#3b82f6', pulse: true  },
+  3: { label: 'ALERT',    color: '#f59e0b', pulse: true  },
+  4: { label: 'PANIC',    color: '#ef4444', pulse: true  },
+} as const;
 
-function urgencyStyle(u: number) {
-  if (u >= 8) return { dot: '#ef4444', border: 'border-red-500/25', bg: 'bg-red-500/8', label: 'text-red-400' };
-  if (u >= 5) return { dot: '#f59e0b', border: 'border-amber-500/25', bg: 'bg-amber-500/8', label: 'text-amber-400' };
-  return { dot: '#22c55e', border: 'border-green-500/20', bg: 'bg-green-500/5', label: 'text-green-400' };
-}
+const THINKING_PHASES = ['感知中', '思考中', '深思中'];
 
-// --------------- route aliases (same as CeceliaChat) ---------------
 const ROUTE_ALIASES: Record<string, string> = {
   'okr': '/okr', '目标': '/okr',
   'projects': '/projects', '项目': '/projects',
@@ -39,7 +29,6 @@ const ROUTE_ALIASES: Record<string, string> = {
   'today': '/today', '今天': '/today',
 };
 
-// --------------- main page ---------------
 export default function CeceliaPage() {
   const {
     messages, addMessage, input, setInput, sending, setSending, generateId,
@@ -48,11 +37,14 @@ export default function CeceliaPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const openingFiredRef = useRef(false);
 
   const [desires, setDesires] = useState<Desire[]>([]);
-  const [desiresLoading, setDesiresLoading] = useState(true);
+  const [alertnessLevel, setAlertnessLevel] = useState(1);
+  const [thinkingPhase, setThinkingPhase] = useState(0);
+  const [msgDepth, setMsgDepth] = useState<Map<string, number>>(new Map());
 
-  // scroll to bottom on new messages
+  // scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, sending]);
@@ -60,31 +52,93 @@ export default function CeceliaPage() {
   // focus input on mount
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  // load desires
+  // cycle thinking phase while sending
   useEffect(() => {
-    async function load() {
+    if (!sending) { setThinkingPhase(0); return; }
+    const t = setInterval(() => setThinkingPhase(p => (p + 1) % 3), 1500);
+    return () => clearInterval(t);
+  }, [sending]);
+
+  // poll alertness
+  useEffect(() => {
+    const load = async () => {
       try {
-        const res = await fetch('/api/brain/desires?status=pending&limit=8');
-        if (!res.ok) return;
-        const data = await res.json();
-        setDesires(Array.isArray(data) ? data : (data.desires || []));
-      } catch { /* silent */ } finally {
-        setDesiresLoading(false);
-      }
-    }
+        const r = await fetch('/api/brain/alertness');
+        if (r.ok) { const d = await r.json(); setAlertnessLevel(d.level ?? 1); }
+      } catch { /* silent */ }
+    };
     load();
-    const t = setInterval(load, 30000);
+    const t = setInterval(load, 30_000);
     return () => clearInterval(t);
   }, []);
 
+  // poll desires
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const r = await fetch('/api/brain/desires?status=pending&limit=10');
+        if (!r.ok) return;
+        const d = await r.json();
+        setDesires(Array.isArray(d) ? d : (d.desires || []));
+      } catch { /* silent */ }
+    };
+    load();
+    const t = setInterval(load, 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  // proactive opening — Cecelia speaks first
+  useEffect(() => {
+    if (messages.length > 0 || openingFiredRef.current) return;
+    openingFiredRef.current = true;
+
+    const fire = async () => {
+      setSending(true);
+      try {
+        const r = await fetch('/api/orchestrator/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: '你好',
+            messages: [],
+            context: {
+              currentRoute,
+              pageContext: getPageContext(),
+              opening: true,
+              availableTools: frontendTools.map(t => ({
+                name: t.name,
+                description: t.description,
+                parameters: t.parameters,
+              })),
+            },
+          }),
+        });
+        const data = await r.json();
+        if (data.reply) {
+          const id = generateId();
+          addMessage({ id, role: 'assistant', content: data.reply });
+          if (data.routing_level !== undefined) {
+            setMsgDepth(prev => new Map(prev).set(id, data.routing_level));
+          }
+        }
+      } catch { /* silent */ } finally {
+        setSending(false);
+      }
+    };
+
+    setTimeout(fire, 700);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // voice
   const realtime = useRealtimeVoice({
     onTranscript: useCallback((text: string) => {
-      if (text.trim()) sendMessage(text.trim());
+      if (text.trim()) handleSend(text.trim());
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   });
 
-  async function sendMessage(overrideText?: string) {
+  async function handleSend(overrideText?: string) {
     const text = overrideText ?? input.trim();
     if (!text || sending) return;
     if (!overrideText) setInput('');
@@ -92,21 +146,18 @@ export default function CeceliaPage() {
     addMessage({ id: generateId(), role: 'user', content: text });
 
     try {
-      // check frontend commands first
-      const lowerMsg = text.toLowerCase();
-      const hasNavIntent = /打开|去|转|看|进入|切换|跳转|navigate|open|go/i.test(lowerMsg);
-      if (hasNavIntent) {
+      const lower = text.toLowerCase();
+      if (/打开|去|转|看|进入|切换|跳转|navigate|open|go/i.test(lower)) {
         for (const [alias, route] of Object.entries(ROUTE_ALIASES).sort((a, b) => b[0].length - a[0].length)) {
-          if (lowerMsg.includes(alias)) {
+          if (lower.includes(alias)) {
             const result = await executeFrontendTool('navigate', { path: route });
             addMessage({ id: generateId(), role: 'assistant', content: result, toolCall: { name: 'navigate', result } });
-            setSending(false);
             return;
           }
         }
       }
 
-      const res = await fetch('/api/orchestrator/chat', {
+      const r = await fetch('/api/orchestrator/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -115,13 +166,21 @@ export default function CeceliaPage() {
           context: {
             currentRoute,
             pageContext: getPageContext(),
-            availableTools: frontendTools.map(t => ({ name: t.name, description: t.description, parameters: t.parameters })),
+            availableTools: frontendTools.map(t => ({
+              name: t.name,
+              description: t.description,
+              parameters: t.parameters,
+            })),
           },
         }),
       });
-      const data = await res.json();
+      const data = await r.json();
       if (data.reply) {
-        addMessage({ id: generateId(), role: 'assistant', content: data.reply });
+        const id = generateId();
+        addMessage({ id, role: 'assistant', content: data.reply });
+        if (data.routing_level !== undefined) {
+          setMsgDepth(prev => new Map(prev).set(id, data.routing_level));
+        }
       } else if (data.error) {
         addMessage({ id: generateId(), role: 'assistant', content: `⚠️ ${data.error}` });
       }
@@ -132,222 +191,251 @@ export default function CeceliaPage() {
     }
   }
 
-  const highUrgency = desires.some(d => d.urgency >= 8);
+  const aC = ALERTNESS_CONF[alertnessLevel as keyof typeof ALERTNESS_CONF] ?? ALERTNESS_CONF[1];
 
   return (
     <div style={{ display: 'flex', height: '100%', background: '#09090f' }}>
 
-      {/* ── Left sidebar: desires ── */}
+      {/* ── desires sidebar ── */}
       <div style={{
-        width: 240, flexShrink: 0,
-        borderRight: '1px solid rgba(255,255,255,0.06)',
+        width: 210, flexShrink: 0,
+        borderRight: '1px solid rgba(255,255,255,0.05)',
         display: 'flex', flexDirection: 'column',
-        background: '#0c0c14',
+        background: '#080810',
       }}>
-        {/* header */}
-        <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <Brain size={13} style={{ color: '#a78bfa' }} />
-            <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-              内心状态
-            </span>
-            {highUrgency && <AlertTriangle size={11} style={{ color: '#ef4444', marginLeft: 'auto' }} />}
-          </div>
+        <div style={{ padding: '13px 14px 9px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+          <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.26)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>内心欲望</span>
         </div>
 
-        {/* list */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {desiresLoading && (
-            <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 24 }}>
-              <RefreshCw size={14} style={{ color: 'rgba(167,139,250,0.4)', animation: 'spin 1s linear infinite' }} />
-            </div>
-          )}
-          {!desiresLoading && desires.length === 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, paddingTop: 24 }}>
-              <CheckCircle size={16} style={{ color: 'rgba(34,197,94,0.4)' }} />
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>无待处理欲望</span>
-            </div>
-          )}
-          {desires.map(d => {
-            const s = urgencyStyle(d.urgency);
-            return (
-              <div key={d.id} style={{
-                borderRadius: 8,
-                border: `1px solid ${s.dot}22`,
-                background: `${s.dot}08`,
-                padding: '8px 10px',
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 9px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {desires.length === 0 ? (
+            <div style={{ paddingTop: 28, textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.18)' }}>平静无欲</div>
+          ) : desires.map(d => (
+            <div key={d.id} style={{
+              borderRadius: 6, padding: '7px 10px',
+              background: d.urgency >= 8 ? 'rgba(239,68,68,0.06)' : d.urgency >= 5 ? 'rgba(245,158,11,0.05)' : 'rgba(255,255,255,0.022)',
+              borderLeft: `2px solid ${d.urgency >= 8 ? 'rgba(239,68,68,0.55)' : d.urgency >= 5 ? 'rgba(245,158,11,0.45)' : 'rgba(255,255,255,0.07)'}`,
+            }}>
+              <p style={{
+                fontSize: 11, color: 'rgba(255,255,255,0.46)', lineHeight: 1.45,
+                margin: '0 0 3px',
+                overflow: 'hidden', display: '-webkit-box',
+                WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot, flexShrink: 0 }} />
-                  <span style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: s.dot }}>
-                    {d.type}
-                  </span>
-                  <span style={{ marginLeft: 'auto', fontSize: 9, color: 'rgba(255,255,255,0.25)', fontWeight: 700 }}>
-                    {d.urgency}
-                  </span>
-                </div>
-                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5, margin: 0, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                  {d.content}
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 5 }}>
-                  <Clock size={9} style={{ color: 'rgba(255,255,255,0.2)' }} />
-                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)' }}>{timeAgo(d.created_at)}</span>
-                </div>
-              </div>
-            );
-          })}
+                {d.content}
+              </p>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.18)' }}>{d.type} · {d.urgency}</div>
+            </div>
+          ))}
         </div>
 
-        {/* footer */}
-        <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <Zap size={11} style={{ color: 'rgba(167,139,250,0.5)' }} />
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{desires.length} 欲望</span>
-          </div>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', animation: 'pulse 2s infinite' }} />
+        <div style={{ padding: '8px 14px', borderTop: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <Zap size={9} style={{ color: 'rgba(167,139,250,0.32)' }} />
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)' }}>{desires.length} 件</span>
         </div>
       </div>
 
-      {/* ── Main: chat ── */}
+      {/* ── main chat ── */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
 
-        {/* chat header */}
+        {/* presence header */}
         <div style={{
-          padding: '14px 20px',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          padding: '10px 18px',
+          borderBottom: '1px solid rgba(255,255,255,0.05)',
           display: 'flex', alignItems: 'center', gap: 10,
-          background: '#0c0c14',
-          flexShrink: 0,
+          background: '#0a0a12', flexShrink: 0,
         }}>
-          <div style={{ position: 'relative' }}>
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(139,92,246,0.3)', borderRadius: 8, filter: 'blur(4px)' }} />
-            <div style={{ position: 'relative', padding: 7, background: 'linear-gradient(135deg,#374151,rgba(124,58,237,0.2),#1f2937)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }}>
-              <Brain size={14} style={{ color: '#c4b5fd' }} />
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <div style={{ position: 'absolute', inset: -5, borderRadius: 11, background: aC.color, opacity: 0.14, filter: 'blur(9px)' }} />
+            <div style={{
+              position: 'relative', width: 32, height: 32, borderRadius: 8,
+              background: 'linear-gradient(135deg,rgba(18,12,36,0.95),rgba(48,18,88,0.6))',
+              border: `1px solid ${aC.color}38`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Brain size={15} style={{ color: aC.color }} />
             </div>
           </div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>Cecelia</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>AI 管家</div>
+
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9', letterSpacing: '-0.01em' }}>Cecelia</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
+              <div style={{
+                width: 5, height: 5, borderRadius: '50%', background: aC.color,
+                ...(aC.pulse ? { animation: 'pulse 2s ease-in-out infinite' } : {}),
+              }} />
+              <span style={{ fontSize: 10, color: aC.color, fontWeight: 500, letterSpacing: '0.05em' }}>{aC.label}</span>
+              {desires.length > 0 && (
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.26)' }}>· {desires.length} 件心事</span>
+              )}
+            </div>
           </div>
+
           {realtime.isConnected && (
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', animation: 'pulse 1s infinite' }} />
-              {realtime.isRecording && <Mic size={12} style={{ color: '#10b981' }} />}
-              {realtime.isPlaying && <Volume2 size={12} style={{ color: '#10b981' }} />}
-              <span style={{ fontSize: 10, color: '#10b981' }}>语音连接中</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', animation: 'pulse 1s infinite' }} />
+              {realtime.isRecording && <Mic size={11} style={{ color: '#10b981' }} />}
+              {realtime.isPlaying && <Volume2 size={11} style={{ color: '#10b981' }} />}
+              <span style={{ fontSize: 10, color: '#10b981' }}>语音</span>
             </div>
           )}
         </div>
 
         {/* messages */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 8px' }}>
-          {messages.length === 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12 }}>
-              <div style={{ position: 'relative' }}>
-                <div style={{ position: 'absolute', inset: -8, background: 'rgba(139,92,246,0.15)', borderRadius: '50%', filter: 'blur(12px)' }} />
-                <Brain size={32} style={{ position: 'relative', color: 'rgba(167,139,250,0.5)' }} />
-              </div>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', margin: 0 }}>和 Cecelia 说点什么吧</p>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                {['今天状态怎么样', '有什么担忧', '任务队列如何'].map(q => (
-                  <button
-                    key={q}
-                    onClick={() => { setInput(q); inputRef.current?.focus(); }}
-                    style={{
-                      padding: '5px 12px', borderRadius: 20, border: '1px solid rgba(139,92,246,0.3)',
-                      background: 'rgba(139,92,246,0.08)', color: 'rgba(167,139,250,0.8)',
-                      fontSize: 11, cursor: 'pointer',
-                    }}
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
+        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px 8px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {messages.map(msg => (
-              <div key={msg.id} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                {msg.role === 'assistant' && (
-                  <div style={{ width: 24, height: 24, borderRadius: 6, background: 'linear-gradient(135deg,#374151,rgba(124,58,237,0.3))', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: 8, marginTop: 2 }}>
-                    <Brain size={11} style={{ color: '#c4b5fd' }} />
-                  </div>
-                )}
-                <div style={{
-                  maxWidth: '72%', borderRadius: 12, fontSize: 13, lineHeight: 1.6,
-                  padding: '8px 12px', wordBreak: 'break-word',
-                  ...(msg.role === 'user'
-                    ? { background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: '#fff', boxShadow: '0 4px 12px rgba(124,58,237,0.25)' }
-                    : { background: 'rgba(30,30,46,0.8)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.06)' }
-                  ),
-                }}>
-                  {msg.toolCall && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, opacity: 0.6, marginBottom: 4 }}>
-                      <Navigation size={10} />
-                      <span>{msg.toolCall.name}</span>
+            {messages.map(msg => {
+              const depth = msgDepth.get(msg.id) ?? -1;
+              const isDeep = depth >= 2;
+              return (
+                <div key={msg.id} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-start' }}>
+
+                  {msg.role === 'assistant' && (
+                    <div style={{
+                      width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+                      marginRight: 8, marginTop: 2,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: isDeep
+                        ? 'linear-gradient(135deg,rgba(44,12,90,0.85),rgba(90,36,180,0.35))'
+                        : 'rgba(24,16,44,0.75)',
+                      border: `1px solid ${isDeep ? 'rgba(167,139,250,0.22)' : 'rgba(255,255,255,0.05)'}`,
+                    }}>
+                      <Brain size={11} style={{ color: isDeep ? '#c4b5fd' : 'rgba(196,181,253,0.42)' }} />
                     </div>
                   )}
-                  {msg.content}
+
+                  <div style={{
+                    maxWidth: '75%',
+                    borderRadius: msg.role === 'user' ? '13px 13px 4px 13px' : '13px 13px 13px 4px',
+                    fontSize: 13.5, lineHeight: 1.65,
+                    padding: '9px 13px', wordBreak: 'break-word',
+                    ...(msg.role === 'user'
+                      ? {
+                          background: 'linear-gradient(135deg,#7c3aed,#6d28d9)',
+                          color: '#fff',
+                          boxShadow: '0 4px 14px rgba(124,58,237,0.16)',
+                        }
+                      : isDeep
+                        ? {
+                            background: 'rgba(16,10,30,0.96)',
+                            color: '#e0d8f0',
+                            border: '1px solid rgba(139,92,246,0.16)',
+                            boxShadow: '0 0 28px rgba(139,92,246,0.07)',
+                          }
+                        : {
+                            background: 'rgba(14,12,26,0.82)',
+                            color: '#c4ccdc',
+                            border: '1px solid rgba(255,255,255,0.04)',
+                          }
+                    ),
+                  }}>
+                    {msg.toolCall && (
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.32)', marginBottom: 5 }}>
+                        → {msg.toolCall.name}
+                      </div>
+                    )}
+                    <span style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</span>
+                    {msg.role === 'assistant' && depth >= 0 && (
+                      <div style={{ marginTop: 5, fontSize: 9, letterSpacing: '0.06em', color: isDeep ? 'rgba(167,139,250,0.42)' : 'rgba(255,255,255,0.16)' }}>
+                        {depth === 0 ? '· 感知' : depth === 1 ? '· 思考' : '· 深思'}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
+
+            {/* thinking indicator */}
             {sending && (
-              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                <div style={{ width: 24, height: 24, borderRadius: 6, background: 'linear-gradient(135deg,#374151,rgba(124,58,237,0.3))', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
-                  <Brain size={11} style={{ color: '#c4b5fd' }} />
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{
+                  width: 24, height: 24, borderRadius: 6, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(24,16,44,0.75)',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                }}>
+                  <Brain size={11} style={{ color: 'rgba(196,181,253,0.42)' }} />
                 </div>
-                <div style={{ padding: '8px 14px', background: 'rgba(30,30,46,0.8)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <RefreshCw size={13} style={{ color: '#a78bfa', animation: 'spin 1s linear infinite' }} />
+                <div style={{
+                  padding: '9px 13px',
+                  background: 'rgba(14,12,26,0.82)',
+                  borderRadius: '13px 13px 13px 4px',
+                  border: '1px solid rgba(255,255,255,0.04)',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}>
+                  <div style={{ display: 'flex', gap: 3.5 }}>
+                    {[0, 1, 2].map(i => (
+                      <div key={i} style={{
+                        width: 4.5, height: 4.5, borderRadius: '50%',
+                        background: i === thinkingPhase ? '#a78bfa' : 'rgba(167,139,250,0.18)',
+                        transition: 'background 0.4s ease',
+                      }} />
+                    ))}
+                  </div>
+                  <span style={{ fontSize: 10, color: 'rgba(167,139,250,0.5)', letterSpacing: '0.05em' }}>
+                    {THINKING_PHASES[thinkingPhase]}
+                  </span>
                 </div>
               </div>
             )}
+
             <div ref={messagesEndRef} />
           </div>
         </div>
 
         {/* input bar */}
-        <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', background: '#0c0c14', flexShrink: 0 }}>
-          {realtime.error && <p style={{ fontSize: 11, color: '#f87171', marginBottom: 6 }}>{realtime.error}</p>}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ padding: '11px 15px', borderTop: '1px solid rgba(255,255,255,0.05)', background: '#0a0a12', flexShrink: 0 }}>
+          {realtime.error && (
+            <p style={{ fontSize: 11, color: '#f87171', margin: '0 0 6px' }}>{realtime.error}</p>
+          )}
+          <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
             <button
               onClick={realtime.isConnected ? realtime.disconnect : realtime.connect}
               style={{
-                padding: '8px 10px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                background: realtime.isConnected ? 'rgba(239,68,68,0.8)' : 'rgba(16,185,129,0.7)',
-                color: '#fff', flexShrink: 0,
+                padding: '7px 9px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: realtime.isConnected ? 'rgba(239,68,68,0.65)' : 'rgba(255,255,255,0.04)',
+                color: realtime.isConnected ? '#fff' : 'rgba(255,255,255,0.28)',
+                flexShrink: 0, transition: 'all 0.2s',
               }}
             >
-              {realtime.isConnected ? <PhoneOff size={14} /> : <Phone size={14} />}
+              {realtime.isConnected ? <PhoneOff size={12} /> : <Phone size={12} />}
             </button>
+
             <input
               ref={inputRef}
               value={input}
               onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-              placeholder="和 Cecelia 说话..."
-              disabled={realtime.isConnected}
+              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
+              placeholder={desires.length > 0 ? `她有 ${desires.length} 件事在心里...` : '和 Cecelia 说话...'}
+              disabled={realtime.isConnected || sending}
               style={{
-                flex: 1, padding: '9px 14px', borderRadius: 10,
-                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                flex: 1, padding: '9px 13px', borderRadius: 8,
+                background: 'rgba(255,255,255,0.025)',
+                border: '1px solid rgba(255,255,255,0.06)',
                 color: '#e2e8f0', fontSize: 13, outline: 'none',
-                opacity: realtime.isConnected ? 0.4 : 1,
+                opacity: (realtime.isConnected || sending) ? 0.4 : 1,
               }}
             />
+
             <button
-              onClick={() => sendMessage()}
+              onClick={() => handleSend()}
               disabled={!input.trim() || sending || realtime.isConnected}
               style={{
-                padding: '8px 10px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                background: input.trim() && !sending && !realtime.isConnected ? '#7c3aed' : 'rgba(255,255,255,0.06)',
-                color: input.trim() && !sending && !realtime.isConnected ? '#fff' : 'rgba(255,255,255,0.25)',
-                flexShrink: 0, transition: 'all 0.15s',
+                padding: '7px 9px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: input.trim() && !sending && !realtime.isConnected
+                  ? 'rgba(110,40,220,0.8)'
+                  : 'rgba(255,255,255,0.04)',
+                color: input.trim() && !sending && !realtime.isConnected
+                  ? '#fff'
+                  : 'rgba(255,255,255,0.2)',
+                flexShrink: 0, transition: 'all 0.2s',
               }}
             >
-              <Send size={14} />
+              <Send size={12} />
             </button>
           </div>
         </div>
+
       </div>
     </div>
   );
