@@ -218,6 +218,7 @@ const EXTRA_MODELS: ModelInfo[] = [
 export default function CeceliaConfigPage() {
   const [profile, setProfile] = useState<ActiveProfile | null>(null);
   const [models, setModels] = useState<ModelInfo[]>([]);
+  const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [profileName, setProfileName] = useState('');
 
@@ -235,9 +236,9 @@ export default function CeceliaConfigPage() {
       }
       if (modelsData.success) {
         const base: ModelInfo[] = modelsData.models || [];
-        // merge extra models (avoid duplicates)
         const ids = new Set(base.map((m: ModelInfo) => m.id));
         setModels([...base, ...EXTRA_MODELS.filter(m => !ids.has(m.id))]);
+        setAgents(modelsData.agents || []);
       }
     } catch { /* silent */ } finally {
       setLoading(false);
@@ -268,35 +269,41 @@ export default function CeceliaConfigPage() {
     );
   }
 
-  // 4 layers of Cecelia's brain
+  // 从 API agents 获取 allowed_models，保证和后端一致
+  // fallback 仅在 core 未部署新版本时使用
+  function agentModels(id: string, fallback: string[]): string[] {
+    return agents.find(a => a.id === id)?.allowed_models || fallback;
+  }
+
+  const cfg = profile?.config as any;
   const layers: LayerDef[] = profile ? [
     {
       id: 'thalamus',
       name: 'L1 丘脑',
       description: '事件路由 · 快速判断',
-      allowed_models: ['MiniMax-M2.5-highspeed', 'MiniMax-M2.5', 'claude-haiku-4-5-20251001', 'claude-sonnet-4-20250514'],
-      currentModel: profile.config.thalamus.model,
+      allowed_models: agentModels('thalamus', ['MiniMax-M2.5-highspeed', 'claude-haiku-4-5-20251001', 'claude-sonnet-4-20250514']),
+      currentModel: cfg.thalamus.model,
     },
     {
       id: 'cortex',
       name: 'L2 皮层',
       description: '深度分析 · RCA · 战略调整',
-      allowed_models: ['claude-opus-4-20250514', 'claude-sonnet-4-20250514', 'MiniMax-M2.5-highspeed', 'MiniMax-M2.5'],
-      currentModel: profile.config.cortex.model,
+      allowed_models: agentModels('cortex', ['claude-opus-4-20250514', 'claude-sonnet-4-20250514']),
+      currentModel: cfg.cortex.model,
     },
     {
       id: 'reflection',
       name: 'L3 反思层',
       description: '定期深度反思 · 生成洞察',
-      allowed_models: ['claude-opus-4-20250514', 'claude-sonnet-4-20250514'],
-      currentModel: (profile.config as any).reflection?.model || REFLECTION_MODEL_FALLBACK,
+      allowed_models: agentModels('reflection', ['claude-opus-4-20250514', 'claude-sonnet-4-20250514']),
+      currentModel: cfg.reflection?.model || REFLECTION_MODEL_FALLBACK,
     },
     {
       id: 'mouth',
       name: '嘴巴',
       description: '对话生成 · 对外接口',
-      allowed_models: ['claude-sonnet-4-6-20251001', 'claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001', 'MiniMax-M2.5-highspeed'],
-      currentModel: (profile.config as any).mouth?.model || MOUTH_MODEL_FALLBACK,
+      allowed_models: agentModels('mouth', ['claude-sonnet-4-6-20251001', 'claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001']),
+      currentModel: cfg.mouth?.model || MOUTH_MODEL_FALLBACK,
     },
   ] : [];
 
