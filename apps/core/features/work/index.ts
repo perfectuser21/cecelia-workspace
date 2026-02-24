@@ -23,12 +23,14 @@ const manifest: FeatureManifest = {
           { path: '/work/okr', label: 'OKR', icon: 'Target', order: 2 },
           { path: '/work/tasks', label: 'Tasks', icon: 'ListTodo', order: 3 },
           { path: '/work/roadmap', label: 'Roadmap', icon: 'Map', order: 4 },
+          { path: '/work/streams', label: 'Streams', icon: 'Zap', order: 5 },
         ],
       },
     },
     { path: '/work/okr', component: 'WorkTabbed' },
     { path: '/work/tasks', component: 'WorkTabbed' },
     { path: '/work/roadmap', component: 'WorkTabbed' },
+    { path: '/work/streams', component: 'WorkTabbed' },
     // Drill-down routes
     { path: '/work/projects/:projectId', component: 'ProjectDetail' },
     { path: '/work/project-panorama', component: 'ProjectPanorama' },
@@ -55,6 +57,7 @@ const manifest: FeatureManifest = {
 
   components: {
     WorkTabbed: () => import('./pages/WorkTabbed'),
+    WorkStreams: () => import('./pages/WorkStreams'),
     ProjectDetail: () => import('../planning/pages/ProjectDetail'),
     ProjectPanorama: () => import('../planning/pages/ProjectPanorama'),
     Whiteboard: () => import('../planning/pages/Whiteboard'),
