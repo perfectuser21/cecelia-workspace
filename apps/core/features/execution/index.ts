@@ -16,8 +16,7 @@ const manifest: FeatureManifest = {
     { path: '/brain-status', component: 'BrainStatusDashboard' },
     // Observability Dashboard
     { path: '/observability', component: 'ObservabilityDashboard' },
-    // Cecelia
-    { path: '/cecelia', component: 'CeceliaOverview' },
+    // Cecelia sub-routes (top-level /cecelia handled by cecelia feature)
     { path: '/cecelia/agents/:agentId', component: 'AgentDetail' },
     { path: '/cecelia/runs', component: 'CeceliaRuns' },
     { path: '/cecelia/runs/:runId', component: 'RunDetail' },
