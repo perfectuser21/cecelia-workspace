@@ -202,16 +202,30 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
     }
   };
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const name = file.name.toLowerCase();
+    const isTextFile = name.endsWith('.txt') || name.endsWith('.csv');
+
+    if (!isTextFile) {
+      setText(`[${file.name}] 无法直接读取此文件格式，请手动粘贴内容`);
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => {
       const raw = reader.result as string;
-      setText(raw.length > 5 ? raw : `[${file.name}] 请手动粘贴文件内容`);
+      setText(raw.length > 0 ? raw : `[${file.name}] 文件内容为空`);
+      if (fileRef.current) fileRef.current.value = '';
+    };
+    reader.onerror = () => {
+      setError(`读取文件失败：${file.name}`);
+      if (fileRef.current) fileRef.current.value = '';
     };
     reader.readAsText(file, 'utf-8');
-    if (fileRef.current) fileRef.current.value = '';
   };
 
   return (
@@ -234,7 +248,7 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
           上传文件
         </button>
         <input ref={fileRef} type="file" accept=".txt,.pdf,.xlsx,.xls,.docx,.doc,.csv" onChange={handleFile} className="hidden" />
-        <span className="text-xs text-slate-500">支持 txt / PDF / Excel / Word</span>
+        <span className="text-xs text-slate-500">支持 txt / CSV（PDF/Excel/Word 请手动粘贴）</span>
         <button
           onClick={() => doImport(text)}
           disabled={importing || !text.trim()}
