@@ -3,11 +3,13 @@ import { Bot, Users, Puzzle, AlertCircle, Loader2, Brain, Building2, X, ChevronR
 import {
   fetchStaff,
   fetchSkillsRegistry,
+  fetchModels,
   updateWorker,
   type Team,
   type AreaConfig,
   type SkillItem,
   type Worker,
+  type ModelEntry,
 } from '../api/staffApi';
 
 const PROVIDERS = ['anthropic', 'minimax', 'openai'] as const;
@@ -65,16 +67,19 @@ function WorkerCard({ worker, onClick }: { worker: Worker; onClick: () => void }
 interface WorkerPanelProps {
   worker: Worker;
   skills: SkillItem[];
+  models: ModelEntry[];
   onClose: () => void;
   onSaved: () => void;
 }
 
-function WorkerPanel({ worker, skills, onClose, onSaved }: WorkerPanelProps) {
+function WorkerPanel({ worker, skills, models, onClose, onSaved }: WorkerPanelProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [skill, setSkill] = useState(worker.skill || '');
   const [provider, setProvider] = useState(worker.model.provider || 'anthropic');
   const [modelName, setModelName] = useState(worker.model.name || '');
+
+  const modelsForProvider = models.filter(m => m.provider === provider);
 
   const save = async () => {
     setSaving(true);
@@ -138,21 +143,26 @@ function WorkerPanel({ worker, skills, onClose, onSaved }: WorkerPanelProps) {
           {/* Model */}
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">模型</div>
-            <div className="flex gap-2">
+            <div className="space-y-2">
               <select
                 value={provider}
-                onChange={e => setProvider(e.target.value)}
-                className="w-32 shrink-0 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onChange={e => { setProvider(e.target.value); setModelName(''); }}
+                className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {PROVIDERS.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
-              <input
-                type="text"
+              <select
                 value={modelName}
                 onChange={e => setModelName(e.target.value)}
-                placeholder="claude-sonnet-4-6-20251001"
-                className="flex-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono min-w-0"
-              />
+                className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">— 不绑定模型 —</option>
+                {modelsForProvider.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.name ? `${m.name}  (${m.id})` : m.id}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -224,18 +234,20 @@ export default function TeamPage() {
   const [areas, setAreas]               = useState<Record<string, AreaConfig>>({});
   const [totalWorkers, setTotalWorkers] = useState(0);
   const [skills, setSkills]             = useState<SkillItem[]>([]);
+  const [models, setModels]             = useState<ModelEntry[]>([]);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState<string | null>(null);
   const [selected, setSelected]         = useState<Worker | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
-    Promise.all([fetchStaff(), fetchSkillsRegistry()])
-      .then(([staff, registry]) => {
+    Promise.all([fetchStaff(), fetchSkillsRegistry(), fetchModels()])
+      .then(([staff, registry, modelList]) => {
         setTeams(staff.teams);
         setAreas(staff.areas || {});
         setTotalWorkers(staff.total_workers);
         setSkills(registry.skills);
+        setModels(modelList);
       })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
@@ -354,6 +366,7 @@ export default function TeamPage() {
         <WorkerPanel
           worker={selected}
           skills={skills}
+          models={models}
           onClose={() => setSelected(null)}
           onSaved={handleSaved}
         />

@@ -73,6 +73,20 @@ export async function fetchSkillsRegistry(): Promise<SkillsRegistryResponse> {
   return res.json();
 }
 
+export interface ModelEntry {
+  id: string;
+  name?: string;
+  provider: string;
+  tier?: string;
+}
+
+export async function fetchModels(): Promise<ModelEntry[]> {
+  const res = await fetch(`${BRAIN_URL}/model-profiles/models`);
+  if (!res.ok) throw new Error(`Models API error: ${res.status}`);
+  const data = await res.json();
+  return (data.models || []) as ModelEntry[];
+}
+
 export interface WorkerUpdatePayload {
   skill?: string | null;
   model?: { provider: string; name: string } | null;
