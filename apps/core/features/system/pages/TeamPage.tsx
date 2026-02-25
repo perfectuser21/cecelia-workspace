@@ -13,7 +13,11 @@ import {
 } from '../api/staffApi';
 
 const PROVIDERS = ['anthropic', 'minimax', 'openai'] as const;
-const MINIMAX_ACCOUNTS = ['minimax', 'minimax2'] as const;
+const PROVIDER_ACCOUNTS: Record<string, string[]> = {
+  anthropic: ['anthropic', 'anthropic2'],
+  minimax: ['minimax', 'minimax2'],
+  openai: ['openai', 'openai2'],
+};
 
 // ── Model badge ───────────────────────────────────────────────
 
@@ -79,7 +83,8 @@ function WorkerPanel({ worker, skills, models, onClose, onSaved }: WorkerPanelPr
   const [skill, setSkill] = useState(worker.skill || '');
   const [provider, setProvider] = useState(worker.model.provider || 'anthropic');
   const [modelName, setModelName] = useState(worker.model.name || '');
-  const [credentialsFile, setCredentialsFile] = useState(worker.model.credentials_file || 'minimax');
+  const defaultCredentials = worker.model.credentials_file || worker.model.provider || 'anthropic';
+  const [credentialsFile, setCredentialsFile] = useState(defaultCredentials);
 
   const modelsForProvider = models.filter(m => m.provider === provider);
 
@@ -90,7 +95,7 @@ function WorkerPanel({ worker, skills, models, onClose, onSaved }: WorkerPanelPr
       await updateWorker(worker.id, {
         skill: skill || null,
         model: modelName ? { provider, name: modelName } : null,
-        credentials_file: provider === 'minimax' ? credentialsFile : null,
+        credentials_file: credentialsFile || null,
       });
       onSaved();
     } catch (e: any) {
@@ -149,7 +154,7 @@ function WorkerPanel({ worker, skills, models, onClose, onSaved }: WorkerPanelPr
             <div className="space-y-2">
               <select
                 value={provider}
-                onChange={e => { setProvider(e.target.value); setModelName(''); }}
+                onChange={e => { setProvider(e.target.value); setCredentialsFile(e.target.value); setModelName(''); }}
                 className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {PROVIDERS.map(p => <option key={p} value={p}>{p}</option>)}
@@ -169,23 +174,19 @@ function WorkerPanel({ worker, skills, models, onClose, onSaved }: WorkerPanelPr
             </div>
           </div>
 
-          {/* MiniMax 账户选择 */}
-          {provider === 'minimax' && (
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5 block">账户</label>
-              <select
-                value={credentialsFile}
-                onChange={e => setCredentialsFile(e.target.value)}
-                className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {MINIMAX_ACCOUNTS.map(a => (
-                  <option key={a} value={a}>
-                    {a === 'minimax' ? '账户 1 (minimax)' : '账户 2 (minimax2)'}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          {/* 账户选择（所有 provider 适用） */}
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5 block">账户</label>
+            <select
+              value={credentialsFile}
+              onChange={e => setCredentialsFile(e.target.value)}
+              className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {(PROVIDER_ACCOUNTS[provider] || [provider]).map(a => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+          </div>
 
           {/* Abilities */}
           {worker.abilities && worker.abilities.length > 0 && (
