@@ -105,3 +105,21 @@ export async function updateWorker(workerId: string, payload: WorkerUpdatePayloa
     throw new Error((err as any).error || `Update worker failed: ${res.status}`);
   }
 }
+
+export interface CredentialEntry {
+  name: string;
+  type: 'anthropic_oauth' | 'api_key';
+  path: string;
+  provider: string;
+}
+
+export async function fetchCredentials(): Promise<CredentialEntry[]> {
+  try {
+    const res = await fetch(`${BRAIN_URL}/credentials`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.credentials || []) as CredentialEntry[];
+  } catch {
+    return [];
+  }
+}
