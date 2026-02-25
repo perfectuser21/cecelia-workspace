@@ -39,12 +39,18 @@ const VIEW_TABS: { id: ViewMode; icon: React.ReactNode; label: string }[] = [
   { id: 'list', icon: <List className="w-3.5 h-3.5" />, label: 'List' },
 ];
 
-const PROP_TYPES: Array<{ value: ColumnDef['type']; label: string }> = [
-  { value: 'text', label: '文本' },
-  { value: 'number', label: '数字' },
-  { value: 'date', label: '日期' },
-  { value: 'select', label: '单选' },
-  { value: 'badge', label: '标签' },
+const PROP_TYPES: Array<{ value: ColumnDef['type']; label: string; icon: string }> = [
+  { value: 'text',         label: '文本',   icon: 'Aa' },
+  { value: 'number',       label: '数字',   icon: '#' },
+  { value: 'date',         label: '日期',   icon: '📅' },
+  { value: 'select',       label: '单选',   icon: '◉' },
+  { value: 'badge',        label: '标签',   icon: '🏷' },
+  { value: 'multi_select', label: '多选',   icon: '☰' },
+  { value: 'checkbox',     label: '勾选',   icon: '✓' },
+  { value: 'url',          label: '链接',   icon: '🔗' },
+  { value: 'email',        label: '邮件',   icon: '✉' },
+  { value: 'phone',        label: '电话',   icon: '📱' },
+  { value: 'progress',     label: '进度条', icon: '▬' },
 ];
 
 function AddPropertyModal({ onAdd, onClose }: {
@@ -89,7 +95,7 @@ function AddPropertyModal({ onAdd, onClose }: {
             className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-indigo-500"
           >
             {PROP_TYPES.map(t => (
-              <option key={t.value} value={t.value}>{t.label}</option>
+              <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
             ))}
           </select>
         </div>
@@ -194,8 +200,8 @@ export function ToolBar({
         </div>
       )}
 
-      {/* Group by (board only) */}
-      {view === 'board' && boardGroupOptions && boardGroupOptions.length > 0 && onBoardGroupChange && (
+      {/* Group by (all views) */}
+      {boardGroupOptions && boardGroupOptions.length > 0 && onBoardGroupChange && (
         <div className="flex items-center gap-1.5 text-xs">
           <Layers className="w-3.5 h-3.5 text-slate-400" />
           <span className="text-slate-400">分组:</span>

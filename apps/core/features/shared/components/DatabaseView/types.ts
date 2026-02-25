@@ -5,7 +5,7 @@ export type ViewMode = 'table' | 'board' | 'gallery' | 'list';
 export interface ColumnDef {
   id: string;
   label: string;
-  type: 'text' | 'select' | 'number' | 'progress' | 'relation' | 'date' | 'badge' | 'link';
+  type: 'text' | 'select' | 'number' | 'progress' | 'relation' | 'date' | 'badge' | 'link' | 'multi_select' | 'checkbox' | 'url' | 'email' | 'phone';
   options?: Array<{ value: string; label: string; color?: string }>;
   width?: number;
   hidden?: boolean;
@@ -35,7 +35,7 @@ export interface DatabaseViewStats {
 export interface CustomColumnDef {
   col_id: string;
   col_label: string;
-  col_type: 'text' | 'number' | 'date' | 'select' | 'badge';
+  col_type: 'text' | 'number' | 'date' | 'select' | 'badge' | 'multi_select' | 'checkbox' | 'url' | 'email' | 'phone' | 'progress';
   options: Array<{ value: string; label: string; color?: string }>;
   col_width: number;
   col_order: number;

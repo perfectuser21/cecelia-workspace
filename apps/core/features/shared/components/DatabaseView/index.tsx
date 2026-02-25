@@ -272,6 +272,7 @@ export function DatabaseView<T extends { id: string }>({
             onDelete={onDelete}
             onReorderCols={handleReorderCols}
             selectedRowId={detailRowId}
+            groupByField={activeBoardGroupField || undefined}
           />
         )}
         {view === 'board' && (
@@ -279,11 +280,14 @@ export function DatabaseView<T extends { id: string }>({
         )}
         {view === 'gallery' && (
           <GalleryView data={processedData} columns={allColumns} renderGalleryCard={renderGalleryCard} onUpdate={onUpdate} onDelete={onDelete}
-            onCreate={onCreate ? () => onCreate({} as Partial<T>) : undefined} />
+            onCreate={onCreate ? () => onCreate({} as Partial<T>) : undefined}
+            groupByField={activeBoardGroupField || undefined} />
         )}
         {view === 'list' && (
           <ListView data={processedData} columns={allColumns} renderListItem={renderListItem}
-            onCreate={onCreate ? () => onCreate({} as Partial<T>) : undefined} />
+            onCreate={onCreate ? () => onCreate({} as Partial<T>) : undefined}
+            onUpdate={onUpdate}
+            groupByField={activeBoardGroupField || undefined} />
         )}
       </div>
       {detailRow && (
