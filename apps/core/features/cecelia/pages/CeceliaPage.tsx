@@ -494,7 +494,7 @@ export default function CeceliaPage() {
   const aC = ALERTNESS_CONF[alertnessLevel as keyof typeof ALERTNESS_CONF] ?? ALERTNESS_CONF[1];
 
   return (
-    <div style={{ display: 'flex', height: '100%', background: '#09090f' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - 64px)', background: '#09090f' }}>
 
       {/* ── 左侧状态面板 ── */}
       <StatusPanel
