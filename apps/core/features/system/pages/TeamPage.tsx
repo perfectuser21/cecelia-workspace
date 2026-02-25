@@ -4,16 +4,17 @@ import {
   fetchStaff,
   fetchSkillsRegistry,
   fetchModels,
+  fetchCredentials,
   updateWorker,
   type Team,
   type AreaConfig,
   type SkillItem,
   type Worker,
   type ModelEntry,
+  type CredentialEntry,
 } from '../api/staffApi';
 
-const PROVIDERS = ['anthropic', 'minimax', 'openai'] as const;
-const MINIMAX_ACCOUNTS = ['minimax', 'minimax2'] as const;
+
 
 // ── Model badge ───────────────────────────────────────────────
 
@@ -73,24 +74,56 @@ interface WorkerPanelProps {
   onSaved: () => void;
 }
 
+// Skills 分组
+const SKILL_GROUPS: Record<string, string[]> = {
+  '开发': ['dev', 'review', 'code-review', 'plan', 'frontend-design', 'chrome', 'dashboard-debug', 'feature-map', 'canvas-project', 'repo-visualizer', 'headless-deploy'],
+  '管理': ['okr', 'autumnrice', 'cecelia', 'cecelia-brain', 'credentials', 'versioning', 'nobel', 'repo-lead'],
+  '内容': ['content-analyzer', 'content-creator', 'content-rewriter', 'batch-notion-analyzer', 'two-layer-parallel-analyzer', 'claude-work-summarizer', 'notebooklm', 'quote-card-generator', 'luxury-card-generator', 'batch-luxury-card-generator', 'image-gen-workflow'],
+  '发布': ['douyin-publisher', 'toutiao-publisher'],
+  '数据': ['platform-scraper', 'social-media-analysis', 'media-scraping'],
+};
+
+function groupSkills(skills: SkillItem[]) {
+  const grouped: Record<string, SkillItem[]> = {};
+  const used = new Set<string>();
+  for (const [group, ids] of Object.entries(SKILL_GROUPS)) {
+    const items = skills.filter(s => ids.includes(s.id));
+    if (items.length > 0) {
+      grouped[group] = items;
+      items.forEach(s => used.add(s.id));
+    }
+  }
+  const rest = skills.filter(s => !used.has(s.id));
+  if (rest.length > 0) grouped['其他'] = rest;
+  return grouped;
+}
+
 function WorkerPanel({ worker, skills, models, onClose, onSaved }: WorkerPanelProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [skill, setSkill] = useState(worker.skill || '');
-  const [provider, setProvider] = useState(worker.model.provider || 'anthropic');
   const [modelName, setModelName] = useState(worker.model.name || '');
-  const [credentialsFile, setCredentialsFile] = useState(worker.model.credentials_file || 'minimax');
+  const defaultCred = worker.model.credentials_file || worker.model.provider || 'anthropic';
+  const [credAccount, setCredAccount] = useState(defaultCred);
+  const [credentials, setCredentials] = useState<CredentialEntry[]>([]);
 
-  const modelsForProvider = models.filter(m => m.provider === provider);
+  useEffect(() => {
+    fetchCredentials().then(setCredentials);
+  }, []);
+
+  const providerFromAccount = credentials.find(c => c.name === credAccount)?.provider || 'anthropic';
+  const modelsForProvider = models.filter(m => m.provider === providerFromAccount);
+  const skillGroups = groupSkills(skills);
 
   const save = async () => {
     setSaving(true);
     setError(null);
     try {
+      const provider = providerFromAccount;
       await updateWorker(worker.id, {
         skill: skill || null,
         model: modelName ? { provider, name: modelName } : null,
-        credentials_file: provider === 'minimax' ? credentialsFile : null,
+        credentials_file: credAccount || null,
       });
       onSaved();
     } catch (e: any) {
@@ -102,102 +135,102 @@ function WorkerPanel({ worker, skills, models, onClose, onSaved }: WorkerPanelPr
   return (
     <>
       <div className="fixed inset-0 bg-black/20 dark:bg-black/40 z-40" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-gray-900 shadow-2xl z-50 flex flex-col">
+      <div className="fixed right-0 top-0 h-screen w-full max-w-sm bg-white dark:bg-gray-900 shadow-2xl z-50 flex flex-col overflow-hidden">
 
         {/* Header */}
-        <div className="shrink-0 flex items-start justify-between p-5 border-b border-gray-100 dark:border-gray-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0">
-              <Bot size={20} className="text-white" />
+        <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0">
+              <Bot size={16} className="text-white" />
             </div>
-            <div>
-              <div className="font-bold text-lg text-gray-900 dark:text-gray-100">{worker.name}</div>
-              <div className="text-sm text-gray-500">{worker.role}</div>
+            <div className="min-w-0">
+              <div className="font-bold text-sm text-gray-900 dark:text-gray-100 truncate">{worker.name}</div>
+              <div className="text-xs text-gray-500">{worker.role}</div>
             </div>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 shrink-0">
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         {/* Content — scrollable */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5 min-h-0">
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0">
 
+          <p className="text-xs text-gray-500 dark:text-gray-400">{worker.description}</p>
+
+          {/* 账户选择 */}
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">描述</div>
-            <p className="text-sm text-gray-700 dark:text-gray-300">{worker.description}</p>
+            <label className="text-xs font-medium text-gray-500 mb-1 block">账户</label>
+            <select
+              value={credAccount}
+              onChange={e => { setCredAccount(e.target.value); setModelName(''); }}
+              className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-1.5 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {credentials.length === 0 && (
+                <option value={credAccount}>{credAccount}</option>
+              )}
+              {credentials.map(cred => (
+                <option key={cred.name} value={cred.name}>
+                  {cred.name}  ({cred.path})
+                </option>
+              ))}
+            </select>
+            {credentials.length > 0 && (
+              <div className="mt-0.5 text-[11px] text-gray-400">
+                Provider: <span className="font-mono">{providerFromAccount}</span>
+              </div>
+            )}
           </div>
 
-          {/* Skill */}
+          {/* 模型选择 */}
           <div>
-            <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5 block">Skill</label>
+            <label className="text-xs font-medium text-gray-500 mb-1 block">模型</label>
             <select
-              value={skill}
-              onChange={e => setSkill(e.target.value)}
-              className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={modelName}
+              onChange={e => setModelName(e.target.value)}
+              className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-1.5 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">— 不绑定 —</option>
-              {skills.map(s => (
-                <option key={s.id} value={`/${s.id}`}>/{s.id}{s.name ? `  (${s.name})` : ''}</option>
+              <option value="">-- 不绑定 --</option>
+              {modelsForProvider.map(m => (
+                <option key={m.id} value={m.id}>
+                  {m.name || m.id}
+                </option>
               ))}
             </select>
           </div>
 
-          {/* Model */}
+          {/* Skill — 分组 */}
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">模型</div>
-            <div className="space-y-2">
-              <select
-                value={provider}
-                onChange={e => { setProvider(e.target.value); setModelName(''); }}
-                className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {PROVIDERS.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-              <select
-                value={modelName}
-                onChange={e => setModelName(e.target.value)}
-                className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">— 不绑定模型 —</option>
-                {modelsForProvider.map(m => (
-                  <option key={m.id} value={m.id}>
-                    {m.name ? `${m.name}  (${m.id})` : m.id}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <label className="text-xs font-medium text-gray-500 mb-1 block">Skill</label>
+            <select
+              value={skill}
+              onChange={e => setSkill(e.target.value)}
+              className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-1.5 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">-- 不绑定 --</option>
+              {Object.entries(skillGroups).map(([group, items]) => (
+                <optgroup key={group} label={group}>
+                  {items.map(s => (
+                    <option key={s.id} value={`/${s.id}`}>
+                      /{s.id}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
           </div>
-
-          {/* MiniMax 账户选择 */}
-          {provider === 'minimax' && (
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5 block">账户</label>
-              <select
-                value={credentialsFile}
-                onChange={e => setCredentialsFile(e.target.value)}
-                className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {MINIMAX_ACCOUNTS.map(a => (
-                  <option key={a} value={a}>
-                    {a === 'minimax' ? '账户 1 (minimax)' : '账户 2 (minimax2)'}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
 
           {/* Abilities */}
           {worker.abilities && worker.abilities.length > 0 && (
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">
+              <div className="text-xs font-medium text-gray-500 mb-1">
                 Abilities ({worker.abilities.length})
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 {worker.abilities.map(ab => (
-                  <div key={ab.id} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
-                    <div className="text-sm font-medium text-gray-800 dark:text-gray-200">{ab.name}</div>
-                    {ab.description && <div className="text-xs text-gray-500 mt-0.5">{ab.description}</div>}
+                  <div key={ab.id} className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+                    <div className="text-xs font-medium text-gray-800 dark:text-gray-200">{ab.name}</div>
+                    {ab.description && <div className="text-[11px] text-gray-500 mt-0.5">{ab.description}</div>}
                   </div>
                 ))}
               </div>
@@ -205,19 +238,19 @@ function WorkerPanel({ worker, skills, models, onClose, onSaved }: WorkerPanelPr
           )}
 
           {error && (
-            <div className="flex items-center gap-2 text-sm text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
-              <AlertCircle size={15} />
+            <div className="flex items-center gap-2 text-xs text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg p-2.5">
+              <AlertCircle size={14} />
               {error}
             </div>
           )}
         </div>
 
-        {/* Footer — 固定底部，始终可见 */}
-        <div className="shrink-0 p-4 border-t border-gray-100 dark:border-gray-800">
+        {/* Footer — 固定底部 */}
+        <div className="shrink-0 px-4 py-3 border-t border-gray-100 dark:border-gray-800">
           <button
             onClick={save}
             disabled={saving}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
             {saving ? '保存中...' : '保存'}
