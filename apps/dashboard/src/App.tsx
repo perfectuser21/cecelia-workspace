@@ -55,7 +55,7 @@ function AppContent() {
 
   // Tab 路由不加 p-8 内边距（TabbedPage 自带布局）
   const isTabbedRoute = (path: string) =>
-    path.startsWith('/system') || path.startsWith('/work') || path.startsWith('/immune');
+    path.startsWith('/system') || path.startsWith('/work') || path.startsWith('/immune') || path.startsWith('/cecelia');
 
   // 设置浏览器标题
   useEffect(() => {

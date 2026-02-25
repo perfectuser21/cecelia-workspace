@@ -77,7 +77,8 @@ router.post('/', async (req, res) => {
     const {
       project_id, title, description, status, priority, target_date, progress, metadata, parent_id, type, weight,
       scope, cycle, business_id, department_id, area_id,
-      expected_start_date, expected_end_date, actual_start_date, actual_end_date
+      expected_start_date, expected_end_date, actual_start_date, actual_end_date,
+      custom_props
     } = req.body;
 
     // Determine type based on parent_id if not explicitly set
@@ -144,7 +145,8 @@ router.patch('/:id', async (req, res) => {
     const {
       title, description, status, priority, target_date, progress, metadata, weight,
       scope, cycle, business_id, department_id, area_id,
-      expected_start_date, expected_end_date, actual_start_date, actual_end_date
+      expected_start_date, expected_end_date, actual_start_date, actual_end_date,
+      custom_props
     } = req.body;
 
     const updates = [];
@@ -218,6 +220,10 @@ router.patch('/:id', async (req, res) => {
     if (actual_end_date !== undefined) {
       updates.push('actual_end_date = $' + paramIndex++);
       params.push(actual_end_date);
+    }
+    if (custom_props !== undefined) {
+      updates.push('custom_props = custom_props || $' + paramIndex++);
+      params.push(JSON.stringify(custom_props));
     }
 
     if (updates.length === 0) {
