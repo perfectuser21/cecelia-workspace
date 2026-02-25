@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Brain, Send, Phone, PhoneOff, Mic, Volume2, Maximize2, Minimize2, Clock, Activity, Zap, CheckCircle, MessageSquare, AlertCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Brain, Send, Phone, PhoneOff, Mic, Volume2, Maximize2, Minimize2, Zap, CheckCircle, MessageSquare, AlertTriangle, ChevronUp, Loader2 } from 'lucide-react';
 import { useCecelia } from '@/contexts/CeceliaContext';
 import { useRealtimeVoice } from '@features/core/shared/hooks/useRealtimeVoice';
 
@@ -11,6 +11,15 @@ interface Desire {
   content: string;
   urgency: number;
   created_at: string;
+  proposed_action?: string;
+  insight?: string;
+}
+
+interface DesireGroup {
+  key: string;
+  desires: Desire[];
+  maxUrgency: number;
+  representative: Desire;
 }
 
 interface Task {
@@ -49,131 +58,160 @@ const ROUTE_ALIASES: Record<string, string> = {
   'work': '/work', '工作': '/work',
 };
 
-// ── 工具：提取 desire 第一段作为摘要 ──────────────────────
+const CHAT_DEFAULT_VISIBLE = 3;
 
-function extractSummary(content: string, maxLen = 120): string {
-  const clean = content
-    .replace(/^#+\s*/gm, '')
-    .replace(/\*\*/g, '')
-    .replace(/\n{2,}/g, '\n')
-    .trim();
-  const firstPara = clean.split('\n').find(l => l.trim().length > 10) || clean;
-  return firstPara.length > maxLen ? firstPara.slice(0, maxLen) + '...' : firstPara;
+// ── Desire 去重分组 ─────────────────────────────────────
+
+function extractKeywords(content: string): string[] {
+  const clean = content.replace(/[#*`\n]/g, ' ').toLowerCase();
+  const stopwords = new Set(['的', '了', '是', '在', '和', '有', '不', '这', '个', '中', '为', '与', 'the', 'a', 'is', 'to', 'and', 'of']);
+  return clean.split(/\s+/).filter(w => w.length > 1 && !stopwords.has(w));
 }
 
-// ── 汇报卡片：Cecelia 主动沟通 ──────────────────────────
+function groupDesires(desires: Desire[]): DesireGroup[] {
+  if (desires.length === 0) return [];
 
-function DesireCard({ desire, onAction }: {
-  desire: Desire;
-  onAction: (action: string, desire: Desire) => void;
+  const groups: DesireGroup[] = [];
+  const assigned = new Set<string>();
+  const sorted = [...desires].sort((a, b) => b.urgency - a.urgency);
+
+  for (const d of sorted) {
+    if (assigned.has(d.id)) continue;
+
+    const kw = extractKeywords(d.content);
+    const group: Desire[] = [d];
+    assigned.add(d.id);
+
+    for (const other of sorted) {
+      if (assigned.has(other.id)) continue;
+      const otherKw = extractKeywords(other.content);
+      const overlap = kw.filter(w => otherKw.includes(w)).length;
+      const similarity = overlap / Math.max(kw.length, otherKw.length, 1);
+      if (similarity > 0.3) {
+        group.push(other);
+        assigned.add(other.id);
+      }
+    }
+
+    groups.push({
+      key: d.id,
+      desires: group,
+      maxUrgency: Math.max(...group.map(g => g.urgency)),
+      representative: d,
+    });
+  }
+
+  return groups;
+}
+
+function partitionDesires(groups: DesireGroup[]): { decisions: DesireGroup[]; updates: DesireGroup[] } {
+  const decisions: DesireGroup[] = [];
+  const updates: DesireGroup[] = [];
+
+  for (const g of groups) {
+    const rep = g.representative;
+    if (['warn', 'question', 'propose'].includes(rep.type) || g.maxUrgency >= 7) {
+      decisions.push(g);
+    } else {
+      updates.push(g);
+    }
+  }
+
+  return { decisions, updates };
+}
+
+// ── 红区卡片：需要决策 ──────────────────────────────────
+
+function DecisionCard({ group, onAcknowledge, onAsk, loading }: {
+  group: DesireGroup;
+  onAcknowledge: (ids: string[]) => void;
+  onAsk: (desire: Desire) => void;
+  loading: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const summary = extractSummary(desire.content);
-  const isLong = desire.content.length > 150;
+  const { representative: d, desires } = group;
+  const summary = d.content.replace(/^#+\s*/gm, '').replace(/\*\*/g, '').trim();
+  const firstLine = summary.split('\n').find(l => l.trim().length > 10) || summary;
+  const display = firstLine.length > 140 ? firstLine.slice(0, 140) + '...' : firstLine;
 
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.02)',
-      border: '1px solid rgba(255,255,255,0.06)',
-      borderLeft: `3px solid ${desire.urgency >= 8 ? '#ef4444' : desire.urgency >= 5 ? '#f59e0b' : 'rgba(167,139,250,0.4)'}`,
-      borderRadius: 12, padding: '16px 20px', transition: 'border-color 0.2s',
+      background: 'rgba(239,68,68,0.04)',
+      border: '1px solid rgba(239,68,68,0.12)',
+      borderLeft: '3px solid #ef4444',
+      borderRadius: 10, padding: '14px 18px',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <div style={{
-          width: 24, height: 24, borderRadius: 7, flexShrink: 0,
-          background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.15)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <Brain size={12} style={{ color: 'rgba(167,139,250,0.7)' }} />
-        </div>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(167,139,250,0.6)' }}>Cecelia 想跟您说</span>
-        {desire.urgency >= 7 && (
-          <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', padding: '2px 8px', borderRadius: 10, marginLeft: 'auto' }}>
-            紧急
-          </span>
-        )}
-      </div>
-
-      <p style={{
-        margin: 0, fontSize: 13.5, color: 'rgba(255,255,255,0.65)', lineHeight: 1.7,
-        ...(!expanded && isLong ? { overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as const } : {}),
-      }}>
-        {expanded ? desire.content.replace(/\*\*/g, '').replace(/^#+\s*/gm, '') : summary}
+      <p style={{ margin: 0, fontSize: 13.5, color: 'rgba(255,255,255,0.7)', lineHeight: 1.65 }}>
+        {display}
       </p>
-
-      {isLong && (
-        <button
-          onClick={() => setExpanded(!expanded)}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0 0',
-            color: 'rgba(167,139,250,0.45)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4,
-          }}
-        >
-          {expanded ? <><ChevronUp size={12} />收起</> : <><ChevronDown size={12} />展开全文</>}
-        </button>
+      {desires.length > 1 && (
+        <span style={{ fontSize: 11, color: 'rgba(239,68,68,0.5)', marginTop: 6, display: 'inline-block' }}>
+          还有 {desires.length - 1} 条类似
+        </span>
       )}
-
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-        <button onClick={() => onAction('ack', desire)} style={btnStyle('rgba(255,255,255,0.06)', 'rgba(255,255,255,0.4)')}>
-          <CheckCircle size={12} />已了解
+        <button
+          onClick={() => onAsk(d)}
+          disabled={loading}
+          style={btnStyle('rgba(239,68,68,0.12)', '#f87171')}
+        >
+          <AlertTriangle size={12} />处理
         </button>
-        <button onClick={() => onAction('ask', desire)} style={btnStyle('rgba(124,58,237,0.12)', '#a78bfa')}>
-          <MessageSquare size={12} />详细说说
-        </button>
-        <button onClick={() => onAction('act', desire)} style={btnStyle('rgba(34,197,94,0.12)', '#4ade80')}>
-          <Zap size={12} />处理一下
+        <button
+          onClick={() => onAcknowledge(desires.map(x => x.id))}
+          disabled={loading}
+          style={btnStyle('rgba(255,255,255,0.06)', 'rgba(255,255,255,0.4)')}
+        >
+          {loading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle size={12} />}了解
         </button>
       </div>
     </div>
   );
 }
 
-// ── 任务卡片：需要您确认 ─────────────────────────────────
+// ── 黄区：任务确认卡片 ──────────────────────────────────
 
-function TaskCard({ task, onAction }: {
+function TaskConfirmCard({ task, onDispatch, onAsk, loading }: {
   task: Task;
-  onAction: (action: string, task: Task) => void;
+  onDispatch: (id: string) => void;
+  onAsk: (task: Task) => void;
+  loading: boolean;
 }) {
   return (
     <div style={{
       background: 'rgba(255,255,255,0.02)',
       border: '1px solid rgba(255,255,255,0.06)',
-      borderLeft: `3px solid ${PRIORITY_COLOR[task.priority] ?? '#6b7280'}55`,
-      borderRadius: 12, padding: '16px 20px',
+      borderRadius: 10, padding: '12px 16px',
+      display: 'flex', alignItems: 'center', gap: 12,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{
-          fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5,
-          background: `${PRIORITY_COLOR[task.priority] ?? '#6b7280'}18`,
-          color: PRIORITY_COLOR[task.priority] ?? '#6b7280',
-        }}>{task.priority}</span>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: 5 }}>
-          {task.task_type}
-        </span>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)', marginLeft: 'auto' }}>需要您确认</span>
-      </div>
-
-      <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#e2e8f0', lineHeight: 1.5 }}>
-        {task.title}
-      </h3>
-      {task.description && (
-        <p style={{ margin: '6px 0 0', fontSize: 12.5, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
-          {task.description.length > 100 ? task.description.slice(0, 100) + '...' : task.description}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+          <span style={{
+            fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
+            background: `${PRIORITY_COLOR[task.priority] ?? '#6b7280'}18`,
+            color: PRIORITY_COLOR[task.priority] ?? '#6b7280',
+          }}>{task.priority}</span>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.04)', padding: '1px 6px', borderRadius: 4 }}>
+            {task.task_type}
+          </span>
+        </div>
+        <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: '#e2e8f0', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {task.title}
         </p>
-      )}
-
-      <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-        <button onClick={() => onAction('dispatch', task)} style={btnStyle('rgba(34,197,94,0.12)', '#4ade80')}>
-          <CheckCircle size={12} />派发吧
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+        <button
+          onClick={() => onDispatch(task.id)}
+          disabled={loading}
+          style={btnStyle('rgba(34,197,94,0.12)', '#4ade80')}
+        >
+          {loading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Zap size={12} />}派发
         </button>
-        <button onClick={() => onAction('pause', task)} style={btnStyle('rgba(245,158,11,0.1)', '#fbbf24')}>
-          <AlertCircle size={12} />再等等
-        </button>
-        <button onClick={() => onAction('ask', task)} style={btnStyle('rgba(124,58,237,0.12)', '#a78bfa')}>
-          <MessageSquare size={12} />问一下
-        </button>
-        <button onClick={() => onAction('abandon', task)} style={btnStyle('rgba(239,68,68,0.06)', 'rgba(239,68,68,0.45)')}>
-          <XCircle size={12} />
+        <button
+          onClick={() => onAsk(task)}
+          disabled={loading}
+          style={btnStyle('rgba(255,255,255,0.04)', 'rgba(255,255,255,0.3)')}
+        >
+          <MessageSquare size={12} />?
         </button>
       </div>
     </div>
@@ -182,17 +220,17 @@ function TaskCard({ task, onAction }: {
 
 // ── 对话气泡 ─────────────────────────────────────────────
 
-function ChatBubble({ msg }: { msg: { id: string; role: string; content: string; toolCall?: any } }) {
+function ChatBubble({ msg }: { msg: { id: string; role: string; content: string; toolCall?: { name: string } } }) {
   const isUser = msg.role === 'user';
   return (
     <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: 8 }}>
       {!isUser && (
         <div style={{
-          width: 26, height: 26, borderRadius: 8, flexShrink: 0,
+          width: 24, height: 24, borderRadius: 7, flexShrink: 0,
           background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.12)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <Brain size={12} style={{ color: 'rgba(167,139,250,0.6)' }} />
+          <Brain size={11} style={{ color: 'rgba(167,139,250,0.6)' }} />
         </div>
       )}
       <div style={{
@@ -204,7 +242,7 @@ function ChatBubble({ msg }: { msg: { id: string; role: string; content: string;
           : { background: 'rgba(255,255,255,0.03)', color: '#c4ccdc', border: '1px solid rgba(255,255,255,0.06)' }
         ),
       }}>
-        {msg.toolCall && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 4 }}>→ {msg.toolCall.name}</div>}
+        {msg.toolCall && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 4 }}>{'\u2192'} {msg.toolCall.name}</div>}
         <span style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</span>
       </div>
     </div>
@@ -215,10 +253,38 @@ function ChatBubble({ msg }: { msg: { id: string; role: string; content: string;
 
 function btnStyle(bg: string, color: string): React.CSSProperties {
   return {
-    padding: '7px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+    padding: '6px 12px', borderRadius: 7, border: 'none', cursor: 'pointer',
     background: bg, color, fontSize: 12, fontWeight: 500,
-    display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.15s',
+    display: 'flex', alignItems: 'center', gap: 4, transition: 'all 0.15s',
   };
+}
+
+// ── 简报摘要生成（纯前端，不调 LLM）───────────────────
+
+function buildBriefing(desires: Desire[], tasks: Task[], status: StatusData, alertnessLevel: number): string {
+  const parts: string[] = [];
+  const aC = ALERTNESS_CONF[alertnessLevel as keyof typeof ALERTNESS_CONF] ?? ALERTNESS_CONF[1];
+
+  const urgentCount = desires.filter(d => d.urgency >= 7).length;
+  const warnCount = desires.filter(d => d.type === 'warn').length;
+
+  if (urgentCount > 0 || warnCount > 0) {
+    parts.push(`有 ${urgentCount + warnCount} 件事需要你关注。`);
+  }
+
+  if (status.tasksInProgress > 0) {
+    parts.push(`当前 ${status.tasksInProgress} 个任务正在执行中。`);
+  }
+
+  if (tasks.length > 0) {
+    parts.push(`${tasks.length} 个任务等待你确认派发。`);
+  }
+
+  if (parts.length === 0) {
+    parts.push(`一切运行正常，系统状态 ${aC.label}。今日已执行 ${status.tickActionsToday} 次操作。`);
+  }
+
+  return parts.join('');
 }
 
 // ── 主组件 ───────────────────────────────────────────────
@@ -229,8 +295,7 @@ export default function CeceliaPage() {
     currentRoute, frontendTools, executeFrontendTool, getPageContext,
   } = useCecelia();
 
-  const openingFiredRef = useRef(false);
-  const feedEndRef = useRef<HTMLDivElement>(null);
+  const feedRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [desires, setDesires] = useState<Desire[]>([]);
@@ -239,25 +304,42 @@ export default function CeceliaPage() {
   const [queuedTasks, setQueuedTasks] = useState<Task[]>([]);
   const [fullscreen, setFullscreen] = useState(false);
   const [status, setStatus] = useState<StatusData>({ tasksQueued: 0, tasksInProgress: 0, tickActionsToday: 0 });
+  const [showAllChat, setShowAllChat] = useState(false);
+  const [loadingActions, setLoadingActions] = useState<Set<string>>(new Set());
+  const [briefingShown, setBriefingShown] = useState(false);
 
+  // ── Escape 退出全屏 ────────────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && fullscreen) setFullscreen(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [fullscreen]);
 
+  // ── 思考动画 ────────────────────────────────────────────
   useEffect(() => {
     if (!sending) { setThinkingPhase(0); return; }
     const t = setInterval(() => setThinkingPhase(p => (p + 1) % 3), 1500);
     return () => clearInterval(t);
   }, [sending]);
 
-  // 只在用户主动发消息后才滚动到底部（跳过 opening message）
-  const userHasInteracted = useRef(false);
-  useEffect(() => {
-    if (messages.some(m => m.role === 'user')) userHasInteracted.current = true;
-    if (userHasInteracted.current) feedEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, sending]);
+  // ── 数据轮询 ────────────────────────────────────────────
+  const fetchDesires = useCallback(async () => {
+    try {
+      const r = await fetch('/api/brain/desires?status=pending&limit=20');
+      if (!r.ok) return;
+      const d = await r.json();
+      setDesires(Array.isArray(d) ? d : (d.desires || []));
+    } catch { /* */ }
+  }, []);
+
+  const fetchTasks = useCallback(async () => {
+    try {
+      const r = await fetch('/api/brain/tasks?status=queued&limit=8');
+      if (!r.ok) return;
+      const d = await r.json();
+      setQueuedTasks(Array.isArray(d) ? d : (d.tasks || []));
+    } catch { /* */ }
+  }, []);
 
   useEffect(() => {
     const load = async () => { try { const r = await fetch('/api/brain/alertness'); if (r.ok) { const d = await r.json(); setAlertnessLevel(d.level ?? 1); } } catch { /* */ } };
@@ -265,14 +347,12 @@ export default function CeceliaPage() {
   }, []);
 
   useEffect(() => {
-    const load = async () => { try { const r = await fetch('/api/brain/desires?status=pending&limit=10'); if (!r.ok) return; const d = await r.json(); setDesires(Array.isArray(d) ? d : (d.desires || [])); } catch { /* */ } };
-    load(); const t = setInterval(load, 30_000); return () => clearInterval(t);
-  }, []);
+    fetchDesires(); const t = setInterval(fetchDesires, 30_000); return () => clearInterval(t);
+  }, [fetchDesires]);
 
   useEffect(() => {
-    const load = async () => { try { const r = await fetch('/api/brain/tasks?status=queued&limit=8'); if (!r.ok) return; const d = await r.json(); setQueuedTasks(Array.isArray(d) ? d : (d.tasks || [])); } catch { /* */ } };
-    load(); const t = setInterval(load, 60_000); return () => clearInterval(t);
-  }, []);
+    fetchTasks(); const t = setInterval(fetchTasks, 60_000); return () => clearInterval(t);
+  }, [fetchTasks]);
 
   useEffect(() => {
     const load = async () => {
@@ -286,24 +366,25 @@ export default function CeceliaPage() {
     load(); const t = setInterval(load, 60_000); return () => clearInterval(t);
   }, []);
 
+  // ── Opening：纯前端简报（不调 LLM）─────────────────────
   useEffect(() => {
-    if (messages.length > 0 || openingFiredRef.current) return;
-    openingFiredRef.current = true;
-    const fire = async () => {
-      setSending(true);
-      try {
-        const r = await fetch('/api/orchestrator/chat', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: '你好', messages: [], context: { currentRoute, pageContext: getPageContext(), opening: true, availableTools: frontendTools.map(t => ({ name: t.name, description: t.description, parameters: t.parameters })) } }),
-        });
-        const data = await r.json();
-        if (data.reply) addMessage({ id: generateId(), role: 'assistant', content: data.reply });
-      } catch { /* */ } finally { setSending(false); }
-    };
-    setTimeout(fire, 700);
+    if (briefingShown || messages.length > 0) return;
+    const timer = setTimeout(() => {
+      const text = buildBriefing(desires, queuedTasks, status, alertnessLevel);
+      if (text) {
+        addMessage({ id: generateId(), role: 'assistant', content: text });
+        setBriefingShown(true);
+      }
+    }, 800);
+    return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [desires, queuedTasks, status, alertnessLevel, briefingShown, messages.length]);
 
+  // ── Desire 分组和分区 ────────────────────────────────────
+  const desireGroups = useMemo(() => groupDesires(desires), [desires]);
+  const { decisions, updates } = useMemo(() => partitionDesires(desireGroups), [desireGroups]);
+
+  // ── 聊天发送 ────────────────────────────────────────────
   const handleSend = useCallback(async (overrideText?: string) => {
     const text = overrideText ?? input.trim();
     if (!text || sending) return;
@@ -334,31 +415,66 @@ export default function CeceliaPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [input, sending, messages, currentRoute, frontendTools]);
 
-  const handleDesireAction = useCallback((action: string, desire: Desire) => {
-    const summary = extractSummary(desire.content, 80);
-    const msgs: Record<string, string> = {
-      ack: `好的，我知道了：「${summary}」`,
-      ask: `关于这件事能详细说说吗？「${summary}」`,
-      act: `这件事需要处理，请帮我分析一下下一步：「${summary}」`,
-    };
-    handleSend(msgs[action] ?? msgs.ask);
+  // ── Desire 操作：调真实 API ──────────────────────────────
+  const acknowledgeDesires = useCallback(async (ids: string[]) => {
+    const key = ids.join(',');
+    setLoadingActions(prev => new Set(prev).add(key));
+    try {
+      await Promise.all(ids.map(id =>
+        fetch(`/api/brain/desires/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'acknowledged' }),
+        })
+      ));
+      await fetchDesires();
+    } catch {
+      addMessage({ id: generateId(), role: 'assistant', content: '\u6807\u8bb0\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5' });
+    } finally {
+      setLoadingActions(prev => { const n = new Set(prev); n.delete(key); return n; });
+    }
+  }, [fetchDesires, addMessage, generateId]);
+
+  const askAboutDesire = useCallback((desire: Desire) => {
+    const summary = desire.content.replace(/^#+\s*/gm, '').replace(/\*\*/g, '').trim();
+    const first = summary.split('\n').find(l => l.trim().length > 10) || summary;
+    const short = first.length > 80 ? first.slice(0, 80) + '...' : first;
+    handleSend(`\u8fd9\u4ef6\u4e8b\u9700\u8981\u5904\u7406\uff0c\u8bf7\u5e2e\u6211\u5206\u6790\u4e0b\u4e00\u6b65\uff1a\u300c${short}\u300d`);
   }, [handleSend]);
 
-  const handleTaskAction = useCallback((action: string, task: Task) => {
-    const msgs: Record<string, string> = {
-      dispatch: `请派发任务「${task.title}」（${task.priority} / ${task.task_type}）`,
-      pause: `请暂缓任务「${task.title}」`,
-      abandon: `请放弃任务「${task.title}」`,
-      ask: `关于任务「${task.title}」（${task.priority} / ${task.task_type}），请解释一下背景和目的`,
-    };
-    handleSend(msgs[action] ?? msgs.ask);
+  // ── Task 操作：调真实 API ──────────────────────────────
+  const dispatchTask = useCallback(async (taskId: string) => {
+    setLoadingActions(prev => new Set(prev).add(taskId));
+    try {
+      const r = await fetch(`/api/brain/tasks/${taskId}/dispatch`, { method: 'POST' });
+      const data = await r.json();
+      if (data.success) {
+        addMessage({ id: generateId(), role: 'assistant', content: `\u5df2\u6d3e\u53d1\u4efb\u52a1\uff0crun_id: ${data.run_id}` });
+        await fetchTasks();
+      } else {
+        addMessage({ id: generateId(), role: 'assistant', content: `\u6d3e\u53d1\u5931\u8d25\uff1a${data.error}${data.detail ? ' \u2014 ' + data.detail : ''}` });
+      }
+    } catch {
+      addMessage({ id: generateId(), role: 'assistant', content: '\u6d3e\u53d1\u8bf7\u6c42\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5' });
+    } finally {
+      setLoadingActions(prev => { const n = new Set(prev); n.delete(taskId); return n; });
+    }
+  }, [fetchTasks, addMessage, generateId]);
+
+  const askAboutTask = useCallback((task: Task) => {
+    handleSend(`\u5173\u4e8e\u4efb\u52a1\u300c${task.title}\u300d\uff08${task.priority} / ${task.task_type}\uff09\uff0c\u8bf7\u89e3\u91ca\u80cc\u666f\u548c\u76ee\u7684`);
   }, [handleSend]);
 
+  // ── 语音 ────────────────────────────────────────────────
   const realtime = useRealtimeVoice({
     onUserSpeech: useCallback((text: string) => { if (text.trim()) handleSend(text.trim()); }, [handleSend]),
   });
 
+  // ── 渲染 ────────────────────────────────────────────────
   const aC = ALERTNESS_CONF[alertnessLevel as keyof typeof ALERTNESS_CONF] ?? ALERTNESS_CONF[1];
+
+  const visibleMessages = showAllChat ? messages : messages.slice(-CHAT_DEFAULT_VISIBLE);
+  const hasHiddenMessages = messages.length > CHAT_DEFAULT_VISIBLE && !showAllChat;
 
   const containerStyle: React.CSSProperties = fullscreen
     ? { position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', flexDirection: 'column', background: '#09090f' }
@@ -366,149 +482,225 @@ export default function CeceliaPage() {
 
   return (
     <div style={containerStyle}>
-      {/* Header */}
+      {/* ── Header ────────────────────────────────────────── */}
       <div style={{
-        flexShrink: 0, padding: '0 24px', height: 52,
-        display: 'flex', alignItems: 'center', gap: 16,
+        flexShrink: 0, padding: '0 24px', height: 48,
+        display: 'flex', alignItems: 'center', gap: 14,
         borderBottom: '1px solid rgba(255,255,255,0.06)',
         background: 'rgba(255,255,255,0.01)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{
-            width: 30, height: 30, borderRadius: 9,
+            width: 28, height: 28, borderRadius: 8,
             background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.15)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <Brain size={15} style={{ color: 'rgba(167,139,250,0.7)' }} />
+            <Brain size={14} style={{ color: 'rgba(167,139,250,0.7)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#e2e8f0' }}>Cecelia</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>Cecelia</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: aC.color }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: aC.color }}>{aC.label}</span>
-          </div>
-          <span style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.08)' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Clock size={11} style={{ color: 'rgba(255,255,255,0.25)' }} />
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Q{status.tasksQueued}</span>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: aC.color }} />
+            <span style={{ fontSize: 10, fontWeight: 600, color: aC.color }}>{aC.label}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Activity size={11} style={{ color: status.tasksInProgress > 0 ? '#3b82f6' : 'rgba(255,255,255,0.25)' }} />
-            <span style={{ fontSize: 11, color: status.tasksInProgress > 0 ? '#60a5fa' : 'rgba(255,255,255,0.4)' }}>{status.tasksInProgress}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Zap size={11} style={{ color: 'rgba(255,255,255,0.25)' }} />
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{status.tickActionsToday}</span>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.08)' }} />
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{status.tickActionsToday}{'\u26a1'}</span>
+          <span style={{ fontSize: 10, color: status.tasksInProgress > 0 ? '#60a5fa' : 'rgba(255,255,255,0.35)' }}>
+            {status.tasksInProgress}{'\u8fd0\u884c\u4e2d'}
+          </span>
           {realtime.isConnected && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginRight: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', animation: 'pulse 1s infinite' }} />
-              {realtime.isRecording && <Mic size={11} style={{ color: '#10b981' }} />}
-              {realtime.isPlaying && <Volume2 size={11} style={{ color: '#10b981' }} />}
+              {realtime.isRecording && <Mic size={10} style={{ color: '#10b981' }} />}
+              {realtime.isPlaying && <Volume2 size={10} style={{ color: '#10b981' }} />}
             </div>
           )}
           <button
             onClick={() => setFullscreen(!fullscreen)}
             style={{
-              padding: 6, borderRadius: 7, border: 'none', cursor: 'pointer',
+              padding: 5, borderRadius: 6, border: 'none', cursor: 'pointer',
               background: fullscreen ? 'rgba(167,139,250,0.15)' : 'rgba(255,255,255,0.04)',
-              color: fullscreen ? '#a78bfa' : 'rgba(255,255,255,0.35)',
+              color: fullscreen ? '#a78bfa' : 'rgba(255,255,255,0.3)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
-            title={fullscreen ? '退出全屏 (Esc)' : '全屏'}
+            title={fullscreen ? '\u9000\u51fa\u5168\u5c4f (Esc)' : '\u5168\u5c4f'}
           >
-            {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            {fullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
           </button>
         </div>
       </div>
 
-      {/* Briefing Feed */}
-      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', justifyContent: 'center' }}>
-        <div style={{ width: '100%', maxWidth: 680, padding: '24px 20px 100px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* ── Briefing Feed ─────────────────────────────────── */}
+      <div ref={feedRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 640, padding: '20px 20px 100px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-          {desires.length > 0 && (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.15)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Cecelia 想跟您说</span>
-                <span style={{ fontSize: 10, color: 'rgba(167,139,250,0.35)', background: 'rgba(167,139,250,0.08)', padding: '1px 7px', borderRadius: 10 }}>{desires.length}</span>
+          {/* ── 红区：需要你决策 ─────────────────────────── */}
+          {decisions.length > 0 && (
+            <section>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0 8px' }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(239,68,68,0.6)', letterSpacing: '0.1em' }}>
+                  {'\ud83d\udd34'} {'\u9700\u8981\u4f60\u51b3\u7b56'}
+                </span>
+                <span style={{ fontSize: 10, color: 'rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.08)', padding: '1px 7px', borderRadius: 10 }}>
+                  {decisions.length}
+                </span>
               </div>
-              {desires.slice(0, 5).map(d => <DesireCard key={d.id} desire={d} onAction={handleDesireAction} />)}
-            </>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {decisions.map(g => (
+                  <DecisionCard
+                    key={g.key}
+                    group={g}
+                    onAcknowledge={acknowledgeDesires}
+                    onAsk={askAboutDesire}
+                    loading={loadingActions.has(g.desires.map(x => x.id).join(','))}
+                  />
+                ))}
+              </div>
+            </section>
           )}
 
+          {/* ── 黄区：等你确认 ───────────────────────────── */}
           {queuedTasks.length > 0 && (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0 4px' }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.15)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>需要您确认的任务</span>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.04)', padding: '1px 7px', borderRadius: 10 }}>{status.tasksQueued}</span>
+            <section>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0 8px' }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(245,158,11,0.6)', letterSpacing: '0.1em' }}>
+                  {'\ud83d\udccb'} {'\u7b49\u4f60\u786e\u8ba4'}
+                </span>
+                <span style={{ fontSize: 10, color: 'rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.08)', padding: '1px 7px', borderRadius: 10 }}>
+                  {queuedTasks.length}
+                </span>
               </div>
-              {queuedTasks.map(t => <TaskCard key={t.id} task={t} onAction={handleTaskAction} />)}
-            </>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {queuedTasks.map(t => (
+                  <TaskConfirmCard
+                    key={t.id}
+                    task={t}
+                    onDispatch={dispatchTask}
+                    onAsk={askAboutTask}
+                    loading={loadingActions.has(t.id)}
+                  />
+                ))}
+              </div>
+            </section>
           )}
 
+          {/* ── 信息通知（非紧急 desires）─────────────────── */}
+          {updates.length > 0 && (
+            <section>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0 8px' }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.15)', letterSpacing: '0.1em' }}>
+                  {'\u901a\u77e5'}
+                </span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)', padding: '1px 7px', borderRadius: 10 }}>
+                  {updates.length}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {updates.map(g => {
+                  const d = g.representative;
+                  const line = d.content.replace(/^#+\s*/gm, '').replace(/\*\*/g, '').split('\n').find(l => l.trim().length > 10) || d.content;
+                  return (
+                    <div key={g.key} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                      background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 8,
+                    }}>
+                      <p style={{ margin: 0, flex: 1, fontSize: 12.5, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {line.length > 100 ? line.slice(0, 100) + '...' : line}
+                      </p>
+                      {g.desires.length > 1 && (
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)', flexShrink: 0 }}>+{g.desires.length - 1}</span>
+                      )}
+                      <button
+                        onClick={() => acknowledgeDesires(g.desires.map(x => x.id))}
+                        style={{ ...btnStyle('rgba(255,255,255,0.04)', 'rgba(255,255,255,0.25)'), padding: '4px 8px', fontSize: 11 }}
+                      >
+                        <CheckCircle size={10} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* ── 空状态 ────────────────────────────────────── */}
           {desires.length === 0 && queuedTasks.length === 0 && messages.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '60px 0', color: 'rgba(255,255,255,0.12)' }}>
-              <Brain size={40} style={{ opacity: 0.15, marginBottom: 12 }} />
-              <p style={{ fontSize: 13, margin: 0 }}>一切安好，暂无需要汇报的事项</p>
+            <div style={{ textAlign: 'center', padding: '48px 0', color: 'rgba(255,255,255,0.1)' }}>
+              <Brain size={36} style={{ opacity: 0.12, marginBottom: 10 }} />
+              <p style={{ fontSize: 13, margin: 0 }}>{'\u4e00\u5207\u5b89\u597d\uff0c\u6682\u65e0\u9700\u8981\u6c47\u62a5\u7684\u4e8b\u9879'}</p>
             </div>
           )}
 
+          {/* ── 对话区 ────────────────────────────────────── */}
           {messages.length > 0 && (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0 4px' }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.15)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>对话</span>
+            <section>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0 8px' }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.15)', letterSpacing: '0.1em' }}>
+                  {'\u5bf9\u8bdd'}
+                </span>
               </div>
-              {messages.map(msg => <ChatBubble key={msg.id} msg={msg} />)}
-            </>
+
+              {hasHiddenMessages && (
+                <button
+                  onClick={() => setShowAllChat(true)}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0 8px',
+                    color: 'rgba(167,139,250,0.4)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4,
+                  }}
+                >
+                  <ChevronUp size={12} />{'\u663e\u793a\u66f4\u591a\u5386\u53f2'}{'\uff08'}{messages.length - CHAT_DEFAULT_VISIBLE} {'\u6761\uff09'}
+                </button>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {visibleMessages.map(msg => <ChatBubble key={msg.id} msg={msg} />)}
+              </div>
+            </section>
           )}
 
+          {/* ── 思考中动画 ────────────────────────────────── */}
           {sending && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Brain size={12} style={{ color: 'rgba(167,139,250,0.5)' }} />
+              <div style={{ width: 24, height: 24, borderRadius: 7, flexShrink: 0, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Brain size={11} style={{ color: 'rgba(167,139,250,0.5)' }} />
               </div>
-              <div style={{ padding: '8px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '14px 14px 14px 4px', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {[0, 1, 2].map(i => <div key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: i === thinkingPhase ? '#a78bfa' : 'rgba(167,139,250,0.15)', transition: 'background 0.4s' }} />)}
+              <div style={{ padding: '7px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px 12px 12px 4px', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 3 }}>
+                  {[0, 1, 2].map(i => <div key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: i === thinkingPhase ? '#a78bfa' : 'rgba(167,139,250,0.15)', transition: 'background 0.4s' }} />)}
                 </div>
-                <span style={{ fontSize: 11, color: 'rgba(167,139,250,0.45)' }}>{['感知中', '思考中', '深思中'][thinkingPhase]}</span>
+                <span style={{ fontSize: 10, color: 'rgba(167,139,250,0.4)' }}>{['\u611f\u77e5\u4e2d', '\u601d\u8003\u4e2d', '\u6df1\u601d\u4e2d'][thinkingPhase]}</span>
               </div>
             </div>
           )}
-
-          <div ref={feedEndRef} />
         </div>
       </div>
 
-      {/* Bottom Chat Input */}
+      {/* ── Bottom Input ──────────────────────────────────── */}
       <div style={{ flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.01)', display: 'flex', justifyContent: 'center' }}>
-        <div style={{ width: '100%', maxWidth: 680, padding: '12px 20px', display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 640, padding: '10px 20px', display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
             onClick={realtime.isConnected ? realtime.disconnect : realtime.connect}
-            style={{ padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer', flexShrink: 0, background: realtime.isConnected ? 'rgba(239,68,68,0.55)' : 'rgba(255,255,255,0.04)', color: realtime.isConnected ? '#fff' : 'rgba(255,255,255,0.3)' }}
+            style={{ padding: 7, borderRadius: 7, border: 'none', cursor: 'pointer', flexShrink: 0, background: realtime.isConnected ? 'rgba(239,68,68,0.55)' : 'rgba(255,255,255,0.04)', color: realtime.isConnected ? '#fff' : 'rgba(255,255,255,0.3)' }}
           >
-            {realtime.isConnected ? <PhoneOff size={14} /> : <Phone size={14} />}
+            {realtime.isConnected ? <PhoneOff size={13} /> : <Phone size={13} />}
           </button>
           <input
             ref={inputRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-            placeholder="跟 Cecelia 说点什么..."
+            placeholder={'\u8ddf Cecelia \u8bf4...'}
             disabled={realtime.isConnected || sending}
-            style={{ flex: 1, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: '#e2e8f0', fontSize: 13.5, outline: 'none', opacity: (realtime.isConnected || sending) ? 0.4 : 1 }}
+            style={{ flex: 1, padding: '9px 14px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: '#e2e8f0', fontSize: 13, outline: 'none', opacity: (realtime.isConnected || sending) ? 0.4 : 1 }}
           />
           <button
             onClick={() => handleSend()}
             disabled={!input.trim() || sending || realtime.isConnected}
-            style={{ padding: 8, borderRadius: 8, border: 'none', cursor: 'pointer', flexShrink: 0, background: input.trim() && !sending && !realtime.isConnected ? 'rgba(110,40,220,0.8)' : 'rgba(255,255,255,0.04)', color: input.trim() && !sending && !realtime.isConnected ? '#fff' : 'rgba(255,255,255,0.2)' }}
+            style={{ padding: 7, borderRadius: 7, border: 'none', cursor: 'pointer', flexShrink: 0, background: input.trim() && !sending && !realtime.isConnected ? 'rgba(110,40,220,0.8)' : 'rgba(255,255,255,0.04)', color: input.trim() && !sending && !realtime.isConnected ? '#fff' : 'rgba(255,255,255,0.2)' }}
           >
-            <Send size={14} />
+            <Send size={13} />
           </button>
         </div>
         {realtime.error && <p style={{ fontSize: 10, color: '#f87171', textAlign: 'center', margin: '0 0 8px' }}>{realtime.error}</p>}
