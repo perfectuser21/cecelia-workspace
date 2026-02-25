@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { ColumnDef } from './types';
-import { Check, Link, Mail, Phone } from 'lucide-react';
+import { Check, Link, Mail, Phone, ExternalLink } from 'lucide-react';
 
 // ── 颜色映射 ──────────────────────────────────────────
 
@@ -60,9 +60,11 @@ interface InlineEditProps {
   value: unknown;
   col: ColumnDef;
   onSave?: (value: unknown) => void;
+  rowId?: string;
+  onNavigate?: (href: string) => void;
 }
 
-export function InlineEdit({ value, col, onSave }: InlineEditProps) {
+export function InlineEdit({ value, col, onSave, rowId, onNavigate }: InlineEditProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(null);
@@ -91,6 +93,25 @@ export function InlineEdit({ value, col, onSave }: InlineEditProps) {
   }
 
   function cancel() { setEditing(false); }
+
+  // ── relation (双链跳转) ────────────────────────────────
+  if (col.type === 'relation') {
+    const str = String(value ?? '');
+    const href = rowId ? (col.navigateTo?.(rowId) ?? null) : null;
+    if (!str) return <span className="text-slate-600 text-sm">—</span>;
+    if (href && onNavigate) {
+      return (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNavigate(href); }}
+          className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 hover:underline transition-colors"
+        >
+          {str}
+          <ExternalLink className="w-3 h-3 opacity-60 shrink-0" />
+        </button>
+      );
+    }
+    return <span className="text-sm text-gray-300">{str}</span>;
+  }
 
   // ── checkbox ────────────────────────────────────────
   if (col.type === 'checkbox') {

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowUp, ArrowDown, ArrowUpDown, Plus, ChevronLeft, ChevronRight, Maximize2, Trash2, GripHorizontal, ChevronDown, ChevronRight as ChevronR } from 'lucide-react';
 import type { ColumnDef } from './types';
 import { InlineEdit, BadgeDisplay } from './InlineEdit';
@@ -43,6 +44,7 @@ export function TableView<T extends { id: string }>({
   onUpdate, onCreate, onRowClick, onDelete, onReorderCols, selectedRowId,
   groupByField,
 }: TableViewProps<T>) {
+  const navigate = useNavigate();
   const [page, setPage] = useState(0);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const [dragColId, setDragColId] = useState<string | null>(null);
@@ -98,7 +100,7 @@ export function TableView<T extends { id: string }>({
         </td>
         {visibleCols.map((col) => (
           <td key={col.id} className="py-1.5 px-3 align-middle text-gray-100">
-            <InlineEdit value={(row as Record<string, unknown>)[col.id]} col={col} onSave={(v) => onUpdate?.(row.id, col.id, v)} />
+            <InlineEdit value={(row as Record<string, unknown>)[col.id]} col={col} onSave={(v) => onUpdate?.(row.id, col.id, v)} rowId={row.id} onNavigate={navigate} />
           </td>
         ))}
       </tr>

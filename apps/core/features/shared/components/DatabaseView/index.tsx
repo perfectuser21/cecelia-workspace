@@ -180,7 +180,9 @@ export function DatabaseView<T extends { id: string }>({
   const effectiveBoardGroupField = activeBoardGroupField || boardGroupField || allColumns.find((c) => c.type === 'select' || c.type === 'badge')?.id || '';
 
   const boardGroupOptions = useMemo(
-    () => allColumns.filter((c) => c.type === 'select' || c.type === 'badge').map((c) => ({ id: c.id, label: c.label })),
+    () => allColumns
+      .filter((c) => c.type !== 'progress' && c.type !== 'relation' && c.type !== 'url' && c.type !== 'email' && c.type !== 'phone')
+      .map((c) => ({ id: c.id, label: c.label })),
     [allColumns]
   );
 
