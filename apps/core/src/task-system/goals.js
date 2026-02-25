@@ -145,7 +145,8 @@ router.patch('/:id', async (req, res) => {
     const {
       title, description, status, priority, target_date, progress, metadata, weight,
       scope, cycle, business_id, department_id, area_id,
-      expected_start_date, expected_end_date, actual_start_date, actual_end_date
+      expected_start_date, expected_end_date, actual_start_date, actual_end_date,
+      custom_props
     } = req.body;
 
     const updates = [];
