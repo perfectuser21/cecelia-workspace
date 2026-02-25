@@ -4,20 +4,17 @@ import {
   fetchStaff,
   fetchSkillsRegistry,
   fetchModels,
+  fetchCredentials,
   updateWorker,
   type Team,
   type AreaConfig,
   type SkillItem,
   type Worker,
   type ModelEntry,
+  type CredentialEntry,
 } from '../api/staffApi';
 
-const PROVIDERS = ['anthropic', 'minimax', 'openai'] as const;
-const PROVIDER_ACCOUNTS: Record<string, string[]> = {
-  anthropic: ['anthropic', 'anthropic2'],
-  minimax: ['minimax', 'minimax2'],
-  openai: ['openai', 'openai2'],
-};
+
 
 // ── Model badge ───────────────────────────────────────────────
 
@@ -81,21 +78,29 @@ function WorkerPanel({ worker, skills, models, onClose, onSaved }: WorkerPanelPr
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [skill, setSkill] = useState(worker.skill || '');
-  const [provider, setProvider] = useState(worker.model.provider || 'anthropic');
   const [modelName, setModelName] = useState(worker.model.name || '');
-  const defaultCredentials = worker.model.credentials_file || worker.model.provider || 'anthropic';
-  const [credentialsFile, setCredentialsFile] = useState(defaultCredentials);
+  const defaultCred = worker.model.credentials_file || worker.model.provider || 'anthropic';
+  const [credAccount, setCredAccount] = useState(defaultCred);
+  const [credentials, setCredentials] = useState<CredentialEntry[]>([]);
 
-  const modelsForProvider = models.filter(m => m.provider === provider);
+  // 初始化时拉取 credentials 列表
+  useEffect(() => {
+    fetchCredentials().then(setCredentials);
+  }, []);
+
+  // 由选中账户推断 provider
+  const providerFromAccount = credentials.find(c => c.name === credAccount)?.provider || 'anthropic';
+  const modelsForProvider = models.filter(m => m.provider === providerFromAccount);
 
   const save = async () => {
     setSaving(true);
     setError(null);
     try {
+      const provider = providerFromAccount;
       await updateWorker(worker.id, {
         skill: skill || null,
         model: modelName ? { provider, name: modelName } : null,
-        credentials_file: credentialsFile || null,
+        credentials_file: credAccount || null,
       });
       onSaved();
     } catch (e: any) {
@@ -133,6 +138,47 @@ function WorkerPanel({ worker, skills, models, onClose, onSaved }: WorkerPanelPr
             <p className="text-sm text-gray-700 dark:text-gray-300">{worker.description}</p>
           </div>
 
+          {/* 账户选择 */}
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5 block">账户</label>
+            <select
+              value={credAccount}
+              onChange={e => { setCredAccount(e.target.value); setModelName(''); }}
+              className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {credentials.length === 0 && (
+                <option value={credAccount}>{credAccount}</option>
+              )}
+              {credentials.map(cred => (
+                <option key={cred.name} value={cred.name}>
+                  {cred.name}  ({cred.path})
+                </option>
+              ))}
+            </select>
+            {credentials.length > 0 && (
+              <div className="mt-1 text-xs text-gray-400">
+                Provider: <span className="font-mono">{providerFromAccount}</span>
+              </div>
+            )}
+          </div>
+
+          {/* 模型选择 */}
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5 block">模型</label>
+            <select
+              value={modelName}
+              onChange={e => setModelName(e.target.value)}
+              className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">— 不绑定模型 —</option>
+              {modelsForProvider.map(m => (
+                <option key={m.id} value={m.id}>
+                  {m.name ? `${m.name}  (${m.id})` : m.id}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Skill */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5 block">Skill</label>
@@ -144,46 +190,6 @@ function WorkerPanel({ worker, skills, models, onClose, onSaved }: WorkerPanelPr
               <option value="">— 不绑定 —</option>
               {skills.map(s => (
                 <option key={s.id} value={`/${s.id}`}>/{s.id}{s.name ? `  (${s.name})` : ''}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Model */}
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">模型</div>
-            <div className="space-y-2">
-              <select
-                value={provider}
-                onChange={e => { setProvider(e.target.value); setCredentialsFile(e.target.value); setModelName(''); }}
-                className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {PROVIDERS.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-              <select
-                value={modelName}
-                onChange={e => setModelName(e.target.value)}
-                className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">— 不绑定模型 —</option>
-                {modelsForProvider.map(m => (
-                  <option key={m.id} value={m.id}>
-                    {m.name ? `${m.name}  (${m.id})` : m.id}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* 账户选择（所有 provider 适用） */}
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5 block">账户</label>
-            <select
-              value={credentialsFile}
-              onChange={e => setCredentialsFile(e.target.value)}
-              className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {(PROVIDER_ACCOUNTS[provider] || [provider]).map(a => (
-                <option key={a} value={a}>{a}</option>
               ))}
             </select>
           </div>
